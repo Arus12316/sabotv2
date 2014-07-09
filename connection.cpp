@@ -1,5 +1,7 @@
 #include "connection.h"
 
+#define MAX_UNAME_PASS 20
+
 
 const quint16 Connection::PORT = 1138;
 
@@ -30,6 +32,14 @@ const char Connection::finishLogin[] = {
     0x30, 0x33, 0x5f, 0x00
 };
 
+const char Connection::charset1[] =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890.";
+
+const char Connection::charset2[] =
+        "abcdefghijklmnopqrstuvwxyz1234567890";
+
+
+
 const char *Connection::saServers[][2] = {
     {"2D Central", S_2D_CENTRAL},
     {"Paper Thin City", S_PAPER_THIN},
@@ -53,12 +63,32 @@ Connection::Connection(const char *host, QObject *parent) :
 
 void Connection::randName(char *buf, unsigned short len)
 {
-    static const char charset[] =
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890.";
-
     for(char *max = buf+len; buf < max; buf++)
-        *buf = charset[rand() % (sizeof charset - 1)];
+        *buf = charset1[rand() % (sizeof charset1 - 1)];
     *buf = '\0';
+}
+
+void Connection::randEmail(char *buf, unsigned short len)
+{
+    char *max;
+    unsigned short partition;
+    const char *suffix;
+    static const char *suffixList[] = {"net", "com", "gov", "edu", "org"};
+
+    suffix = suffixList[rand() % (sizeof suffixList / sizeof *suffixList)];
+
+    len -= 5;
+
+    partition = 1 + (rand() % (len -1));
+
+    for(max = buf + partition; buf < max; buf++)
+        *buf = charset1[rand() % (sizeof charset1 - 2)];
+    *buf++ = '@';
+
+    for(max = buf + (len - partition); buf < max; buf++)
+        *buf = charset1[rand() % (sizeof charset1 - 2)];
+    *buf++ = '.';
+    strcpy(buf, suffix);
 }
 
 void Connection::connect()
@@ -67,5 +97,27 @@ void Connection::connect()
     if(sock.waitForConnected()) {
 
     }
+}
+
+void Connection::createAccount(char *name, char *pass, char *email, int color)
+{
+
+}
+
+void Connection::createAccount(char *name, char *pass, char *email)
+{
+    createAccount(name, pass, email, rand());
+}
+
+void Connection::createAccount(char *name, char *pass)
+{
+    char email[MAX_UNAME_PASS + 1];
+
+
+}
+
+void Connection::createAccount(char *pass)
+{
+
 }
 

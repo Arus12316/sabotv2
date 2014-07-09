@@ -24,16 +24,24 @@ class Connection : public QObject
 public:
     explicit Connection(const char *host, QObject *parent = 0);
 
-    void randName(char *buf, unsigned short len);
+    static void randName(char *buf, unsigned short len);
+
+    static void randEmail(char *buf, unsigned short len);
 
     void connect();
+
+    void login(char *name, char *pass);
+
+    static void createAccount(char *name, char *pass, char *email, int color);
+    static void createAccount(char *name, char *pass, char *email);
+    static void createAccount(char *name, char *pass);
+    static void createAccount(char *pass);
 
 signals:
 
 public slots:
 
 private:
-
 
 
     QTcpSocket sock;
@@ -58,6 +66,9 @@ private:
 
     /* Server List (maps server names to their IP) */
     static const char *saServers[][2];
+
+    static const char charset1[];
+    static const char charset2[];
 };
 
 #endif // CONNECTION_H
