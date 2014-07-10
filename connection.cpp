@@ -1,4 +1,10 @@
+#include "parse.h"
 #include "connection.h"
+#include <QUrl>
+#include <QUrlQuery>
+#include <QNetworkRequest>
+#include <QByteArray>
+#include <QNetworkAccessManager>
 
 #define MAX_UNAME_PASS 20
 
@@ -58,37 +64,37 @@ Connection::Connection(const char *host, QObject *parent) :
 {
     this->host = host;
 
-    srand(time(NULL));
 }
 
-void Connection::randName(char *buf, unsigned short len)
+void Connection::randName(char *buf, ushort len)
 {
     for(char *max = buf+len; buf < max; buf++)
-        *buf = charset1[rand() % (sizeof charset1 - 1)];
+        *buf = charset1[qrand() % (sizeof charset1 - 1)];
     *buf = '\0';
 }
 
-void Connection::randEmail(char *buf, unsigned short len)
+void Connection::randEmail(char *buf, ushort len)
 {
     char *max;
-    unsigned short partition;
+    ushort partition;
     const char *suffix;
     static const char *suffixList[] = {"net", "com", "gov", "edu", "org"};
 
-    suffix = suffixList[rand() % (sizeof suffixList / sizeof *suffixList)];
+    suffix = suffixList[qrand() % (sizeof suffixList / sizeof *suffixList)];
 
     len -= 5;
 
-    partition = 1 + (rand() % (len -1));
+    partition = 1 + (qrand() % (len - 1));
 
     for(max = buf + partition; buf < max; buf++)
-        *buf = charset1[rand() % (sizeof charset1 - 2)];
+        *buf = charset1[qrand() % (sizeof charset1 - 2)];
     *buf++ = '@';
 
     for(max = buf + (len - partition); buf < max; buf++)
-        *buf = charset1[rand() % (sizeof charset1 - 2)];
-    *buf++ = '.';
-    strcpy(buf, suffix);
+        *buf = charset1[qrand() % (sizeof charset1 - 2)];
+
+    *buf = '.';
+    strcpy(buf+1, suffix);
 }
 
 void Connection::connect()
@@ -99,24 +105,40 @@ void Connection::connect()
     }
 }
 
-void Connection::createAccount(char *name, char *pass, char *email, int color)
+void Connection::createAccount(const char name[], const char pass[], const char email[], int color)
 {
+    static QByteArray incl = "_.", excl = "=&?";
+    static QUrl url("http://www.xgenstudios.com/stickarena/stick_arena.php");
+    static QNetworkRequest request;
+    static QNetworkAccessManager netAccess;
+    static QUrlQuery query;
 
+    query.clear();
+    query.addQueryItem("email_address", email);
+    query.addQueryItem("usercol", QString::number(color));
+    query.addQueryItem("userpass", pass);
+    query.addQueryItem("username", name);
+    query.addQueryItem("action", "create");
+
+    request.setUrl(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+    request.setHeader(QNetworkRequest::UserAgentHeader, "All Your Base are Belong To Us. I am Kim Jong Un.");
+    netAccess.post(request, url.toPercentEncoding(query.toString(),  excl, incl));
 }
 
-void Connection::createAccount(char *name, char *pass, char *email)
+void Connection::createAccount(const char name[], const char pass[], const char email[])
 {
-    createAccount(name, pass, email, rand());
+    createAccount(name, pass, email, qrand());
 }
 
-void Connection::createAccount(char *name, char *pass)
+void Connection::createAccount(const char name[], const char pass[])
 {
     char email[MAX_UNAME_PASS + 1];
 
 
 }
 
-void Connection::createAccount(char *pass)
+void Connection::createAccount(const char pass[])
 {
 
 }

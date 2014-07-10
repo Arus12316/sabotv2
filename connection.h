@@ -24,18 +24,20 @@ class Connection : public QObject
 public:
     explicit Connection(const char *host, QObject *parent = 0);
 
-    static void randName(char *buf, unsigned short len);
-
-    static void randEmail(char *buf, unsigned short len);
+    /*
+     * These pseudorandom generators need to be seeded.
+     */
+    static void randName(char *buf, ushort len);
+    static void randEmail(char *buf, ushort len);
 
     void connect();
 
     void login(char *name, char *pass);
 
-    static void createAccount(char *name, char *pass, char *email, int color);
-    static void createAccount(char *name, char *pass, char *email);
-    static void createAccount(char *name, char *pass);
-    static void createAccount(char *pass);
+    static void createAccount(const char name[], const char pass[], const char email[], int color);
+    static void createAccount(const char name[], const char pass[], const char email[]);
+    static void createAccount(const char name[], const char pass[]);
+    static void createAccount(const char pass[]);
 
 signals:
 
