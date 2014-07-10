@@ -44,8 +44,6 @@ const char Connection::charset1[] =
 const char Connection::charset2[] =
         "abcdefghijklmnopqrstuvwxyz1234567890";
 
-
-
 const char *Connection::saServers[][2] = {
     {"2D Central", S_2D_CENTRAL},
     {"Paper Thin City", S_PAPER_THIN},
@@ -135,11 +133,15 @@ void Connection::createAccount(const char name[], const char pass[])
 {
     char email[MAX_UNAME_PASS + 1];
 
-
+    randEmail(email, MAX_UNAME_PASS);
+    createAccount(name, pass, email);
 }
 
 void Connection::createAccount(const char pass[])
 {
+    char name[MAX_UNAME_PASS + 1];
 
+    randName(name, MAX_UNAME_PASS);
+    createAccount(name, pass);
 }
 

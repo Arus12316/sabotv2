@@ -34,6 +34,10 @@ public:
 
     void login(char *name, char *pass);
 
+    /*
+     * Account Creating methods. Methods with less parameters generate the values randomly. Use
+     * only in 1 thread. These are not reentrant.
+     */
     static void createAccount(const char name[], const char pass[], const char email[], int color);
     static void createAccount(const char name[], const char pass[], const char email[]);
     static void createAccount(const char name[], const char pass[]);
@@ -69,6 +73,7 @@ private:
     /* Server List (maps server names to their IP) */
     static const char *saServers[][2];
 
+    /* Char maps for generating random strings */
     static const char charset1[];
     static const char charset2[];
 };
