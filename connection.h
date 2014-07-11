@@ -56,8 +56,6 @@ class Connection : public QObject
     Q_OBJECT
 
 public:
-    QTcpSocket *sock;
-
     /* General ACK 0 */
     static const char ackX0[];
 
@@ -81,6 +79,7 @@ public:
     void connect_();
 
     void atomicWrite(const char *data, qint64 n);
+    void atomicFlush();
 
     void login(const char name[], const char pass[]);
 
@@ -106,6 +105,7 @@ public slots:
 
 
 private:
+    QTcpSocket *sock;
     QMutex mutex;
     KeepAlive *keepAlive;
     QString host;

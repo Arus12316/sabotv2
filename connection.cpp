@@ -126,6 +126,14 @@ void Connection::atomicWrite(const char *data, qint64 n)
     mutex.unlock();
 }
 
+void Connection::atomicFlush()
+{
+    mutex.lock();
+    sock->flush();
+    mutex.unlock();
+}
+
+
 void Connection::login(const char name[], const char pass[])
 {
     this->username = qstrdup(name);
@@ -250,6 +258,8 @@ Connection::~Connection()
     delete[] username;
     delete[] password;
     delete keepAlive;
+    thread.deleteLater();
+    sock->close();
     delete sock;
 }
 
@@ -268,7 +278,7 @@ void KeepAlive::keepAlive()
     while(true) {
         conn->atomicWrite(Connection::ackX0, sizeof Connection::ackX0);
         conn->atomicWrite(Connection::ackX2, sizeof Connection::ackX2);
-        conn->sock->flush();
+        conn->atomicFlush();
         QThread::msleep(5000);
     }
 }
