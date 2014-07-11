@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
     MainWindow w;
     w.show();
 
-    Connection c(TEST_FLI, &w);
+    Connection c(TEST_COMP, &w);
 
     c.login("bot.of.doom", "bot");
     printf("%lu\n", sizeof c);

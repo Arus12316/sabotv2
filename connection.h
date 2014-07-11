@@ -5,6 +5,8 @@
 
 #include <QObject>
 #include <QThread>
+#include <QTimer>
+#include <QMutex>
 #include <QTcpSocket>
 
 #define N_GAMESERVERS 11
@@ -34,11 +36,38 @@
 #define TEST_COMP "Compatibility"
 #define TEST_SS "SS Lineage"
 
+class KeepAlive : public QObject
+{
+    Q_OBJECT
+
+public:
+    KeepAlive(class Connection *conn);
+
+public slots:
+    void keepAlive();
+
+private:
+    Connection *conn;
+    QThread thread;
+};
+
 class Connection : public QObject
 {
     Q_OBJECT
 
 public:
+    QTcpSocket *sock;
+
+    /* General ACK 0 */
+    static const char ackX0[];
+
+    /* General ACK 1 */
+    static const char ackX1[];
+
+    /* General ACK 2 */
+    static const char ackX2[];
+
+
     explicit Connection(const char *host, MainWindow *win, QObject *parent = 0);
 
     ~Connection();
@@ -50,6 +79,8 @@ public:
     static void randEmail(char *buf, ushort len);
 
     void connect_();
+
+    void atomicWrite(const char *data, qint64 n);
 
     void login(const char name[], const char pass[]);
 
@@ -75,8 +106,8 @@ public slots:
 
 
 private:
-
-    QTcpSocket *sock;
+    QMutex mutex;
+    KeepAlive *keepAlive;
     QString host;
     char uid[3];
     QThread thread;
@@ -87,15 +118,6 @@ private:
 
     /* Initial Packet Sent when logging in */
     static const char initSend[];
-
-    /* General ACK 0 */
-    static const char ackX0[];
-
-    /* General ACK 1 */
-    static const char ackX1[];
-
-    /* General ACK 2 */
-    static const char ackX2[];
 
     /* This is sent to complete a login */
     static const char finishLogin[];

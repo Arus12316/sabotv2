@@ -119,6 +119,13 @@ void Connection::connect_()
     }
 }
 
+void Connection::atomicWrite(const char *data, qint64 n)
+{
+    mutex.lock();
+    sock->write(data, n);
+    mutex.unlock();
+}
+
 void Connection::login(const char name[], const char pass[])
 {
     this->username = qstrdup(name);
@@ -174,10 +181,12 @@ void Connection::createAccount(const char pass[])
 
 void Connection::userSession()
 {
+    bool notExpire;
     qint64 n;
     char buf[SOCK_BUFSIZE];
 
     sock = new QTcpSocket;
+
 
     connect(sock, SIGNAL(connected()), this, SLOT(userConnected()));
     connect(sock, SIGNAL(disconnected()), this, SLOT(userDisconnected()));
@@ -204,7 +213,19 @@ void Connection::userSession()
 
         sock->write(finishLogin, sizeof finishLogin);
 
+        keepAlive = new KeepAlive(this);
+
+        while(true) {
+            notExpire = sock->waitForReadyRead();
+            n = sock->read(buf, sizeof buf);
+            for(int i = 0; i < n; i++) {
+                putchar(buf[i]);
+            }
+            fflush(stdout);
+        }
     }
+
+
 }
 
 void Connection::userConnected()
@@ -228,5 +249,26 @@ Connection::~Connection()
 {
     delete[] username;
     delete[] password;
+    delete keepAlive;
     delete sock;
+}
+
+KeepAlive::KeepAlive(Connection *conn)
+{
+    this->conn = conn;
+
+    this->moveToThread(&thread);
+
+    connect(&thread, SIGNAL(started()), this, SLOT(keepAlive()));
+    thread.start();
+}
+
+void KeepAlive::keepAlive()
+{
+    while(true) {
+        conn->atomicWrite(Connection::ackX0, sizeof Connection::ackX0);
+        conn->atomicWrite(Connection::ackX2, sizeof Connection::ackX2);
+        conn->sock->flush();
+        QThread::msleep(5000);
+    }
 }
