@@ -36,17 +36,21 @@
 #define TEST_COMP "Compatibility"
 #define TEST_SS "SS Lineage"
 
+class Connection;
+
 class KeepAlive : public QObject
 {
     Q_OBJECT
 
 public:
-    KeepAlive(class Connection *conn);
+    KeepAlive(Connection *conn);
+    ~KeepAlive();
 
 public slots:
     void keepAlive();
 
 private:
+    bool active;
     Connection *conn;
     QThread thread;
 };
@@ -64,7 +68,6 @@ public:
 
     /* General ACK 2 */
     static const char ackX2[];
-
 
     explicit Connection(const char *host, MainWindow *win, QObject *parent = 0);
 
@@ -113,6 +116,7 @@ private:
     QThread thread;
     char *username;
     char *password;
+    bool active;
 
     static const quint16 PORT;
 

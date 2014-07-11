@@ -68,7 +68,7 @@ Connection::Connection(const char *host, MainWindow *win, QObject *parent) :
         }
     }
 
-
+    this->active = false;
     this->host = host;
     this->moveToThread(&thread);
 
@@ -141,7 +141,6 @@ void Connection::login(const char name[], const char pass[])
     thread.start();
 }
 
-
 void Connection::createAccount(const char name[], const char pass[], const char email[], int color)
 {
     static QByteArray incl = "_.", excl = "=&?";
@@ -182,6 +181,8 @@ void Connection::createAccount(const char pass[])
 
     randName(name, MAX_UNAME_PASS);
     createAccount(name, pass);
+
+    qDebug() << "Created: " << name << endl;
 }
 
 
@@ -191,7 +192,7 @@ void Connection::userSession()
 {
     bool notExpire;
     qint64 n;
-    char buf[SOCK_BUFSIZE];
+    char buf[SOCK_BUFSIZE], *bptr;
 
     sock = new QTcpSocket;
 
@@ -223,17 +224,29 @@ void Connection::userSession()
 
         keepAlive = new KeepAlive(this);
 
-        while(true) {
-            notExpire = sock->waitForReadyRead();
-            n = sock->read(buf, sizeof buf);
-            for(int i = 0; i < n; i++) {
-                putchar(buf[i]);
+        active = true;
+
+        while(active) {
+
+            for(bptr = buf; bptr < buf + SOCK_BUFSIZE; bptr++) {
+                while(!sock->getChar(bptr)) {
+                    sock->waitForReadyRead();
+                }
+                if(!*bptr)
+                    break;
             }
+
+            n = bptr - buf + 1;
+            for(int i = 0; i < n; i++) {
+                if(buf[i])
+                    putchar(buf[i]);
+               else
+                    putchar('%');
+            }
+            puts("\n\n");
             fflush(stdout);
         }
     }
-
-
 }
 
 void Connection::userConnected()
@@ -255,10 +268,10 @@ void Connection::errorConnection(QAbstractSocket::SocketError error)
 
 Connection::~Connection()
 {
+    active = false;
     delete[] username;
     delete[] password;
     delete keepAlive;
-    thread.deleteLater();
     sock->close();
     delete sock;
 }
@@ -266,7 +279,7 @@ Connection::~Connection()
 KeepAlive::KeepAlive(Connection *conn)
 {
     this->conn = conn;
-
+    this->active = true;
     this->moveToThread(&thread);
 
     connect(&thread, SIGNAL(started()), this, SLOT(keepAlive()));
@@ -275,10 +288,16 @@ KeepAlive::KeepAlive(Connection *conn)
 
 void KeepAlive::keepAlive()
 {
-    while(true) {
+    while(active) {
         conn->atomicWrite(Connection::ackX0, sizeof Connection::ackX0);
         conn->atomicWrite(Connection::ackX2, sizeof Connection::ackX2);
         conn->atomicFlush();
         QThread::msleep(5000);
     }
+}
+
+KeepAlive::~KeepAlive()
+{
+    active = false;
+    thread.deleteLater();
 }

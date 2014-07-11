@@ -4,6 +4,8 @@
 
 int main(int argc, char *argv[])
 {
+
+    char buf[21];
     //initialize psrng
     qsrand(time(NULL));
 
@@ -11,10 +13,11 @@ int main(int argc, char *argv[])
     MainWindow w;
     w.show();
 
-    Connection c(TEST_COMP, &w);
+    Connection c(TEST_FW, &w);
 
     c.login("bot.of.doom", "bot");
-    printf("%lu\n", sizeof c);
+
+    qDebug() << "Logged In" <<endl;
 
     return a.exec();
 }
