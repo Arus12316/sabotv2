@@ -192,10 +192,10 @@ void Connection::userSession()
 {
     bool notExpire;
     qint64 n;
-    char buf[SOCK_BUFSIZE], *bptr;
+    QByteArray array;
+    char buf[SOCK_BUFSIZE], *bptr, c;
 
     sock = new QTcpSocket;
-
 
     connect(sock, SIGNAL(connected()), this, SLOT(userConnected()));
     connect(sock, SIGNAL(disconnected()), this, SLOT(userDisconnected()));
@@ -227,24 +227,26 @@ void Connection::userSession()
         active = true;
 
         while(active) {
-
-            for(bptr = buf; bptr < buf + SOCK_BUFSIZE; bptr++) {
-                while(!sock->getChar(bptr)) {
-                    sock->waitForReadyRead();
+            do  {
+                while(!sock->getChar(&c)) {
+                    if(!sock->waitForReadyRead()) {
+                        return; /* temporary way to make stderr shutup when program closes */
+                    }
                 }
-                if(!*bptr)
-                    break;
-            }
+                array.append(c);
+            } while(c);
 
-            n = bptr - buf + 1;
-            for(int i = 0; i < n; i++) {
-                if(buf[i])
-                    putchar(buf[i]);
-               else
-                    putchar('%');
+            n = array.size();
+
+            for(bptr = array.data(); *bptr; bptr++) {
+                putchar(*bptr);
+                switch(*bptr) {
+
+                }
             }
-            puts("\n\n");
+            puts("%\n\n");
             fflush(stdout);
+            array.clear();
         }
     }
 }
