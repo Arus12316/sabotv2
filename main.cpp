@@ -4,16 +4,17 @@
 
 int main(int argc, char *argv[])
 {
-    char buf[21];
-
+    //initialize psrng
     qsrand(time(NULL));
 
     QApplication a(argc, argv);
     MainWindow w;
     w.show();
 
-    Connection c(S_2D_CENTRAL);
+    Connection c(TEST_FLI, &w);
 
+    c.login("bot.of.doom", "bot");
+    printf("%lu\n", sizeof c);
 
     return a.exec();
 }

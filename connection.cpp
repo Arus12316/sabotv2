@@ -7,7 +7,8 @@
 #include <QNetworkAccessManager>
 
 #define MAX_UNAME_PASS 20
-
+#define SOCK_BUFSIZE 256
+#define LOGIN_FLAG "09"
 
 const quint16 Connection::PORT = 1138;
 
@@ -57,11 +58,26 @@ const char *Connection::saServers[][2] = {
     {"SS Lineage", S_SS_LINEAGE}
 };
 
-Connection::Connection(const char *host, QObject *parent) :
+Connection::Connection(const char *host, MainWindow *win, QObject *parent) :
     QObject(parent)
 {
-    this->host = host;
+    for(int i = 0; i < N_GAMESERVERS; i++) {
+        if(!strcmp(saServers[i][0], host)) {
+            host = saServers[i][1];
+            break;
+        }
+    }
 
+
+    this->host = host;
+    this->moveToThread(&thread);
+
+
+    connect(this, SIGNAL(signalConnected()), win, SLOT(slotConnectedMsg()));
+    connect(&thread, SIGNAL(started()), this, SLOT(userSession()));
+
+
+    //connect(&sock, SIGNAL(error(QTcpSocket::SocketError))), this, SLOT(errorConnection(QTcpSocket::SocketError)));
 }
 
 void Connection::randName(char *buf, ushort len)
@@ -95,13 +111,21 @@ void Connection::randEmail(char *buf, ushort len)
     strcpy(buf+1, suffix);
 }
 
-void Connection::connect()
+void Connection::connect_()
 {
-    sock.connectToHost(host, PORT, QTcpSocket::ReadWrite);
-    if(sock.waitForConnected()) {
+    sock->connectToHost(host, PORT, QTcpSocket::ReadWrite);
+    if(sock->waitForConnected()) {
 
     }
 }
+
+void Connection::login(const char name[], const char pass[])
+{
+    this->username = qstrdup(name);
+    this->password = qstrdup(pass);
+    thread.start();
+}
+
 
 void Connection::createAccount(const char name[], const char pass[], const char email[], int color)
 {
@@ -120,7 +144,7 @@ void Connection::createAccount(const char name[], const char pass[], const char 
 
     request.setUrl(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
-    request.setHeader(QNetworkRequest::UserAgentHeader, "All Your Base are Belong To Us. I am Kim Jong Un.");
+    request.setHeader(QNetworkRequest::UserAgentHeader, "I am Kim Jong Un. All Your Base are Belong To Us.");
     netAccess.post(request, url.toPercentEncoding(query.toString(),  excl, incl));
 }
 
@@ -145,3 +169,64 @@ void Connection::createAccount(const char pass[])
     createAccount(name, pass);
 }
 
+
+/* Slots */
+
+void Connection::userSession()
+{
+    qint64 n;
+    char buf[SOCK_BUFSIZE];
+
+    sock = new QTcpSocket;
+
+    connect(sock, SIGNAL(connected()), this, SLOT(userConnected()));
+    connect(sock, SIGNAL(disconnected()), this, SLOT(userDisconnected()));
+    connect(sock, SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(errorConnection(QAbstractSocket::SocketError)));
+
+    sock->connectToHost(host, PORT, QTcpSocket::ReadWrite);
+
+    qDebug() << "Attempting to connect" << endl;
+
+
+    if(sock->waitForConnected()) {
+        sock->write(initSend, sizeof initSend);
+
+        sock->waitForReadyRead();
+
+        n = sock->read(buf, sizeof buf);
+
+        sprintf(buf, LOGIN_FLAG "%s;%s", username, password);
+        sock->write(buf, strlen(buf) + 1);
+
+        sock->waitForReadyRead();
+
+        n = sock->read(buf, sizeof buf);
+
+        sock->write(finishLogin, sizeof finishLogin);
+
+    }
+}
+
+void Connection::userConnected()
+{
+    qDebug() << "Connected!" << endl;
+    emit signalConnected();
+}
+
+void Connection::userDisconnected()
+{
+    qDebug() << "Disconnecteds!" <<  endl;
+}
+
+
+void Connection::errorConnection(QAbstractSocket::SocketError error)
+{
+    qDebug() << "Connection Error: " << sock->errorString() << endl;
+}
+
+Connection::~Connection()
+{
+    delete[] username;
+    delete[] password;
+    delete sock;
+}

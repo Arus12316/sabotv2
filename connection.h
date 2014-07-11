@@ -1,8 +1,13 @@
 #ifndef CONNECTION_H
 #define CONNECTION_H
 
+#include "mainwindow.h"
+
 #include <QObject>
+#include <QThread>
 #include <QTcpSocket>
+
+#define N_GAMESERVERS 11
 
 #define S_REGISTER          "67.19.145.10"
 
@@ -18,11 +23,25 @@
 #define S_QUICKSTART        "67.19.138.236"
 #define S_SS_LINEAGE        "74.86.43.10"
 
+#define TEST_2D "2D Central"
+#define TEST_PTC "Paper Thin City"
+#define TEST_FLI "Fine Line Island"
+#define TEST_USA "U of SA"
+#define TEST_FW "Flat World"
+#define TEST_POU "Planar Outpost"
+#define TEST_MMET "Mobius Metropolis"
+#define TEST_EU "Eu Amsterdam"
+#define TEST_COMP "Compatibility"
+#define TEST_SS "SS Lineage"
+
 class Connection : public QObject
 {
     Q_OBJECT
+
 public:
-    explicit Connection(const char *host, QObject *parent = 0);
+    explicit Connection(const char *host, MainWindow *win, QObject *parent = 0);
+
+    ~Connection();
 
     /*
      * These pseudorandom generators need to be seeded.
@@ -30,9 +49,9 @@ public:
     static void randName(char *buf, ushort len);
     static void randEmail(char *buf, ushort len);
 
-    void connect();
+    void connect_();
 
-    void login(char *name, char *pass);
+    void login(const char name[], const char pass[]);
 
     /*
      * Account Creating methods. Methods with less parameters generate the values randomly. Use
@@ -44,14 +63,25 @@ public:
     static void createAccount(const char pass[]);
 
 signals:
+    void signalConnected();
 
 public slots:
 
+    void userSession();
+
+    void userConnected();
+    void userDisconnected();
+    void errorConnection(QAbstractSocket::SocketError error);
+
+
 private:
 
-
-    QTcpSocket sock;
+    QTcpSocket *sock;
     QString host;
+    char uid[3];
+    QThread thread;
+    char *username;
+    char *password;
 
     static const quint16 PORT;
 

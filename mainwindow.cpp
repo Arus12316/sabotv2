@@ -8,6 +8,12 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
 }
 
+void MainWindow::slotConnectedMsg()
+{
+}
+
+
+
 MainWindow::~MainWindow()
 {
     delete ui;
