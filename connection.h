@@ -8,6 +8,7 @@
 #include <QTimer>
 #include <QMutex>
 #include <QTcpSocket>
+#include <QNetworkProxy>
 
 #define N_GAMESERVERS 11
 

@@ -202,8 +202,7 @@ void Connection::userSession()
     connect(sock, SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(errorConnection(QAbstractSocket::SocketError)));
 
     sock->connectToHost(host, PORT, QTcpSocket::ReadWrite);
-
-    qDebug() << "Attempting to connect" << endl;
+    qDebug() << "Attempting to connect through tor" << endl;
 
 
     if(sock->waitForConnected()) {
@@ -212,6 +211,7 @@ void Connection::userSession()
         sock->waitForReadyRead();
 
         n = sock->read(buf, sizeof buf);
+
 
         sprintf(buf, LOGIN_FLAG "%s;%s", username, password);
         sock->write(buf, strlen(buf) + 1);
@@ -233,7 +233,7 @@ void Connection::userSession()
                         return; /* temporary way to make stderr shutup when program closes */
                     }
                 }
-                array.append(c);
+                array += c;
             } while(c);
 
             n = array.size();
@@ -265,7 +265,15 @@ void Connection::userDisconnected()
 
 void Connection::errorConnection(QAbstractSocket::SocketError error)
 {
-    qDebug() << "Connection Error: " << sock->errorString() << endl;
+    qDebug() << "Connection Error: " << sock->errorString();
+
+    sock->setProxy(QNetworkProxy::NoProxy);
+
+    if(error == QAbstractSocket::ProxyConnectionRefusedError) {
+        qDebug() << "Tor is most likely not running. Attempting to Connect without tor.";
+        sock->connectToHost(host, PORT, QTcpSocket::ReadWrite);
+        qDebug() << "Attempting to connect" << endl;
+    }
 }
 
 Connection::~Connection()

@@ -5,6 +5,7 @@
 int main(int argc, char *argv[])
 {
 
+    QNetworkProxy proxy;
     char buf[21];
     //initialize psrng
     qsrand(time(NULL));
@@ -13,7 +14,16 @@ int main(int argc, char *argv[])
     MainWindow w;
     w.show();
 
-    Connection c(TEST_FW, &w);
+    proxy.setType(QNetworkProxy::Socks5Proxy);
+    proxy.setHostName("127.0.0.1");
+    proxy.setPort(9050);
+
+    QNetworkProxy::setApplicationProxy(proxy);
+
+
+    Connection c(TEST_COMP, &w);
+
+
 
     c.login("bot.of.doom", "bot");
 
