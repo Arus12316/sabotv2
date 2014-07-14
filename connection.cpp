@@ -316,10 +316,9 @@ void Connection::errorConnection(QAbstractSocket::SocketError error)
 {
     qDebug() << "Connection Error: " << sock->errorString();
 
-    sock->setProxy(QNetworkProxy::NoProxy);
-
     if(error == QAbstractSocket::ProxyConnectionRefusedError) {
         qDebug() << "Tor is most likely not running. Attempting to Connect without tor.";
+        sock->setProxy(QNetworkProxy::NoProxy);
         sock->connectToHost(host, PORT, QTcpSocket::ReadWrite);
         qDebug() << "Attempting to connect" << endl;
     }
@@ -374,11 +373,13 @@ KeepAlive::KeepAlive(Connection *conn)
 
 void KeepAlive::keepAlive()
 {
+    enum { SLEEP_TIME = 5000 };
+
     while(active) {
         conn->atomicWrite(Connection::ackX0, sizeof Connection::ackX0);
         conn->atomicWrite(Connection::ackX2, sizeof Connection::ackX2);
         conn->atomicFlush();
-        QThread::msleep(5000);
+        QThread::msleep(SLEEP_TIME);
     }
 }
 
