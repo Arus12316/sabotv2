@@ -1,3 +1,4 @@
+#include "user.h"
 #include "parse.h"
 #include "connection.h"
 #include <QUrl>
@@ -6,7 +7,6 @@
 #include <QByteArray>
 #include <QNetworkAccessManager>
 
-#define MAX_UNAME_PASS 20
 #define SOCK_BUFSIZE 256
 #define LOGIN_FLAG "09"
 
@@ -58,7 +58,7 @@ const char *Connection::saServers[][2] = {
     {"SS Lineage", S_SS_LINEAGE}
 };
 
-Connection::Connection(const char *host, MainWindow *win, QObject *parent) :
+Connection::Connection(Connection *master, const char *host, MainWindow *win, QObject *parent) :
     QObject(parent)
 {
     for(int i = 0; i < N_GAMESERVERS; i++) {
@@ -72,6 +72,11 @@ Connection::Connection(const char *host, MainWindow *win, QObject *parent) :
     this->host = host;
     this->moveToThread(&thread);
 
+    this->master = master;
+    if(!master)
+        this->utable = new hash_s[1][UID_TABLE_SIZE];
+    else
+        this->utable = master->utable;
 
     connect(this, SIGNAL(signalConnected()), win, SLOT(slotConnectedMsg()));
     connect(&thread, SIGNAL(started()), this, SLOT(userSession()));
@@ -141,6 +146,23 @@ void Connection::login(const char name[], const char pass[])
     thread.start();
 }
 
+void Connection::sendMessage(const char msg[])
+{
+    size_t mlen = strlen(msg);
+    char buf[256];
+
+    if(mlen >= 256)
+        perror("message to long");
+    else {
+        strcpy(buf, "9");
+        strcat(buf, msg);
+        //sock->write(conn->sock, buf, strlen(buf)+1, 0);
+        sock->write(buf, strlen(buf) + 1);
+    }
+
+}
+
+
 void Connection::createAccount(const char name[], const char pass[], const char email[], int color)
 {
     static QByteArray incl = "_.", excl = "=&?";
@@ -187,11 +209,12 @@ void Connection::createAccount(const char pass[])
 
 
 /* Slots */
-
 void Connection::userSession()
 {
+    User *u;
     bool notExpire;
     qint64 n;
+    int i;
     QByteArray array;
     char buf[SOCK_BUFSIZE], *bptr, c;
 
@@ -212,7 +235,7 @@ void Connection::userSession()
 
         n = sock->read(buf, sizeof buf);
 
-
+        //sprintf in c++ umad
         sprintf(buf, LOGIN_FLAG "%s;%s", username, password);
         sock->write(buf, strlen(buf) + 1);
 
@@ -241,6 +264,32 @@ void Connection::userSession()
             for(bptr = array.data(); *bptr; bptr++) {
                 putchar(*bptr);
                 switch(*bptr) {
+                    case 'U':
+                        u = new User(this);
+
+                        /* get uid */
+                        u->id[0] = *++bptr;
+                        u->id[1] = *++bptr;
+                        u->id[2] = *++bptr;
+                        
+                        for(n = 0; *++bptr == '#'; n++);
+                        
+                        n = MAX_UNAME_PASS - n;
+                        for(i = 0; i < n; i++)
+                            u->name[i] = bptr[i];
+                        bptr += n;
+                        u->name[i] = '\0';
+
+                        printf("\nuser: %s: %c%c%c\n", u->name, u->id[0], u->id[1], u->id[2]);
+                        fflush(stdout);
+                        *bptr = '\0';
+                        break;
+                    case 'D':
+                        break;
+                    case 'C':
+                        break;
+                    case 'M':
+                        break;
 
                 }
             }
@@ -276,6 +325,29 @@ void Connection::errorConnection(QAbstractSocket::SocketError error)
     }
 }
 
+quint16 Connection::hashUid(const char uid[3])
+{
+    quint32 h = 0, g;
+
+    h = (h << 4) + uid[0];
+    if((g = h & 0xf0000000)) {
+        h ^= (g >> 24);
+        h ^= g;
+    }
+    h = (h << 4) + uid[1];
+    if((g = h & 0xf0000000)) {
+        h ^= (g >> 24);
+        h ^= g;
+    }
+    h = (h << 4) + uid[2];
+    if((g = h & 0xf0000000)) {
+        h ^= (g >> 24);
+        h ^= g;
+    }
+    return h % UID_TABLE_SIZE;
+}
+
+
 Connection::~Connection()
 {
     active = false;
@@ -284,6 +356,10 @@ Connection::~Connection()
     delete keepAlive;
     sock->close();
     delete sock;
+
+    if(!master) {
+
+    }
 }
 
 KeepAlive::KeepAlive(Connection *conn)

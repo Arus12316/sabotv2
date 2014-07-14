@@ -11,6 +11,7 @@
 #include <QNetworkProxy>
 
 #define N_GAMESERVERS 11
+#define UID_TABLE_SIZE 53
 
 #define S_REGISTER          "67.19.145.10"
 
@@ -70,7 +71,15 @@ public:
     /* General ACK 2 */
     static const char ackX2[];
 
-    explicit Connection(const char *host, MainWindow *win, QObject *parent = 0);
+    struct hash_s {
+        char key[3];
+        class User *user;
+        hash_s *next;
+    }
+    (*utable)[UID_TABLE_SIZE];
+
+
+    explicit Connection(Connection *master, const char *host, MainWindow *win, QObject *parent = 0);
 
     ~Connection();
 
@@ -86,6 +95,8 @@ public:
     void atomicFlush();
 
     void login(const char name[], const char pass[]);
+
+    void sendMessage(const char msg[]);
 
     /*
      * Account Creating methods. Methods with less parameters generate the values randomly. Use
@@ -109,6 +120,9 @@ public slots:
 
 
 private:
+
+    quint16 hashUid(const char uid[3]);
+
     QTcpSocket *sock;
     QMutex mutex;
     KeepAlive *keepAlive;
@@ -118,6 +132,8 @@ private:
     char *username;
     char *password;
     bool active;
+
+    Connection *master;
 
     static const quint16 PORT;
 

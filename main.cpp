@@ -20,12 +20,12 @@ int main(int argc, char *argv[])
 
     QNetworkProxy::setApplicationProxy(proxy);
 
+    //Connection::createAccount("immanoooob", "bot");
 
-    Connection c(TEST_COMP, &w);
+    Connection c(NULL, TEST_PTC, &w);
+    c.login("sexy.little.bot", "bot");
 
-
-
-    c.login("bot.of.doom", "bot");
+    w.setConn(&c);
 
     qDebug() << "Logged In" <<endl;
 

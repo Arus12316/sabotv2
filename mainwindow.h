@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 
+
 namespace Ui {
 class MainWindow;
 }
@@ -15,11 +16,16 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
+    void setConn(class Connection *conn);
+
 public slots:
     void slotConnectedMsg();
 
+    void pressEnter();
+
 private:
     Ui::MainWindow *ui;
+    class Connection *conn;
 };
 
 #endif // MAINWINDOW_H
