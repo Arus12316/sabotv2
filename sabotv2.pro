@@ -16,11 +16,13 @@ SOURCES += main.cpp\
         mainwindow.cpp \
     connection.cpp \
     parse.cpp \
-    user.cpp
+    user.cpp \
+    server.cpp
 
 HEADERS  += mainwindow.h \
     connection.h \
     parse.h \
-    user.h
+    user.h \
+    server.h
 
 FORMS    += mainwindow.ui

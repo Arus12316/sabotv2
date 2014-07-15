@@ -10,34 +10,6 @@
 #include <QTcpSocket>
 #include <QNetworkProxy>
 
-#define N_GAMESERVERS 11
-#define UID_TABLE_SIZE 53
-
-#define S_REGISTER          "67.19.145.10"
-
-#define S_2D_CENTRAL        "74.86.43.9"
-#define S_PAPER_THIN        "74.86.43.8"
-#define S_FINE_LINE         "67.19.138.234" //(?)
-#define S_U_OF_SA           "67.19.138.236"
-#define S_FLAT_WORLD        "74.86.3.220"
-#define S_PLANAR_OUTPOST    "67.19.138.235"
-#define S_MOBIUS_METROPOLIS "74.86.3.221"
-#define S_AMSTERDAM         "94.75.214.10"
-#define S_COMPATABILITY     "74.86.3.222"
-#define S_QUICKSTART        "67.19.138.236"
-#define S_SS_LINEAGE        "74.86.43.10"
-
-#define TEST_2D "2D Central"
-#define TEST_PTC "Paper Thin City"
-#define TEST_FLI "Fine Line Island"
-#define TEST_USA "U of SA"
-#define TEST_FW "Flat World"
-#define TEST_POU "Planar Outpost"
-#define TEST_MMET "Mobius Metropolis"
-#define TEST_EU "Eu Amsterdam"
-#define TEST_COMP "Compatibility"
-#define TEST_SS "SS Lineage"
-
 class Connection;
 
 class KeepAlive : public QObject
@@ -50,6 +22,7 @@ public:
 
 public slots:
     void keepAlive();
+
 
 private:
     bool active;
@@ -71,15 +44,7 @@ public:
     /* General ACK 2 */
     static const char ackX2[];
 
-    struct hash_s {
-        char key[3];
-        class User *user;
-        hash_s *next;
-    }
-    (*utable)[UID_TABLE_SIZE];
-
-
-    explicit Connection(Connection *master, const char *host, MainWindow *win, QObject *parent = 0);
+    explicit Connection(int server, MainWindow *win, QObject *parent = 0);
 
     ~Connection();
 
@@ -121,19 +86,18 @@ public slots:
 
 private:
 
-    quint16 hashUid(const char uid[3]);
+    quint16 hashUid(const char *uid);
+    void insertUser(class User *u);
 
     QTcpSocket *sock;
     QMutex mutex;
     KeepAlive *keepAlive;
-    QString host;
-    char uid[3];
+    char uid[4];
     QThread thread;
     char *username;
     char *password;
     bool active;
-
-    Connection *master;
+    class Server *server;
 
     static const quint16 PORT;
 
@@ -142,9 +106,6 @@ private:
 
     /* This is sent to complete a login */
     static const char finishLogin[];
-
-    /* Server List (maps server names to their IP) */
-    static const char *saServers[][2];
 
     /* Char maps for generating random strings */
     static const char charset1[];

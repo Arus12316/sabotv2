@@ -2,10 +2,12 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QTabWidget>
 
 
 namespace Ui {
 class MainWindow;
+
 }
 
 class MainWindow : public QMainWindow
@@ -17,11 +19,11 @@ public:
     ~MainWindow();
 
     void setConn(class Connection *conn);
+    void newTab(const char *server);
 
 public slots:
-    void slotConnectedMsg();
+    void loginButtonPressed();
 
-    void pressEnter();
 
 private:
     Ui::MainWindow *ui;

@@ -11,7 +11,7 @@ class User : public QObject
 {
     Q_OBJECT
 public:
-    char id[3];
+    char id[4];
     char name[MAX_UNAME_PASS + 1];
 
 

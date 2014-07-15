@@ -1,12 +1,11 @@
+#include "server.h"
 #include "mainwindow.h"
 #include "connection.h"
 #include <QApplication>
 
 int main(int argc, char *argv[])
 {
-
     QNetworkProxy proxy;
-    char buf[21];
     //initialize psrng
     qsrand(time(NULL));
 
@@ -14,20 +13,15 @@ int main(int argc, char *argv[])
     MainWindow w;
     w.show();
 
+    for(int i = 0; i < N_GAMESERVERS; i++)
+        Server::servers[i] = new Server(i);
+
     proxy.setType(QNetworkProxy::Socks5Proxy);
     proxy.setHostName("127.0.0.1");
     proxy.setPort(9050);
 
     QNetworkProxy::setApplicationProxy(proxy);
 
-    //Connection::createAccount("immanoooob", "bot");
-
-    Connection c(NULL, TEST_PTC, &w);
-    c.login("sexy.little.bot", "bot");
-
-    w.setConn(&c);
-
     qDebug() << "Logged In" <<endl;
-
     return a.exec();
 }

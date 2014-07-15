@@ -1,5 +1,6 @@
 #include "user.h"
 #include "parse.h"
+#include "server.h"
 #include "connection.h"
 #include <QUrl>
 #include <QUrlQuery>
@@ -45,45 +46,18 @@ const char Connection::charset1[] =
 const char Connection::charset2[] =
         "abcdefghijklmnopqrstuvwxyz1234567890";
 
-const char *Connection::saServers[][2] = {
-    {"2D Central", S_2D_CENTRAL},
-    {"Paper Thin City", S_PAPER_THIN},
-    {"Fine Line Island", S_FINE_LINE},
-    {"U of SA", S_U_OF_SA},
-    {"Flat World", S_FLAT_WORLD},
-    {"Planar Outpost", S_PLANAR_OUTPOST},
-    {"Mobius Metropolis", S_MOBIUS_METROPOLIS},
-    {"EU Amsterdam", S_AMSTERDAM},
-    {"Compatibility", S_COMPATABILITY},
-    {"SS Lineage", S_SS_LINEAGE}
-};
-
-Connection::Connection(Connection *master, const char *host, MainWindow *win, QObject *parent) :
+Connection::Connection(int server, MainWindow *win, QObject *parent) :
     QObject(parent)
 {
-    for(int i = 0; i < N_GAMESERVERS; i++) {
-        if(!strcmp(saServers[i][0], host)) {
-            host = saServers[i][1];
-            break;
-        }
-    }
+
+    this->server = Server::servers[server];
 
     this->active = false;
-    this->host = host;
     this->moveToThread(&thread);
 
-    this->master = master;
-    if(!master)
-        this->utable = new hash_s[1][UID_TABLE_SIZE];
-    else
-        this->utable = master->utable;
-
-    connect(this, SIGNAL(signalConnected()), win, SLOT(slotConnectedMsg()));
     connect(&thread, SIGNAL(started()), this, SLOT(userSession()));
-
-
-    //connect(&sock, SIGNAL(error(QTcpSocket::SocketError))), this, SLOT(errorConnection(QTcpSocket::SocketError)));
 }
+
 
 void Connection::randName(char *buf, ushort len)
 {
@@ -118,7 +92,7 @@ void Connection::randEmail(char *buf, ushort len)
 
 void Connection::connect_()
 {
-    sock->connectToHost(host, PORT, QTcpSocket::ReadWrite);
+    sock->connectToHost(server->getIP(), PORT, QTcpSocket::ReadWrite);
     if(sock->waitForConnected()) {
 
     }
@@ -137,7 +111,6 @@ void Connection::atomicFlush()
     sock->flush();
     mutex.unlock();
 }
-
 
 void Connection::login(const char name[], const char pass[])
 {
@@ -159,9 +132,7 @@ void Connection::sendMessage(const char msg[])
         //sock->write(conn->sock, buf, strlen(buf)+1, 0);
         sock->write(buf, strlen(buf) + 1);
     }
-
 }
-
 
 void Connection::createAccount(const char name[], const char pass[], const char email[], int color)
 {
@@ -224,7 +195,7 @@ void Connection::userSession()
     connect(sock, SIGNAL(disconnected()), this, SLOT(userDisconnected()));
     connect(sock, SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(errorConnection(QAbstractSocket::SocketError)));
 
-    sock->connectToHost(host, PORT, QTcpSocket::ReadWrite);
+    sock->connectToHost(server->getIP(), PORT, QTcpSocket::ReadWrite);
     qDebug() << "Attempting to connect through tor" << endl;
 
 
@@ -271,6 +242,7 @@ void Connection::userSession()
                         u->id[0] = *++bptr;
                         u->id[1] = *++bptr;
                         u->id[2] = *++bptr;
+                        u->id[3] = '\0';
                         
                         for(n = 0; *++bptr == '#'; n++);
                         
@@ -283,6 +255,7 @@ void Connection::userSession()
                         printf("\nuser: %s: %c%c%c\n", u->name, u->id[0], u->id[1], u->id[2]);
                         fflush(stdout);
                         *bptr = '\0';
+
                         break;
                     case 'D':
                         break;
@@ -319,33 +292,10 @@ void Connection::errorConnection(QAbstractSocket::SocketError error)
     if(error == QAbstractSocket::ProxyConnectionRefusedError) {
         qDebug() << "Tor is most likely not running. Attempting to Connect without tor.";
         sock->setProxy(QNetworkProxy::NoProxy);
-        sock->connectToHost(host, PORT, QTcpSocket::ReadWrite);
+        sock->connectToHost(server->getIP(), PORT, QTcpSocket::ReadWrite);
         qDebug() << "Attempting to connect" << endl;
     }
 }
-
-quint16 Connection::hashUid(const char uid[3])
-{
-    quint32 h = 0, g;
-
-    h = (h << 4) + uid[0];
-    if((g = h & 0xf0000000)) {
-        h ^= (g >> 24);
-        h ^= g;
-    }
-    h = (h << 4) + uid[1];
-    if((g = h & 0xf0000000)) {
-        h ^= (g >> 24);
-        h ^= g;
-    }
-    h = (h << 4) + uid[2];
-    if((g = h & 0xf0000000)) {
-        h ^= (g >> 24);
-        h ^= g;
-    }
-    return h % UID_TABLE_SIZE;
-}
-
 
 Connection::~Connection()
 {
@@ -355,10 +305,6 @@ Connection::~Connection()
     delete keepAlive;
     sock->close();
     delete sock;
-
-    if(!master) {
-
-    }
 }
 
 KeepAlive::KeepAlive(Connection *conn)
