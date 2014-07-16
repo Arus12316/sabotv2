@@ -10,26 +10,6 @@
 #include <QTcpSocket>
 #include <QNetworkProxy>
 
-class Connection;
-
-class KeepAlive : public QObject
-{
-    Q_OBJECT
-
-public:
-    KeepAlive(Connection *conn);
-    ~KeepAlive();
-
-public slots:
-    void keepAlive();
-
-
-private:
-    bool active;
-    Connection *conn;
-    QThread thread;
-};
-
 class Connection : public QObject
 {
     Q_OBJECT
@@ -56,9 +36,6 @@ public:
 
     void connect_();
 
-    void atomicWrite(const char *data, qint64 n);
-    void atomicFlush();
-
     void login(const char name[], const char pass[]);
 
     void sendMessage(const char msg[]);
@@ -77,11 +54,14 @@ signals:
 
 public slots:
 
-    void userSession();
+    void sessionInit();
+    void gameEvent();
+    void keepAlive();
 
     void userConnected();
     void userDisconnected();
     void errorConnection(QAbstractSocket::SocketError error);
+    void test();
 
 
 private:
@@ -90,14 +70,14 @@ private:
     void insertUser(class User *u);
 
     QTcpSocket *sock;
-    QMutex mutex;
-    KeepAlive *keepAlive;
     char uid[4];
     QThread thread;
     char *username;
     char *password;
     bool active;
     class Server *server;
+    QByteArray gameBuf;
+    QTimer timer;
 
     static const quint16 PORT;
 

@@ -26,14 +26,16 @@ void MainWindow::newTab(const char *server)
 
 void MainWindow::loginButtonPressed()
 {
-    const char *username, *password;
+    QString username, password;
     int server = ui->serverList->currentIndex();
     Connection *c = new Connection(server, this);
 
-    username = ui->userName->text().toStdString().c_str();
-    password = ui->password->text().toStdString().c_str();
+    username = ui->userName->text();
+    password = ui->password->text();
 
-    c->login(username, password);
+    c->login(username.toStdString().c_str(), password.toStdString().c_str());
+    ui->userName->clear();
+    ui->password->clear();
 }
 
 

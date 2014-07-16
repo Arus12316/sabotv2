@@ -55,7 +55,7 @@ Connection::Connection(int server, MainWindow *win, QObject *parent) :
     this->active = false;
     this->moveToThread(&thread);
 
-    connect(&thread, SIGNAL(started()), this, SLOT(userSession()));
+    connect(&thread, SIGNAL(started()), this, SLOT(sessionInit()));
 }
 
 
@@ -96,20 +96,6 @@ void Connection::connect_()
     if(sock->waitForConnected()) {
 
     }
-}
-
-void Connection::atomicWrite(const char *data, qint64 n)
-{
-    mutex.lock();
-    sock->write(data, n);
-    mutex.unlock();
-}
-
-void Connection::atomicFlush()
-{
-    mutex.lock();
-    sock->flush();
-    mutex.unlock();
 }
 
 void Connection::login(const char name[], const char pass[])
@@ -180,15 +166,13 @@ void Connection::createAccount(const char pass[])
 
 
 /* Slots */
-void Connection::userSession()
-{
-    User *u;
-    bool notExpire;
-    qint64 n;
-    int i;
-    QByteArray array;
-    char buf[SOCK_BUFSIZE], *bptr, c;
 
+
+void Connection::sessionInit()
+{
+    enum { SLEEP_TIME = 5000 };
+    qint64 n;
+    char buf[SOCK_BUFSIZE];
     sock = new QTcpSocket;
 
     connect(sock, SIGNAL(connected()), this, SLOT(userConnected()));
@@ -197,7 +181,6 @@ void Connection::userSession()
 
     sock->connectToHost(server->getIP(), PORT, QTcpSocket::ReadWrite);
     qDebug() << "Attempting to connect through tor" << endl;
-
 
     if(sock->waitForConnected()) {
         sock->write(initSend, sizeof initSend);
@@ -214,63 +197,77 @@ void Connection::userSession()
 
         n = sock->read(buf, sizeof buf);
 
+        qDebug() << buf;
+
+
         sock->write(finishLogin, sizeof finishLogin);
 
-        keepAlive = new KeepAlive(this);
+        connect(sock, SIGNAL(readyRead()), this, SLOT(gameEvent()));
+        connect(&timer, SIGNAL(timeout()), this, SLOT(keepAlive()));
+        timer.start(SLEEP_TIME);
 
         active = true;
+    }
+}
 
-        while(active) {
-            do  {
-                while(!sock->getChar(&c)) {
-                    if(!sock->waitForReadyRead()) {
-                        return; /* temporary way to make stderr shutup when program closes */
-                    }
-                }
-                array += c;
-            } while(c);
+void Connection::gameEvent()
+{
+    int i;
+    char c;
+    qint64 n;
+    char *bptr;
+    User *u;
 
-            n = array.size();
+    if(sock->getChar(&c)) {
+        do {
+            gameBuf += c;
+        }
+        while(sock->getChar(&c));
 
-            for(bptr = array.data(); *bptr; bptr++) {
-                putchar(*bptr);
+        if(!c) {
+            n = gameBuf.size();
+            qDebug() << gameBuf;
+            for(bptr = gameBuf.data(); *bptr; bptr++) {
                 switch(*bptr) {
-                    case 'U':
-                        u = new User(this);
+                case 'U':
+                    u = new User(this);
 
-                        /* get uid */
-                        u->id[0] = *++bptr;
-                        u->id[1] = *++bptr;
-                        u->id[2] = *++bptr;
-                        u->id[3] = '\0';
-                        
-                        for(n = 0; *++bptr == '#'; n++);
-                        
-                        n = MAX_UNAME_PASS - n;
-                        for(i = 0; i < n; i++)
-                            u->name[i] = bptr[i];
-                        bptr += n;
-                        u->name[i] = '\0';
+                    /* get uid */
+                    u->id[0] = *++bptr;
+                    u->id[1] = *++bptr;
+                    u->id[2] = *++bptr;
+                    u->id[3] = '\0';
 
-                        printf("\nuser: %s: %c%c%c\n", u->name, u->id[0], u->id[1], u->id[2]);
-                        fflush(stdout);
-                        *bptr = '\0';
+                    for(n = 0; *++bptr == '#'; n++);
 
-                        break;
-                    case 'D':
-                        break;
-                    case 'C':
-                        break;
-                    case 'M':
-                        break;
+                    n = MAX_UNAME_PASS - n;
+                    for(i = 0; i < n; i++)
+                        u->name[i] = bptr[i];
+                    bptr += n;
+                    u->name[i] = '\0';
 
+                    printf("\nuser: %s: %c%c%c\n", u->name, u->id[0], u->id[1], u->id[2]);
+                    fflush(stdout);
+                    *bptr = '\0';
+                    break;
+                case 'D':
+                    break;
+                case 'C':
+                    break;
+                case 'M':
+                    break;
                 }
             }
-            puts("%\n\n");
-            fflush(stdout);
-            array.clear();
+            gameBuf.clear();
         }
     }
+}
+
+
+void Connection::keepAlive()
+{
+    sock->write(ackX0, sizeof ackX0);
+    sock->write(ackX2, sizeof ackX2);
 }
 
 void Connection::userConnected()
@@ -297,40 +294,17 @@ void Connection::errorConnection(QAbstractSocket::SocketError error)
     }
 }
 
+void Connection::test()
+{
+    qDebug() << "Slot called.";
+}
+
 Connection::~Connection()
 {
     active = false;
     delete[] username;
     delete[] password;
-    delete keepAlive;
     sock->close();
     delete sock;
 }
 
-KeepAlive::KeepAlive(Connection *conn)
-{
-    this->conn = conn;
-    this->active = true;
-    this->moveToThread(&thread);
-
-    connect(&thread, SIGNAL(started()), this, SLOT(keepAlive()));
-    thread.start();
-}
-
-void KeepAlive::keepAlive()
-{
-    enum { SLEEP_TIME = 5000 };
-
-    while(active) {
-        conn->atomicWrite(Connection::ackX0, sizeof Connection::ackX0);
-        conn->atomicWrite(Connection::ackX2, sizeof Connection::ackX2);
-        conn->atomicFlush();
-        QThread::msleep(SLEEP_TIME);
-    }
-}
-
-KeepAlive::~KeepAlive()
-{
-    active = false;
-    thread.deleteLater();
-}
