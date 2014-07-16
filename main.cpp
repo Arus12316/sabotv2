@@ -1,3 +1,4 @@
+#include "user.h"
 #include "server.h"
 #include "mainwindow.h"
 #include "connection.h"

@@ -1,7 +1,7 @@
-#include "user.h"
 #include "parse.h"
 #include "server.h"
 #include "connection.h"
+#include "user.h"
 #include <QUrl>
 #include <QUrlQuery>
 #include <QNetworkRequest>
@@ -172,7 +172,7 @@ void Connection::sessionInit()
 {
     enum { SLEEP_TIME = 5000 };
     qint64 n;
-    char buf[SOCK_BUFSIZE];
+    char buf[SOCK_BUFSIZE], *bptr;
     sock = new QTcpSocket;
 
     connect(sock, SIGNAL(connected()), this, SLOT(userConnected()));
@@ -199,6 +199,12 @@ void Connection::sessionInit()
 
         qDebug() << buf;
 
+        bptr = buf;
+
+        if(*bptr == 'A') {
+            user = new User(this, buf);
+        }
+
 
         sock->write(finishLogin, sizeof finishLogin);
 
@@ -218,37 +224,17 @@ void Connection::gameEvent()
     char *bptr;
     User *u;
 
-    if(sock->getChar(&c)) {
-        do {
-            gameBuf += c;
-        }
-        while(sock->getChar(&c));
+    while(sock->getChar(&c)) {
+
+        gameBuf += c;
 
         if(!c) {
             n = gameBuf.size();
-            qDebug() << gameBuf;
+            qDebug() << gameBuf << "\n";
             for(bptr = gameBuf.data(); *bptr; bptr++) {
                 switch(*bptr) {
                 case 'U':
-                    u = new User(this);
-
-                    /* get uid */
-                    u->id[0] = *++bptr;
-                    u->id[1] = *++bptr;
-                    u->id[2] = *++bptr;
-                    u->id[3] = '\0';
-
-                    for(n = 0; *++bptr == '#'; n++);
-
-                    n = MAX_UNAME_PASS - n;
-                    for(i = 0; i < n; i++)
-                        u->name[i] = bptr[i];
-                    bptr += n;
-                    u->name[i] = '\0';
-
-                    printf("\nuser: %s: %c%c%c\n", u->name, u->id[0], u->id[1], u->id[2]);
-                    fflush(stdout);
-                    *bptr = '\0';
+                    u = new User(this, bptr);
                     break;
                 case 'D':
                     break;

@@ -78,6 +78,7 @@ private:
     class Server *server;
     QByteArray gameBuf;
     QTimer timer;
+    class User *user;
 
     static const quint16 PORT;
 
