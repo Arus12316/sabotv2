@@ -5,6 +5,7 @@
 #define N_GAMESERVERS 10
 
 #include <QObject>
+#include <QListWidget>
 
 class Server : public QObject
 {
@@ -12,6 +13,7 @@ class Server : public QObject
 public:
 
     class Connection *master;
+    class QListWidget *userList;
 
     explicit Server(int index, QObject *parent = 0);
 

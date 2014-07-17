@@ -33,12 +33,15 @@ public:
     void setConn(class Connection *conn);
     void newTab(const char *server);
     class QListWidget *getMessageBox();
+    class QListWidget *getUserList();
     void postMessage();
 
 public slots:
     void loginButtonPressed();
     void newUser(class User *);
     void newSelf(class User *);
+    void postMessage(struct message_s *);
+    void deleteUser(class Connection *conn, char *id);
 
 private:
     Ui::MainWindow *ui;

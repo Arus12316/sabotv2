@@ -64,7 +64,7 @@ void User::parseData(const char *data)
     col[2] = *data++;
     b = atoi(col);
 
-    qDebug() << "RGB( "<< r << ", " << g << ", " << b << " )";
+   // qDebug() << "RGB( "<< r << ", " << g << ", " << b << " )";
 
     color.setRgb(r, g, b);
     brush.setColor(color);

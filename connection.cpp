@@ -55,9 +55,14 @@ Connection::Connection(int server, MainWindow *win, QObject *parent) :
     this->active = false;
     this->moveToThread(&thread);
 
+    //temporary!!!
+    this->server->userList = win->getUserList();
+
     connect(&thread, SIGNAL(started()), this, SLOT(sessionInit()));
     connect(this, SIGNAL(newUser(User *)), win, SLOT(newUser(User *)));
     connect(this, SIGNAL(newSelf(User *)), win, SLOT(newSelf(User *)));
+    connect(this, SIGNAL(postMessage(message_s *)), win, SLOT(postMessage(message_s *)));
+    connect(this, SIGNAL(deleteUser(Connection *, char *)), win, SLOT(deleteUser(Connection *, char* )));
 }
 
 
@@ -232,8 +237,10 @@ void Connection::gameEvent()
     int i;
     char c;
     qint64 n;
-    char *bptr;
+    char *bptr, *mptr;
     User *u;
+    char id[4], *idSignal;
+    message_s *msg;
 
     while(sock->getChar(&c)) {
 
@@ -252,13 +259,32 @@ void Connection::gameEvent()
                           emit newUser(u);
                           goto tmpout;
                         case 'D':
-                            goto tmpout;
+                            idSignal = new char[4];
+                            idSignal[0] = *++bptr;
+                            idSignal[1] = *++bptr;
+                            idSignal[2] = *++bptr;
+                            idSignal[3] = '\0';
+                            emit deleteUser(this, idSignal);
                             break;
                         case 'C':
                             goto tmpout;
                             break;
                         case 'M':
-                            goto tmpout;
+                            id[0] = *++bptr;
+                            id[1] = *++bptr;
+                            id[2] = *++bptr;
+                            id[3] = '\0';
+
+                            msg = new message_s;
+                            msg->type = *++bptr;
+                            mptr = msg->body;
+                            while(*bptr)
+                                *mptr++ = *++bptr;
+
+                            *mptr = '\0';
+                            msg->sender = server->lookupUser(id);
+                            msg->view = this;
+                            emit postMessage(msg);
                             break;
                     }
                 }

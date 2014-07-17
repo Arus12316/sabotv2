@@ -1,6 +1,6 @@
 #include "mainwindow.h"
-#include "ui_mainwindow.h"
 #include "connection.h"
+#include "ui_mainwindow.h"
 #include "user.h"
 #include "server.h"
 
@@ -27,6 +27,10 @@ QListWidget *MainWindow::getMessageBox()
     return ui->messageView;
 }
 
+QListWidget *MainWindow::getUserList()
+{
+    return ui->userList;
+}
 
 void MainWindow::newTab(const char *server)
 {
@@ -66,6 +70,34 @@ void MainWindow::newSelf(class User *u)
 {
     ui->selfUserList->addItem(u->name);
 }
+
+void MainWindow::postMessage(message_s *msg)
+{
+    QString post ;
+
+    post += "<";
+    post += msg->sender->name;
+    post += "> ";
+    post += msg->body;
+
+    msg->view->messageBox->addItem(post);
+
+    delete msg;
+}
+
+void MainWindow::deleteUser(Connection *conn, char *id)
+{
+    User *user = conn->server->lookupUser(id);
+    QList<QListWidgetItem *> item = conn->server->userList->findItems(QString::fromStdString(user->name), Qt::MatchExactly);
+
+    qDebug() << "Removing: " << user->name;
+    conn->server->userList->removeItemWidget(item.first());
+    conn->server->deleteUser(id);
+
+    delete[] id;
+    delete user;
+}
+
 
 MainWindow::~MainWindow()
 {

@@ -10,11 +10,19 @@
 #include <QTcpSocket>
 #include <QNetworkProxy>
 
+struct message_s {
+    class User *sender;
+    class Connection *view;
+    char body[148];
+    char type;
+};
+
 class Connection : public QObject
 {
     Q_OBJECT
 
 public:
+    
     /* General ACK 0 */
     static const char ackX0[];
 
@@ -58,6 +66,9 @@ signals:
 
     void newUser(class User *);
     void newSelf(class User *);
+
+    void postMessage(message_s *msg);
+    void deleteUser(Connection *conn, char *id);
 
 public slots:
 
