@@ -11,6 +11,8 @@ class Server : public QObject
     Q_OBJECT
 public:
 
+    class Connection *master;
+
     explicit Server(int index, QObject *parent = 0);
 
     const char *getIP();

@@ -51,11 +51,13 @@ Connection::Connection(int server, MainWindow *win, QObject *parent) :
 {
 
     this->server = Server::servers[server];
-
+    this->win = win;
     this->active = false;
     this->moveToThread(&thread);
 
     connect(&thread, SIGNAL(started()), this, SLOT(sessionInit()));
+    connect(this, SIGNAL(newUser(User *)), win, SLOT(newUser(User *)));
+    connect(this, SIGNAL(newSelf(User *)), win, SLOT(newSelf(User *)));
 }
 
 
@@ -120,7 +122,7 @@ void Connection::sendMessage(const char msg[])
     }
 }
 
-void Connection::createAccount(const char name[], const char pass[], const char email[], int color)
+void Connection::createAccount(const char name[], const char pass[], const char email[], quint8 r, quint8 g, quint8 b)
 {
     static QByteArray incl = "_.", excl = "=&?";
     static QUrl url("http://www.xgenstudios.com/stickarena/stick_arena.php");
@@ -128,9 +130,14 @@ void Connection::createAccount(const char name[], const char pass[], const char 
     static QNetworkAccessManager netAccess;
     static QUrlQuery query;
 
+    QString color;
+    color.append(QString::number(r));
+    color.append(QString::number(g));
+    color.append(QString::number(b));
+
     query.clear();
     query.addQueryItem("email_address", email);
-    query.addQueryItem("usercol", QString::number(color));
+    query.addQueryItem("usercol", color);
     query.addQueryItem("userpass", pass);
     query.addQueryItem("username", name);
     query.addQueryItem("action", "create");
@@ -143,7 +150,7 @@ void Connection::createAccount(const char name[], const char pass[], const char 
 
 void Connection::createAccount(const char name[], const char pass[], const char email[])
 {
-    createAccount(name, pass, email, qrand());
+    createAccount(name, pass, email, qrand() % 256, qrand() % 256, qrand() % 256);
 }
 
 void Connection::createAccount(const char name[], const char pass[])
@@ -172,7 +179,7 @@ void Connection::sessionInit()
 {
     enum { SLEEP_TIME = 5000 };
     qint64 n;
-    char buf[SOCK_BUFSIZE], *bptr;
+    char buf[SOCK_BUFSIZE];
     sock = new QTcpSocket;
 
     connect(sock, SIGNAL(connected()), this, SLOT(userConnected()));
@@ -199,12 +206,16 @@ void Connection::sessionInit()
 
         qDebug() << buf;
 
-        bptr = buf;
-
-        if(*bptr == 'A') {
+        if(buf[0] == 'A') {
             user = new User(this, buf);
+            user->isSelf = true;
+            emit newSelf(user);
+            if(!server->master) {
+                server->master = this;
+                messageBox = win->getMessageBox();
+                emit newUser(user);
+            }
         }
-
 
         sock->write(finishLogin, sizeof finishLogin);
 
@@ -230,20 +241,34 @@ void Connection::gameEvent()
 
         if(!c) {
             n = gameBuf.size();
-            qDebug() << gameBuf << "\n";
-            for(bptr = gameBuf.data(); *bptr; bptr++) {
-                switch(*bptr) {
-                case 'U':
-                    u = new User(this, bptr);
-                    break;
-                case 'D':
-                    break;
-                case 'C':
-                    break;
-                case 'M':
-                    break;
+            if(server->master == this) {
+                qDebug() << gameBuf;
+
+                for(bptr = gameBuf.data(); *bptr; bptr++) {
+                    switch(*bptr) {
+                        case 'U':
+                          u = new User(this, bptr);
+                          u->isSelf = false;
+                          emit newUser(u);
+                          goto tmpout;
+                        case 'D':
+                            goto tmpout;
+                            break;
+                        case 'C':
+                            goto tmpout;
+                            break;
+                        case 'M':
+                            goto tmpout;
+                            break;
+                    }
                 }
             }
+            else {
+                if(*bptr == 'M') {
+
+                }
+            }
+            tmpout:
             gameBuf.clear();
         }
     }
@@ -252,7 +277,7 @@ void Connection::gameEvent()
 
 void Connection::keepAlive()
 {
-    sock->write(ackX0, sizeof ackX0);
+    //sock->write(ackX0, sizeof ackX0);
     sock->write(ackX2, sizeof ackX2);
 }
 

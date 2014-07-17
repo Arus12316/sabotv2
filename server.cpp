@@ -43,6 +43,7 @@ Server::Server(int index, QObject *parent) :
     QObject(parent)
 {
     this->index = index;
+    this->master = NULL;
 
     for(int i = 0; i < UID_TABLE_SIZE; i++)
         utable[i] = NULL;

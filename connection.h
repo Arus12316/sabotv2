@@ -24,6 +24,10 @@ public:
     /* General ACK 2 */
     static const char ackX2[];
 
+    class Server *server;
+    class QListWidget *messageBox;
+
+
     explicit Connection(int server, MainWindow *win, QObject *parent = 0);
 
     ~Connection();
@@ -44,13 +48,16 @@ public:
      * Account Creating methods. Methods with less parameters generate the values randomly. Use
      * only in 1 thread. These are not reentrant.
      */
-    static void createAccount(const char name[], const char pass[], const char email[], int color);
+    static void createAccount(const char name[], const char pass[], const char email[], quint8 r, quint8 g, quint8 b);
     static void createAccount(const char name[], const char pass[], const char email[]);
     static void createAccount(const char name[], const char pass[]);
     static void createAccount(const char pass[]);
 
 signals:
     void signalConnected();
+
+    void newUser(class User *);
+    void newSelf(class User *);
 
 public slots:
 
@@ -75,10 +82,10 @@ private:
     char *username;
     char *password;
     bool active;
-    class Server *server;
     QByteArray gameBuf;
     QTimer timer;
     class User *user;
+    MainWindow *win;
 
     static const quint16 PORT;
 

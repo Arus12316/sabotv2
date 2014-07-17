@@ -3,6 +3,8 @@
 
 #include "connection.h"
 #include <QObject>
+#include <QColor>
+#include <QBrush>
 
 #define MAX_UNAME_PASS 20
 
@@ -13,6 +15,10 @@ class User : public QObject
 public:
     char id[4];
     char name[MAX_UNAME_PASS + 1];
+    QColor color;
+    QBrush brush;
+
+
     char field1[32];
     char field2[32];
     char field3[32];
@@ -24,8 +30,8 @@ public:
     char field9[32];
 
     char modLevel;
-
-
+    Connection *conn;
+    bool isSelf;
 
     User(Connection *conn, QObject *parent = 0);
     User(const char *buf, QObject *parent = 0);
@@ -38,7 +44,6 @@ signals:
 public slots:
 
 private:
-    Connection *conn;
 
     void parseData(const char *data);
 };

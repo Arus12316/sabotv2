@@ -26,3 +26,4 @@ HEADERS  += mainwindow.h \
     server.h
 
 FORMS    += mainwindow.ui
+CONFIG += c++11
