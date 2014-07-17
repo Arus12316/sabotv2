@@ -74,26 +74,30 @@ void MainWindow::newSelf(class User *u)
 
 void MainWindow::newTab(Server *server)
 {
-    QString name("server");
-    QWidget *layout = new QWidget(ui->tabs);
-    QWidget *prototype = ui->tabs->widget(0);
+    if(ui->tabs->tabText(0) == "<not connected>") {
+        ui->tabs->setTabText(0, server->getName());
+    }
+    else {
+        QWidget *prototype = ui->tabs->widget(0);
+        QString name("server");
+        QWidget *layout = new QWidget(ui->tabs);
 
-    QListWidget *userList;
+        QListWidget *selfUserList;
+        QListWidget *userList;
 
+        name += ui->tabs->count() + 1;
+        layout->setObjectName(name);
 
-    server += ui->tabs->count() + 1;
-    layout->setObjectName(name);
+        selfUserList = new QListWidget(layout);
+        selfUserList->move(ui->selfUserList->pos());
+        selfUserList->resize(ui->selfUserList->size());
 
-    userList = new QListWidget(layout);
+        userList = new QListWidget(layout);
+        userList->move(ui->userList->pos());
+        userList->resize(ui->userList->size());
 
-    userList->move(ui->userList->pos());
-    userList->resize(ui->userList->size());
-
-    printf("~~%p\n", server);
-    fflush(stdout);
-
-    ui->tabs->addTab(layout, server->getName());
-
+        ui->tabs->addTab(layout, server->getName());
+    }
 }
 
 void MainWindow::postMessage(message_s *msg)

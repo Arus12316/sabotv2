@@ -235,7 +235,7 @@ void Connection::sessionInit()
 void Connection::gameEvent()
 {
     int i;
-    char c;
+    char c, t;
     qint64 n;
     char *bptr, *mptr;
     User *u;
@@ -250,7 +250,6 @@ void Connection::gameEvent()
             n = gameBuf.size();
             if(server->master == this) {
                 qDebug() << gameBuf;
-
                 for(bptr = gameBuf.data(); *bptr; bptr++) {
                     switch(*bptr) {
                         case 'U':
@@ -291,7 +290,15 @@ void Connection::gameEvent()
             }
             else {
                 if(*bptr == 'M') {
+                    id[0] = *++bptr;
+                    id[1] = *++bptr;
+                    id[2] = *++bptr;
+                    id[3] = '\0';
 
+                    t = *++bptr;
+                    if(t == 'P') {
+
+                    }
                 }
             }
             tmpout:

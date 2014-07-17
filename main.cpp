@@ -11,8 +11,7 @@ int main(int argc, char *argv[])
     qsrand(time(NULL));
 
     for(int i = 0; i < N_GAMESERVERS; i++) {
-        Server::servers[i] = new Server(i);
-        printf("%p\n", Server::servers[i]);
+        Server::servers[i] = new Server(i, NULL);
     }
 
     proxy.setType(QNetworkProxy::Socks5Proxy);
@@ -21,15 +20,10 @@ int main(int argc, char *argv[])
 
     QNetworkProxy::setApplicationProxy(proxy);
 
-    qDebug() << "Logged In" <<endl;
-
-
     QApplication a(argc, argv);
     MainWindow w;
     w.show();
-
     w.newTab(Server::servers[1]);
-
 
     return a.exec();
 }

@@ -45,7 +45,6 @@ Server::Server(int index, QObject *parent) :
     this->index = index;
     this->master = NULL;
 
-
     for(int i = 0; i < UID_TABLE_SIZE; i++)
         utable[i] = NULL;
 }
@@ -57,10 +56,6 @@ const char *Server::getIP()
 
 const char *Server::getName()
 {
-    printf("%d\n", this->index);
-    printf("%p\n", Server::saServers[this->index]);
-
-    fflush(stdout);
     return Server::saServers[this->index][0];
 }
 

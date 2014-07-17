@@ -12,6 +12,8 @@ class Server : public QObject
     Q_OBJECT
 public:
 
+    int index;
+
     class Connection *master;
     class QListWidget *userList;
 
@@ -61,7 +63,6 @@ public slots:
 private:
     quint16 hashUid(const char *uid);
 
-    short index;
     struct hash_s {
         char key[4];
         class User *user;
