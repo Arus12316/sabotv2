@@ -36,6 +36,8 @@ public:
     class QListWidget *getUserList();
     void postMessage();
 
+    void newTab(class Server *server);
+
 public slots:
     void loginButtonPressed();
     void newUser(class User *);

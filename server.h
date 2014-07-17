@@ -18,6 +18,7 @@ public:
     explicit Server(int index, QObject *parent = 0);
 
     const char *getIP();
+    const char *getName();
 
     static const char *toIP(const char key[]);
 

@@ -8,6 +8,7 @@
 #include <QListWidget>
 #include <QListWidgetItem>
 
+
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
@@ -71,12 +72,38 @@ void MainWindow::newSelf(class User *u)
     ui->selfUserList->addItem(u->name);
 }
 
+void MainWindow::newTab(Server *server)
+{
+    QString name("server");
+    QWidget *layout = new QWidget(ui->tabs);
+    QWidget *prototype = ui->tabs->widget(0);
+
+    QListWidget *userList;
+
+
+    server += ui->tabs->count() + 1;
+    layout->setObjectName(name);
+
+    userList = new QListWidget(layout);
+
+    userList->move(ui->userList->pos());
+    userList->resize(ui->userList->size());
+
+    printf("~~%p\n", server);
+    fflush(stdout);
+
+    ui->tabs->addTab(layout, server->getName());
+
+}
+
 void MainWindow::postMessage(message_s *msg)
 {
     QString post ;
 
     post += "<";
     post += msg->sender->name;
+    if(msg->type == 'P')
+        post += " : P";
     post += "> ";
     post += msg->body;
 
@@ -88,10 +115,10 @@ void MainWindow::postMessage(message_s *msg)
 void MainWindow::deleteUser(Connection *conn, char *id)
 {
     User *user = conn->server->lookupUser(id);
-    QList<QListWidgetItem *> item = conn->server->userList->findItems(QString::fromStdString(user->name), Qt::MatchExactly);
+    QList<QListWidgetItem *> itemList = conn->server->userList->findItems(QString::fromStdString(user->name), Qt::MatchExactly);
 
-    qDebug() << "Removing: " << user->name;
-    conn->server->userList->removeItemWidget(item.first());
+    qDebug() << endl << user->name << " has disconnected" << endl;
+    delete itemList.first();
     conn->server->deleteUser(id);
 
     delete[] id;
