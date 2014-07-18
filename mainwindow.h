@@ -34,7 +34,7 @@ public:
 
     void setConn(class Connection *conn);
     void newTab(const char *server);
-    class QListWidget *getMessageBox();
+    class QListWidget *getMessageView();
     class QListWidget *getUserList();
     class QLineEdit *getMessageInput();
     class QListWidget *getSelfUserList();

@@ -24,7 +24,7 @@ void MainWindow::setConn(class Connection *conn)
     this->conn = conn;
 }
 
-QListWidget *MainWindow::getMessageBox()
+QListWidget *MainWindow::getMessageView()
 {
     return ui->messageView;
 }
@@ -146,7 +146,7 @@ void MainWindow::postMessage(message_s *msg)
     post += "> ";
     post += msg->body;
 
-    msg->view->messageBox->addItem(post);
+    currServer->messageView->addItem(post);
 
     delete msg;
 }
@@ -164,16 +164,13 @@ void MainWindow::deleteUser(Connection *conn, char *id)
     delete user;
 }
 
-void MainWindow::selfUserListItemChanged(class QListWidgetItem *curr, class QListWidgetItem *prev)
+void MainWindow::selfUserListItemChanged(QListWidgetItem *curr, QListWidgetItem *prev)
 {
     Connection *conn;
     qDebug() << "Changed! " << endl;
 
     QVariant data = curr->data(Qt::UserRole);
     conn = data.value<Connection *>();
-
-    //TEMPORARY!!!
-    conn->messageBox= currServer->master->messageBox;
 
     currServer->master = conn;
 }

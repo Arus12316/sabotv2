@@ -18,6 +18,7 @@ public:
     class QListWidget *userList;
     class QLineEdit *messageInput;
     class QListWidget *selfUserList;
+    class QListWidget *messageView;
 
     explicit Server(int index, QObject *parent = 0);
 

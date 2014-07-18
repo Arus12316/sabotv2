@@ -33,8 +33,6 @@ public:
     static const char ackX2[];
 
     class Server *server;
-    class QListWidget *messageBox;
-
 
     explicit Connection(int server, MainWindow *win, QObject *parent = 0);
 
@@ -81,7 +79,6 @@ public slots:
     void errorConnection(QAbstractSocket::SocketError error);
     void test();
     void sendPublicMessage(message_s *msg);
-
 
 
 private:

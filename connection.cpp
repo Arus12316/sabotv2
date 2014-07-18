@@ -219,7 +219,7 @@ void Connection::sessionInit()
             emit newSelf(user);
             if(!server->master) {
                 server->master = this;
-                messageBox = win->getMessageBox();
+                server->messageView = win->getMessageView();
                 emit newUser(user);
             }
         }
@@ -323,7 +323,7 @@ void Connection::userConnected()
 
 void Connection::userDisconnected()
 {
-    qDebug() << "Disconnecteds!" <<  endl;
+    qDebug() << "Disconnected!" <<  endl;
 }
 
 
