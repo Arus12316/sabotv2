@@ -55,8 +55,6 @@ public slots:
 private:
     Ui::MainWindow *ui;
 
-    std::unordered_map<char *, class QListWidget> derp;
-
     class Connection *conn;
 };
 
