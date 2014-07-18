@@ -14,6 +14,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    currServer = NULL;
     connect(ui->loginButton, SIGNAL(clicked()), this, SLOT(loginButtonPressed()));
     connect(ui->password, SIGNAL(returnPressed()), this, SLOT(loginButtonPressed()));
 }
@@ -55,6 +56,7 @@ void MainWindow::loginButtonPressed()
     int server = ui->serverList->currentIndex();
     Connection *c = new Connection(server, this);
 
+    currServer = c->server;
     username = ui->userName->text();
     password = ui->password->text();
 
@@ -88,9 +90,20 @@ void MainWindow::newUser(User *u)
 
 void MainWindow::newSelf(class User *u)
 {
-    ui->selfUserList->addItem(u->name);
-    if(u->conn->server->master == u->conn) {
+    Server *server = u->conn->server;
+
+    QVariant *data = new QVariant(QVariant::fromValue<Connection *>(u->conn));
+    QListWidgetItem *item = new QListWidgetItem();
+
+    item->setText(u->name);
+    item->setData(Qt::UserRole, *data);
+
+    ui->selfUserList->addItem(item);
+
+    if(server->master == u->conn) {
         ui->selfUserList->setCurrentRow(0);
+        connect(ui->selfUserList, SIGNAL(currentItemChanged(QListWidgetItem*,QListWidgetItem*)), this, SLOT(selfUserListItemChanged(QListWidgetItem*,QListWidgetItem*)));
+        connect(server->messageInput, SIGNAL(returnPressed()), this, SLOT(sendMessage()));
     }
 }
 
@@ -150,6 +163,33 @@ void MainWindow::deleteUser(Connection *conn, char *id)
     delete[] id;
     delete user;
 }
+
+void MainWindow::selfUserListItemChanged(class QListWidgetItem *curr, class QListWidgetItem *prev)
+{
+    Connection *conn;
+    qDebug() << "Changed! " << endl;
+
+    QVariant data = curr->data(Qt::UserRole);
+    conn = data.value<Connection *>();
+
+    //TEMPORARY!!!
+    conn->messageBox= currServer->master->messageBox;
+
+    currServer->master = conn;
+}
+
+void MainWindow::sendMessage()
+{
+    QString qmsg;
+    std::string smsg;
+    Connection *conn = currServer->master;
+
+    qmsg = currServer->messageInput->text();
+    smsg = qmsg.toStdString();
+    conn->sendMessage(smsg.c_str());
+    currServer->messageInput->clear();
+}
+
 
 MainWindow::~MainWindow()
 {

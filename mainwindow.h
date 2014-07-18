@@ -27,6 +27,8 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
+    class Server *currServer;
+
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
@@ -46,6 +48,9 @@ public slots:
     void newSelf(class User *);
     void postMessage(struct message_s *);
     void deleteUser(class Connection *conn, char *id);
+
+    void selfUserListItemChanged(class QListWidgetItem *curr, class QListWidgetItem *prev);
+    void sendMessage();
 
 private:
     Ui::MainWindow *ui;
