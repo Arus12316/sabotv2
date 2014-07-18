@@ -57,6 +57,8 @@ Connection::Connection(int server, MainWindow *win, QObject *parent) :
 
     //temporary!!!
     this->server->userList = win->getUserList();
+    this->server->selfUserList = win->getSelfUserList();
+    this->server->messageInput = win->getMessageInput();
 
     connect(&thread, SIGNAL(started()), this, SLOT(sessionInit()));
     connect(this, SIGNAL(newUser(User *)), win, SLOT(newUser(User *)));
@@ -248,45 +250,44 @@ void Connection::gameEvent()
 
         if(!c) {
             n = gameBuf.size();
+            bptr = gameBuf.data();
+
             if(server->master == this) {
                 qDebug() << gameBuf;
-                for(bptr = gameBuf.data(); *bptr; bptr++) {
-                    switch(*bptr) {
-                        case 'U':
-                          u = new User(this, bptr);
-                          u->isSelf = false;
-                          emit newUser(u);
-                          goto tmpout;
-                        case 'D':
-                            idSignal = new char[4];
-                            idSignal[0] = *++bptr;
-                            idSignal[1] = *++bptr;
-                            idSignal[2] = *++bptr;
-                            idSignal[3] = '\0';
-                            emit deleteUser(this, idSignal);
-                            break;
-                        case 'C':
-                            goto tmpout;
-                            break;
-                        case 'M':
-                            id[0] = *++bptr;
-                            id[1] = *++bptr;
-                            id[2] = *++bptr;
-                            id[3] = '\0';
+                switch(*bptr) {
+                    case 'U':
+                        u = new User(this, bptr);
+                        u->isSelf = false;
+                        emit newUser(u);
+                        break;
+                    case 'D':
+                        idSignal = new char[4];
+                        idSignal[0] = *++bptr;
+                        idSignal[1] = *++bptr;
+                        idSignal[2] = *++bptr;
+                        idSignal[3] = '\0';
+                        emit deleteUser(this, idSignal);
+                        break;
+                    case 'C':
+                        break;
+                    case 'M':
+                        id[0] = *++bptr;
+                        id[1] = *++bptr;
+                        id[2] = *++bptr;
+                        id[3] = '\0';
 
-                            msg = new message_s;
-                            msg->type = *++bptr;
-                            mptr = msg->body;
-                            while(*bptr)
-                                *mptr++ = *++bptr;
+                        msg = new message_s;
+                        msg->type = *++bptr;
+                        mptr = msg->body;
+                        while(*bptr)
+                            *mptr++ = *++bptr;
 
-                            *mptr = '\0';
-                            msg->sender = server->lookupUser(id);
-                            msg->view = this;
-                            emit postMessage(msg);
-                            break;
+                        *mptr = '\0';
+                        msg->sender = server->lookupUser(id);
+                        msg->view = this;
+                        emit postMessage(msg);
+                        break;
                     }
-                }
             }
             else {
                 if(*bptr == 'M') {
@@ -341,6 +342,11 @@ void Connection::errorConnection(QAbstractSocket::SocketError error)
 void Connection::test()
 {
     qDebug() << "Slot called.";
+}
+
+void Connection::sendPublicMessage(message_s *msg)
+{
+    sendMessage(msg->body);
 }
 
 Connection::~Connection()

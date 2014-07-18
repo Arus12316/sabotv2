@@ -16,8 +16,6 @@ public:
     char id[4];
     char name[MAX_UNAME_PASS + 1];
     QColor color;
-    QBrush brush;
-
 
     char field1[32];
     char field2[32];

@@ -16,6 +16,8 @@ public:
 
     class Connection *master;
     class QListWidget *userList;
+    class QLineEdit *messageInput;
+    class QListWidget *selfUserList;
 
     explicit Server(int index, QObject *parent = 0);
 

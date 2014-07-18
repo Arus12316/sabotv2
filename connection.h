@@ -80,6 +80,8 @@ public slots:
     void userDisconnected();
     void errorConnection(QAbstractSocket::SocketError error);
     void test();
+    void sendPublicMessage(message_s *msg);
+
 
 
 private:

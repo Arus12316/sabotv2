@@ -67,8 +67,6 @@ void User::parseData(const char *data)
    // qDebug() << "RGB( "<< r << ", " << g << ", " << b << " )";
 
     color.setRgb(r, g, b);
-    brush.setColor(color);
-    brush.setStyle(Qt::SolidPattern);
 
     for(ptr = field1; *data != ';'; data++)
         *ptr++ = *data;

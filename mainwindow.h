@@ -34,6 +34,8 @@ public:
     void newTab(const char *server);
     class QListWidget *getMessageBox();
     class QListWidget *getUserList();
+    class QLineEdit *getMessageInput();
+    class QListWidget *getSelfUserList();
     void postMessage();
 
     void newTab(class Server *server);

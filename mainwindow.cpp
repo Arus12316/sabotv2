@@ -33,6 +33,16 @@ QListWidget *MainWindow::getUserList()
     return ui->userList;
 }
 
+QLineEdit *MainWindow::getMessageInput()
+{
+    return ui->messageInput;
+}
+
+QListWidget *MainWindow::getSelfUserList()
+{
+    return ui->selfUserList;
+}
+
 void MainWindow::newTab(const char *server)
 {
 
@@ -58,10 +68,19 @@ void MainWindow::loginButtonPressed()
 
 void MainWindow::newUser(User *u)
 {
+    QString name;
     QListWidgetItem *item = new QListWidgetItem;
 
+    if(u->modLevel > '0') {
+        name += "M";
+        name += u->modLevel;
+        name += ' ';
+    }
+    else
+        name += "     ";
+    name += u->name;
     item->setBackground(u->color);
-    item->setText(u->name);
+    item->setText(name);
     ui->userList->addItem(item);
 
     u->conn->server->insertUser(u);
@@ -70,6 +89,9 @@ void MainWindow::newUser(User *u)
 void MainWindow::newSelf(class User *u)
 {
     ui->selfUserList->addItem(u->name);
+    if(u->conn->server->master == u->conn) {
+        ui->selfUserList->setCurrentRow(0);
+    }
 }
 
 void MainWindow::newTab(Server *server)
@@ -119,7 +141,7 @@ void MainWindow::postMessage(message_s *msg)
 void MainWindow::deleteUser(Connection *conn, char *id)
 {
     User *user = conn->server->lookupUser(id);
-    QList<QListWidgetItem *> itemList = conn->server->userList->findItems(QString::fromStdString(user->name), Qt::MatchExactly);
+    QList<QListWidgetItem *> itemList = conn->server->userList->findItems(QString::fromStdString(user->name), Qt::MatchContains);
 
     qDebug() << endl << user->name << " has disconnected" << endl;
     delete itemList.first();
@@ -128,7 +150,6 @@ void MainWindow::deleteUser(Connection *conn, char *id)
     delete[] id;
     delete user;
 }
-
 
 MainWindow::~MainWindow()
 {
