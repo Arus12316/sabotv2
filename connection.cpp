@@ -216,12 +216,12 @@ void Connection::sessionInit()
         if(buf[0] == 'A') {
             user = new User(this, buf);
             user->isSelf = true;
-            emit newUser(user);
             if(!server->master) {
                 server->master = this;
                 server->messageView = win->getMessageView();
-                emit newSelf(user);
             }
+            emit newUser(user);
+            emit newSelf(user);
         }
 
         sock->write(finishLogin, sizeof finishLogin);

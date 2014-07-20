@@ -73,20 +73,24 @@ void MainWindow::newUser(User *u)
     QString name;
     QListWidgetItem *item = new QListWidgetItem;
 
-    if(u->modLevel > '0') {
-        name += "M";
-        name += u->modLevel;
-        name += ' ';
-    }
-    else
-        name += "     ";
-    name += u->name;
-    item->setBackground(u->color);
-    item->setText(name);
-    ui->userList->addItem(item);
+    QList<QListWidgetItem *> selfList = u->conn->server->selfUserList->findItems(QString::fromStdString(u->name), Qt::MatchExactly);
 
+    if(!selfList.size()) {
+        if(u->modLevel > '0') {
+            name += "M";
+            name += u->modLevel;
+            name += ' ';
+        }
+        else
+            name += "     ";
+        name += u->name;
+        item->setBackground(u->color);
+        item->setText(name);
+        ui->userList->addItem(item);
+
+        u->conn->server->insertUser(u);
+    }
     lock.lock();
-    u->conn->server->insertUser(u);
     cond.wakeOne();
     lock.unlock();
 }
