@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1059</width>
-    <height>552</height>
+    <width>1414</width>
+    <height>578</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,8 +19,8 @@
      <rect>
       <x>0</x>
       <y>0</y>
-      <width>1041</width>
-      <height>501</height>
+      <width>1401</width>
+      <height>511</height>
      </rect>
     </property>
     <property name="currentIndex">
@@ -252,6 +252,16 @@
        <string>Login Multiple Users</string>
       </property>
      </widget>
+     <widget class="QListWidget" name="miscView">
+      <property name="geometry">
+       <rect>
+        <x>960</x>
+        <y>0</y>
+        <width>421</width>
+        <height>381</height>
+       </rect>
+      </property>
+     </widget>
     </widget>
    </widget>
   </widget>
@@ -260,7 +270,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1059</width>
+     <width>1414</width>
      <height>22</height>
     </rect>
    </property>

@@ -1,5 +1,9 @@
 #include "user.h"
 
+#define BRIGHTNESS 100
+#define MINPLAYERCOLORVALUE 6582527
+#define MAXPLAYERCOLORVALUE 16777158
+
 User::User(QObject *parent) :
     QObject(parent)
 {
@@ -26,7 +30,7 @@ void User::parseData(const char *data)
 {
     int i, n;
     char *ptr, type, col[4];
-    int r, g, b;
+    int r, g, b, rgb;
 
     col[3] = '\0';
     type = *data++;
@@ -64,9 +68,9 @@ void User::parseData(const char *data)
     col[2] = *data++;
     b = atoi(col);
 
+
    // qDebug() << "RGB( "<< r << ", " << g << ", " << b << " )";
 
-    color.setRgb(r, g, b);
 
     for(ptr = field1; *data != ';'; data++)
         *ptr++ = *data;
@@ -129,6 +133,29 @@ void User::parseData(const char *data)
     }
 
     modLevel = *++data;
+
+
+    if(!modLevel) {
+        rgb = r << 16 ^ g << 8 ^ b;
+        if(rgb < MINPLAYERCOLORVALUE || rgb > MAXPLAYERCOLORVALUE) {
+            r = 222;
+            g = 2;
+            b = 2;
+        }
+    }
+    r += BRIGHTNESS;
+    if(r > 255)
+        r = 255;
+
+    g += BRIGHTNESS;
+    if(g > 255)
+        g = 255;
+
+    b += BRIGHTNESS;
+    if(b > 255)
+        b = 255;
+
+    color.setRgb(r, g, b, 255);
 
    // qDebug() << "Mod Level: " << modLevel;
 }

@@ -17,6 +17,13 @@ MainWindow::MainWindow(QWidget *parent) :
     currServer = NULL;
     connect(ui->loginButton, SIGNAL(clicked()), this, SLOT(loginButtonPressed()));
     connect(ui->password, SIGNAL(returnPressed()), this, SLOT(loginButtonPressed()));
+
+    connect(this, &MainWindow::postMiscMessage,
+        [=](Server *server, QString *msg) {
+            server->miscView->addItem(*msg);
+            server->miscView->scrollToBottom();
+            delete msg;
+    } );
 }
 
 void MainWindow::setConn(class Connection *conn)
@@ -42,6 +49,11 @@ QLineEdit *MainWindow::getMessageInput()
 QListWidget *MainWindow::getSelfUserList()
 {
     return ui->selfUserList;
+}
+
+QListWidget *MainWindow::getMiscView()
+{
+    return ui->miscView;
 }
 
 void MainWindow::newTab(const char *server)
@@ -70,7 +82,7 @@ void MainWindow::loginButtonPressed()
 
 void MainWindow::newUser(User *u)
 {
-    QString name;
+    QString name, *msg;
     QListWidgetItem *item = new QListWidgetItem;
 
     QList<QListWidgetItem *> selfList = u->conn->server->selfUserList->findItems(QString::fromStdString(u->name), Qt::MatchExactly);
@@ -89,7 +101,17 @@ void MainWindow::newUser(User *u)
         ui->userList->addItem(item);
 
         u->conn->server->insertUser(u);
+
+        msg = new QString('<');
+        *msg += u->name;
+        *msg += ':';
+        *msg += u->id;
+        *msg += "> has entered the lobby.";
+
+        emit postMiscMessage(u->conn->server, msg);
+
     }
+
     lock.lock();
     cond.wakeOne();
     lock.unlock();
@@ -155,24 +177,31 @@ void MainWindow::postMessage(message_s *msg)
 
     currServer->messageView->addItem(post);
     currServer->messageView->scrollToBottom();
+    // msg->sender->conn->server->messageView
 
     delete msg;
 }
 
-void MainWindow::deleteUser(Connection *conn, char *id)
+void MainWindow::userDisconnected(User *u)
 {
-    User *user = conn->server->lookupUser(id);
-    QList<QListWidgetItem *> itemList = conn->server->userList->findItems(QString::fromStdString(user->name), Qt::MatchContains);    
+    Connection *conn = u->conn;
+    QString *msg = new QString("<");
+    QList<QListWidgetItem *> itemList = conn->server->userList->findItems(QString::fromStdString(u->name), Qt::MatchContains);
 
-    qDebug() << endl << user->name << " has disconnected" << endl;
     delete itemList.first();
 
+    *msg += u->name;
+    *msg += ':';
+    *msg += u->id;
+    *msg += "> has left the lobby.";
+
+    emit postMiscMessage(conn->server, msg);
+
     lock.lock();
-    conn->server->deleteUser(id);
+    conn->server->deleteUser(u->id);
     cond.wakeOne();
     lock.unlock();
 
-    delete[] id;
 }
 
 void MainWindow::selfUserListItemChanged(QListWidgetItem *curr, QListWidgetItem *prev)
@@ -197,7 +226,6 @@ void MainWindow::sendMessage()
     conn->sendMessage(smsg.c_str());
     currServer->messageInput->clear();
 }
-
 
 MainWindow::~MainWindow()
 {

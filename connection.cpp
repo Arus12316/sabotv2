@@ -59,12 +59,13 @@ Connection::Connection(int server, MainWindow *win, QObject *parent) :
     this->server->userList = win->getUserList();
     this->server->selfUserList = win->getSelfUserList();
     this->server->messageInput = win->getMessageInput();
+    this->server->miscView = win->getMiscView();
 
     connect(&thread, SIGNAL(started()), this, SLOT(sessionInit()));
     connect(this, SIGNAL(newUser(User *)), win, SLOT(newUser(User *)));
     connect(this, SIGNAL(newSelf(User *)), win, SLOT(newSelf(User *)));
     connect(this, SIGNAL(postMessage(message_s *)), win, SLOT(postMessage(message_s *)));
-    connect(this, SIGNAL(deleteUser(Connection *, char *)), win, SLOT(deleteUser(Connection *, char* )));
+    connect(this, SIGNAL(userDisconnected(User *)), win, SLOT(userDisconnected(User *)));
 }
 
 
@@ -137,10 +138,9 @@ void Connection::createAccount(const char name[], const char pass[], const char 
     static QNetworkAccessManager netAccess;
     static QUrlQuery query;
 
-    QString color;
-    color.append(QString::number(r));
-    color.append(QString::number(g));
-    color.append(QString::number(b));
+    char color[10];
+
+    sprintf(color, "%003u%003u%003u", r, g, b);
 
     query.clear();
     query.addQueryItem("email_address", email);
@@ -241,7 +241,7 @@ void Connection::gameEvent()
     qint64 n;
     char *bptr, *mptr;
     User *u;
-    char id[4], *idSignal;
+    char id[4];
     message_s *msg;
 
     while(sock->getChar(&c)) {
@@ -266,12 +266,12 @@ void Connection::gameEvent()
                         win->lock.unlock();
                         break;
                     case 'D':
-                        idSignal = new char[4];
-                        idSignal[0] = *++bptr;
-                        idSignal[1] = *++bptr;
-                        idSignal[2] = *++bptr;
-                        idSignal[3] = '\0';
-                        emit deleteUser(this, idSignal);
+                        id[0] = *++bptr;
+                        id[1] = *++bptr;
+                        id[2] = *++bptr;
+                        id[3] = '\0';
+                        u = server->lookupUser(id);
+                        emit userDisconnected(u);
 
                         //force synchronization
                         win->lock.lock();

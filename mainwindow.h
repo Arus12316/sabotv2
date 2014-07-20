@@ -42,16 +42,20 @@ public:
     class QListWidget *getUserList();
     class QLineEdit *getMessageInput();
     class QListWidget *getSelfUserList();
+    class QListWidget *getMiscView();
     void postMessage();
 
     void newTab(class Server *server);
+
+signals:
+    void postMiscMessage(class Server *server, QString *msg);
 
 public slots:
     void loginButtonPressed();
     void newUser(class User *);
     void newSelf(class User *);
     void postMessage(struct message_s *);
-    void deleteUser(class Connection *conn, char *id);
+    void userDisconnected(class User *);
 
     void selfUserListItemChanged(class QListWidgetItem *curr, class QListWidgetItem *prev);
     void sendMessage();

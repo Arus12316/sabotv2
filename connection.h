@@ -66,7 +66,7 @@ signals:
     void newSelf(class User *);
 
     void postMessage(message_s *msg);
-    void deleteUser(Connection *conn, char *id);
+    void userDisconnected(class User *);
 
 public slots:
 
