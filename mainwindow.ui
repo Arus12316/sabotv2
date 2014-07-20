@@ -44,7 +44,7 @@
       <property name="geometry">
        <rect>
         <x>0</x>
-        <y>410</y>
+        <y>390</y>
         <width>171</width>
         <height>32</height>
        </rect>
@@ -237,6 +237,19 @@
       </property>
       <property name="text">
        <string>send</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="loginButton_2">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>430</y>
+        <width>171</width>
+        <height>32</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Login Multiple Users</string>
       </property>
      </widget>
     </widget>

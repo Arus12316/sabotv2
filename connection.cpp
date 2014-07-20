@@ -212,15 +212,15 @@ void Connection::sessionInit()
         n = sock->read(buf, sizeof buf);
 
         qDebug() << buf;
-
+//0f30;inappropriate
         if(buf[0] == 'A') {
             user = new User(this, buf);
             user->isSelf = true;
-            emit newSelf(user);
+            emit newUser(user);
             if(!server->master) {
                 server->master = this;
                 server->messageView = win->getMessageView();
-                emit newUser(user);
+                emit newSelf(user);
             }
         }
 
@@ -253,12 +253,17 @@ void Connection::gameEvent()
             bptr = gameBuf.data();
 
             if(server->master == this) {
-                qDebug() << gameBuf;
+                qDebug() << gameBuf << endl;
                 switch(*bptr) {
                     case 'U':
                         u = new User(this, bptr);
                         u->isSelf = false;
                         emit newUser(u);
+
+                        //force synchronization
+                        win->lock.lock();
+                        win->cond.wait(&win->lock);
+                        win->lock.unlock();
                         break;
                     case 'D':
                         idSignal = new char[4];
@@ -267,6 +272,11 @@ void Connection::gameEvent()
                         idSignal[2] = *++bptr;
                         idSignal[3] = '\0';
                         emit deleteUser(this, idSignal);
+
+                        //force synchronization
+                        win->lock.lock();
+                        win->cond.wait(&win->lock);
+                        win->lock.unlock();
                         break;
                     case 'C':
                         break;
@@ -302,7 +312,6 @@ void Connection::gameEvent()
                     }
                 }
             }
-            tmpout:
             gameBuf.clear();
         }
     }

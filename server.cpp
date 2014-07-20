@@ -100,6 +100,7 @@ void Server::insertUser(User *u)
 
     n->next = rec;
     n->user = u;
+
     *prec = n;
 }
 
@@ -116,6 +117,7 @@ void Server::deleteUser(const char *key)
             else {
                 *prec = rec->next;
             }
+            delete rec->user;
             delete rec;
             break;
         }

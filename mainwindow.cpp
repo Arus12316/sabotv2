@@ -85,7 +85,10 @@ void MainWindow::newUser(User *u)
     item->setText(name);
     ui->userList->addItem(item);
 
+    lock.lock();
     u->conn->server->insertUser(u);
+    cond.wakeOne();
+    lock.unlock();
 }
 
 void MainWindow::newSelf(class User *u)
@@ -147,6 +150,7 @@ void MainWindow::postMessage(message_s *msg)
     post += msg->body;
 
     currServer->messageView->addItem(post);
+    currServer->messageView->scrollToBottom();
 
     delete msg;
 }
@@ -154,14 +158,17 @@ void MainWindow::postMessage(message_s *msg)
 void MainWindow::deleteUser(Connection *conn, char *id)
 {
     User *user = conn->server->lookupUser(id);
-    QList<QListWidgetItem *> itemList = conn->server->userList->findItems(QString::fromStdString(user->name), Qt::MatchContains);
+    QList<QListWidgetItem *> itemList = conn->server->userList->findItems(QString::fromStdString(user->name), Qt::MatchContains);    
 
     qDebug() << endl << user->name << " has disconnected" << endl;
     delete itemList.first();
+
+    lock.lock();
     conn->server->deleteUser(id);
+    cond.wakeOne();
+    lock.unlock();
 
     delete[] id;
-    delete user;
 }
 
 void MainWindow::selfUserListItemChanged(QListWidgetItem *curr, QListWidgetItem *prev)

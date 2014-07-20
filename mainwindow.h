@@ -3,6 +3,8 @@
 
 #include <QMainWindow>
 #include <QTabWidget>
+#include <QMutex>
+#include <QWaitCondition>
 #include <unordered_map>
 
 template <class T> class PCharHash;
@@ -27,6 +29,8 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
+    QMutex lock;
+    QWaitCondition cond;
     class Server *currServer;
 
     explicit MainWindow(QWidget *parent = 0);

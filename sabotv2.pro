@@ -17,13 +17,16 @@ SOURCES += main.cpp\
     connection.cpp \
     parse.cpp \
     user.cpp \
-    server.cpp
+    server.cpp \
+    loginmultiusers.cpp
 
 HEADERS  += mainwindow.h \
     connection.h \
     parse.h \
     user.h \
-    server.h
+    server.h \
+    loginmultiusers.h
 
-FORMS    += mainwindow.ui
+FORMS    += mainwindow.ui \
+    loginmultiusers.ui
 CONFIG += c++11

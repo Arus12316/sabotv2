@@ -36,7 +36,7 @@ void User::parseData(const char *data)
     id[2] = *data++;
     id[3] = '\0';
 
-    qDebug() << "id: " << id;
+    //qDebug() << "id: " << id;
 
     for(ptr = (char *)data; *data == '#'; data++);
 
@@ -47,7 +47,7 @@ void User::parseData(const char *data)
     }
     name[i] = '\0';
 
-    qDebug() << "name: " << name;
+    //qDebug() << "name: " << name;
 
     col[0] = *data++;
     col[1] = *data++;
