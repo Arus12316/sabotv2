@@ -262,6 +262,16 @@
        </rect>
       </property>
      </widget>
+     <widget class="QLineEdit" name="inputRaw">
+      <property name="geometry">
+       <rect>
+        <x>180</x>
+        <y>450</y>
+        <width>551</width>
+        <height>21</height>
+       </rect>
+      </property>
+     </widget>
     </widget>
    </widget>
   </widget>

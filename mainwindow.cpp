@@ -221,6 +221,8 @@ void MainWindow::sendMessage()
     std::string smsg;
     Connection *conn = currServer->master;
 
+
+    //not thread safe! Move code to slot
     qmsg = currServer->messageInput->text();
     smsg = qmsg.toStdString();
     conn->sendMessage(smsg.c_str());
