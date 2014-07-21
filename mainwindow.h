@@ -43,6 +43,7 @@ public:
     class QLineEdit *getMessageInput();
     class QListWidget *getSelfUserList();
     class QListWidget *getMiscView();
+    class QListWidget *getGameView();
     void postMessage();
 
     void newTab(class Server *server);
@@ -59,6 +60,7 @@ public slots:
 
     void selfUserListItemChanged(class QListWidgetItem *curr, class QListWidgetItem *prev);
     void sendMessage();
+    void postGameList(class Connection *conn);
 
 private:
     Ui::MainWindow *ui;

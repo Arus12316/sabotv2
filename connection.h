@@ -22,6 +22,8 @@ class Connection : public QObject
     Q_OBJECT
 
 public:
+    QMutex listLock;
+    QStringList gameList;
     
     /* General ACK 0 */
     static const char ackX0[];
@@ -67,6 +69,8 @@ signals:
 
     void postMessage(message_s *msg);
     void userDisconnected(class User *);
+    void postGameList(Connection *conn);
+
 
 public slots:
 

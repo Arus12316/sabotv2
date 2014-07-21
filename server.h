@@ -20,6 +20,7 @@ public:
     class QListWidget *selfUserList;
     class QListWidget *messageView;
     class QListWidget *miscView;
+    class QListWidget *gameView;
 
     explicit Server(int index, QObject *parent = 0);
 

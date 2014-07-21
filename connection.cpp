@@ -60,12 +60,14 @@ Connection::Connection(int server, MainWindow *win, QObject *parent) :
     this->server->selfUserList = win->getSelfUserList();
     this->server->messageInput = win->getMessageInput();
     this->server->miscView = win->getMiscView();
+    this->server->gameView = win->getGameView();
 
     connect(&thread, SIGNAL(started()), this, SLOT(sessionInit()));
     connect(this, SIGNAL(newUser(User *)), win, SLOT(newUser(User *)));
     connect(this, SIGNAL(newSelf(User *)), win, SLOT(newSelf(User *)));
     connect(this, SIGNAL(postMessage(message_s *)), win, SLOT(postMessage(message_s *)));
     connect(this, SIGNAL(userDisconnected(User *)), win, SLOT(userDisconnected(User *)));
+    connect(this, SIGNAL(postGameList(Connection *)), win, SLOT(postGameList(Connection *)));
 }
 
 
@@ -255,6 +257,44 @@ void Connection::gameEvent()
             if(server->master == this) {
                 qDebug() << gameBuf << endl;
                 switch(*bptr) {
+                    case '0':
+                        switch(*++bptr) {
+                            case '1':
+                                listLock.lock();
+                                while(*bptr) {
+                                    for(mptr = bptr; *bptr != ';'; bptr++);
+                                    *(bptr - 1) = '\0';
+                                    gameList += mptr;
+                                    bptr++;
+                                }
+                                listLock.unlock();
+                                emit postGameList(this);
+                                break;
+                            case '4':
+                                break;
+                            case '6':
+                                break;
+                            case '7':
+                                break;
+                            case '8':
+                                break;
+                            case '9':
+                                break;
+                            case 'a':
+                                break;
+                            case 'c':
+                                break;
+                            case 'e':
+                            case 'f':
+                                break;
+                            case 'g':
+                                break;
+                            case 'h':
+                                break;
+                            case 'j':
+                                break;
+                        }
+                        break;
                     case 'U':
                         u = new User(this, bptr);
                         u->isSelf = false;

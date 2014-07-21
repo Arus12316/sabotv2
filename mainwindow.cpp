@@ -56,6 +56,11 @@ QListWidget *MainWindow::getMiscView()
     return ui->miscView;
 }
 
+QListWidget *MainWindow::getGameView()
+{
+    return ui->gameList;
+}
+
 void MainWindow::newTab(const char *server)
 {
 
@@ -234,6 +239,17 @@ void MainWindow::sendMessage()
     smsg = qmsg.toStdString();
     conn->sendMessage(smsg.c_str());
     currServer->messageInput->clear();
+}
+
+void MainWindow::postGameList(Connection *conn)
+{
+    conn->listLock.lock();
+
+    conn->server->gameView->clear();
+    conn->gameList.pop_front();
+    conn->server->gameView->addItems(conn->gameList);
+    conn->gameList.clear();
+    conn->listLock.unlock();
 }
 
 MainWindow::~MainWindow()
