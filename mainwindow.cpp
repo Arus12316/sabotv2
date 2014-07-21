@@ -112,6 +112,7 @@ void MainWindow::newUser(User *u)
 
     }
 
+
     lock.lock();
     cond.wakeOne();
     lock.unlock();
@@ -166,19 +167,25 @@ void MainWindow::newTab(Server *server)
 
 void MainWindow::postMessage(message_s *msg)
 {
-    QString post ;
+    QString post("<");
 
-    post += "<";
     post += msg->sender->name;
-    if(msg->type == 'P')
-        post += " : P";
-    post += "> ";
-    post += msg->body;
-
-    currServer->messageView->addItem(post);
-    currServer->messageView->scrollToBottom();
-    // msg->sender->conn->server->messageView
-
+    if(msg->type == '9' || msg->type == 'P') {
+        if(msg->type == 'P')
+            post += " : [Private]";
+        post += "> ";
+        post += msg->body;
+        msg->sender->conn->server->messageView->addItem(post);
+        msg->sender->conn->server->messageView->scrollToBottom();
+    }
+    else {
+        post += " : ";
+        post += msg->type;
+        post += "> ";
+        post += msg->body;
+        msg->sender->conn->server->miscView->addItem(post);
+        msg->sender->conn->server->miscView->scrollToBottom();
+    }
     delete msg;
 }
 
