@@ -117,7 +117,6 @@ void MainWindow::newUser(User *u)
 
     }
 
-
     lock.lock();
     cond.wakeOne();
     lock.unlock();

@@ -70,6 +70,7 @@ signals:
     void postMessage(message_s *msg);
     void userDisconnected(class User *);
     void postGameList(Connection *conn);
+    void sendMessageFromMain(QString *msg);
 
 
 public slots:
