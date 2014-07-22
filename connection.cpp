@@ -221,7 +221,9 @@ void Connection::sessionInit()
             user->isSelf = true;
             if(!server->master) {
                 server->master = this;
+                server->currConn = this;
                 server->messageView = win->getMessageView();
+                connect(win, SIGNAL(sendPublicMessage(QString *)), this, SLOT(sendPublicMessage(QString *)));
             }
             emit newUser(user);
             emit newSelf(user);
@@ -400,6 +402,8 @@ void Connection::sendPublicMessage(QString *msg)
     const char *cstr = sString.c_str();
 
     sendMessage(cstr);
+
+    delete msg;
 }
 
 Connection::~Connection()

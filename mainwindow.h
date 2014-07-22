@@ -50,6 +50,7 @@ public:
 
 signals:
     void postMiscMessage(class Server *server, QString *msg);
+    void sendPublicMessage(QString *msg);
 
 public slots:
     void loginButtonPressed();

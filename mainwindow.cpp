@@ -217,31 +217,29 @@ void MainWindow::userDisconnected(User *u)
 
 void MainWindow::selfUserListItemChanged(QListWidgetItem *curr, QListWidgetItem *prev)
 {
-    Connection *connCurr, *connPrev;
+    Connection *connPrev, *connCurr;
     qDebug() << "Changed! " << endl;
 
     QVariant dataCurr = curr->data(Qt::UserRole);
     QVariant dataPrev = prev->data(Qt::UserRole);
-    connCurr = dataCurr.value<Connection *>();
     connPrev = dataPrev.value<Connection *>();
+    connCurr = dataCurr.value<Connection *>();
 
-   // connect(currServer->messageInput, SIGNAL(returnPressed()), connCurr, SLOT(sendPublicMessage(QString*))
-
-
-    currServer->master = conn;
+    disconnect(this, SIGNAL(sendPublicMessage(QString *)), connPrev, SLOT(sendPublicMessage(QString *)));
+    currServer->currConn = conn;
+    connect(this, SIGNAL(sendPublicMessage(QString *)), connCurr, SLOT(sendPublicMessage(QString *)));
 }
 
 void MainWindow::sendMessage()
 {
-    QString qmsg;
-    std::string smsg;
-    Connection *conn = currServer->master;
+    QString *msg;
+    Connection *conn = currServer->currConn;
 
 
-    //not thread safe! Move code to slot
-    qmsg = currServer->messageInput->text();
-    smsg = qmsg.toStdString();
-    conn->sendMessage(smsg.c_str());
+    msg = new QString(currServer->messageInput->text());
+
+    emit sendPublicMessage(msg);
+
     currServer->messageInput->clear();
 }
 
