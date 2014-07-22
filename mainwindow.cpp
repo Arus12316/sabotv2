@@ -105,6 +105,7 @@ void MainWindow::newUser(User *u)
 
     if(!selfList.size()) {
         item = new QListWidgetItem;
+        u->listEntry = item;
         data = new QVariant(QVariant::fromValue<User *>(u));
         item->setData(Qt::UserRole, *data);
 
@@ -214,9 +215,8 @@ void MainWindow::userDisconnected(User *u)
 {
     Connection *conn = u->conn;
     QString *msg = new QString("<");
-    QList<QListWidgetItem *> itemList = conn->server->userList->findItems(QString::fromStdString(u->name), Qt::MatchContains);
 
-    delete itemList.first();
+    delete u->listEntry;
 
     *msg += u->name;
     *msg += ':';

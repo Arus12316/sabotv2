@@ -4,6 +4,7 @@
 #include "connection.h"
 
 #include <time.h>
+
 #include <QApplication>
 
 int main(int argc, char *argv[])
@@ -19,6 +20,7 @@ int main(int argc, char *argv[])
     proxy.setType(QNetworkProxy::Socks5Proxy);
     proxy.setHostName("127.0.0.1");
     proxy.setPort(9050);
+
 
     QNetworkProxy::setApplicationProxy(proxy);
 

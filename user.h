@@ -30,6 +30,7 @@ public:
     char modLevel;
     Connection *conn;
     bool isSelf;
+    class QListWidgetItem *listEntry;
 
     User(Connection *conn, QObject *parent = 0);
     User(const char *buf, QObject *parent = 0);
