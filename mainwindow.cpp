@@ -61,6 +61,17 @@ QListWidget *MainWindow::getGameView()
     return ui->gameList;
 }
 
+QPushButton *MainWindow::getSendButton()
+{
+    return ui->sendButton;
+}
+
+class QPushButton *MainWindow::getPmButton()
+{
+    return ui->pmButton;
+}
+
+
 void MainWindow::newTab(const char *server)
 {
 
@@ -87,12 +98,16 @@ void MainWindow::loginButtonPressed()
 
 void MainWindow::newUser(User *u)
 {
+    QVariant *data;
     QString name, *msg;
-    QListWidgetItem *item = new QListWidgetItem;
-
+    QListWidgetItem *item;
     QList<QListWidgetItem *> selfList = u->conn->server->selfUserList->findItems(QString::fromStdString(u->name), Qt::MatchExactly);
 
     if(!selfList.size()) {
+        item = new QListWidgetItem;
+        data = new QVariant(QVariant::fromValue<User *>(u));
+        item->setData(Qt::UserRole, *data);
+
         if(u->modLevel > '0') {
             name += "M";
             name += u->modLevel;
@@ -137,7 +152,9 @@ void MainWindow::newSelf(class User *u)
     if(server->master == u->conn) {
         ui->selfUserList->setCurrentRow(0);
         connect(ui->selfUserList, SIGNAL(currentItemChanged(QListWidgetItem*,QListWidgetItem*)), this, SLOT(selfUserListItemChanged(QListWidgetItem*,QListWidgetItem*)));
-        connect(server->messageInput, SIGNAL(returnPressed()), this, SLOT(sendMessage()));
+        connect(server->messageInput, SIGNAL(returnPressed()), this, SLOT(preparePublicMessage()));
+        connect(server->sendButton, SIGNAL(clicked()), this, SLOT(preparePublicMessage()));
+        connect(server->pmButton, SIGNAL(clicked()), this, SLOT(preparePrivateMessage()));
     }
 }
 
@@ -226,11 +243,13 @@ void MainWindow::selfUserListItemChanged(QListWidgetItem *curr, QListWidgetItem 
     connCurr = dataCurr.value<Connection *>();
 
     disconnect(this, SIGNAL(sendPublicMessage(QString *)), connPrev, SLOT(sendPublicMessage(QString *)));
+    disconnect(this, SIGNAL(sendPrivateMessage(message_s *)), connPrev, SLOT(sendPrivateMessage(message_s *)));
     currServer->currConn = conn;
     connect(this, SIGNAL(sendPublicMessage(QString *)), connCurr, SLOT(sendPublicMessage(QString *)));
+    connect(this, SIGNAL(sendPrivateMessage(message_s *)), connCurr, SLOT(sendPrivateMessage(message_s *)));
 }
 
-void MainWindow::sendMessage()
+void MainWindow::preparePublicMessage()
 {
     QString *msg;
     Connection *conn = currServer->currConn;
@@ -241,6 +260,32 @@ void MainWindow::sendMessage()
     emit sendPublicMessage(msg);
 
     currServer->messageInput->clear();
+}
+
+void MainWindow::preparePrivateMessage()
+{
+    QVariant uData = currServer->userList->currentItem()->data(Qt::UserRole);
+    User *u = uData.value<User *>();
+
+    QString qtext = currServer->messageInput->text();
+    std::string stdText = qtext.toStdString();
+    const char *cstr = stdText.c_str();
+
+
+    message_s *msg = new message_s;
+    strcpy(msg->body, cstr);
+    msg->receiver = u;
+    msg->type = 'P';
+
+    emit sendPrivateMessage(msg);
+
+    QString post("<< pm to: ");
+
+    post += u->name;
+    post += ">> ";
+    post += cstr;
+
+    currServer->messageView->addItem(post);
 }
 
 void MainWindow::postGameList(Connection *conn)

@@ -272,6 +272,19 @@
        </rect>
       </property>
      </widget>
+     <widget class="QPushButton" name="pmButton">
+      <property name="geometry">
+       <rect>
+        <x>740</x>
+        <y>430</y>
+        <width>114</width>
+        <height>32</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>pm</string>
+      </property>
+     </widget>
     </widget>
    </widget>
   </widget>

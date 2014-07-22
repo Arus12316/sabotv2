@@ -62,6 +62,8 @@ Connection::Connection(int server, MainWindow *win, QObject *parent) :
     this->server->messageInput = win->getMessageInput();
     this->server->miscView = win->getMiscView();
     this->server->gameView = win->getGameView();
+    this->server->sendButton = win->getSendButton();
+    this->server->pmButton = win->getPmButton();
 
     connect(&thread, SIGNAL(started()), this, SLOT(sessionInit()));
     connect(this, SIGNAL(newUser(User *)), win, SLOT(newUser(User *)));
@@ -224,6 +226,7 @@ void Connection::sessionInit()
                 server->currConn = this;
                 server->messageView = win->getMessageView();
                 connect(win, SIGNAL(sendPublicMessage(QString *)), this, SLOT(sendPublicMessage(QString *)));
+                connect(win, SIGNAL(sendPrivateMessage(message_s *)), this, SLOT(sendPrivateMessage(message_s *)));
             }
             emit newUser(user);
             emit newSelf(user);
@@ -404,6 +407,20 @@ void Connection::sendPublicMessage(QString *msg)
     sendMessage(cstr);
 
     delete msg;
+}
+
+void Connection::sendPrivateMessage(message_s *msg)
+{
+    char msgbuf[256];
+
+    msgbuf[0] = '0';
+    msgbuf[1] = '0';
+
+    strcpy(msgbuf+2, msg->receiver->id);
+    msgbuf[5] = 'P';
+
+    strcpy(msgbuf+6, msg->body);
+    sock->write(msgbuf, strlen(msgbuf) + 1);
 }
 
 Connection::~Connection()

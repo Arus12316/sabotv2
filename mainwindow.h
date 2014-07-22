@@ -44,6 +44,8 @@ public:
     class QListWidget *getSelfUserList();
     class QListWidget *getMiscView();
     class QListWidget *getGameView();
+    class QPushButton *getSendButton();
+    class QPushButton *getPmButton();
     void postMessage();
 
     void newTab(class Server *server);
@@ -51,6 +53,7 @@ public:
 signals:
     void postMiscMessage(class Server *server, QString *msg);
     void sendPublicMessage(QString *msg);
+    void sendPrivateMessage(struct message_s *msg);
 
 public slots:
     void loginButtonPressed();
@@ -60,7 +63,8 @@ public slots:
     void userDisconnected(class User *);
 
     void selfUserListItemChanged(class QListWidgetItem *curr, class QListWidgetItem *prev);
-    void sendMessage();
+    void preparePublicMessage();
+    void preparePrivateMessage();
     void postGameList(class Connection *conn);
 
 private:

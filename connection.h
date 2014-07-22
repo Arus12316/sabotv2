@@ -11,7 +11,10 @@
 #include <QNetworkProxy>
 
 struct message_s {
-    class User *sender;
+    union {
+        class User *sender;
+        class User *receiver;
+    };
     class Connection *view;
     char body[148];
     char type;
@@ -70,7 +73,6 @@ signals:
     void postMessage(message_s *msg);
     void userDisconnected(class User *);
     void postGameList(Connection *conn);
-    void sendMessageFromMain(QString *msg);
 
 
 public slots:
@@ -84,6 +86,7 @@ public slots:
     void errorConnection(QAbstractSocket::SocketError error);
     void test();
     void sendPublicMessage(QString *msg);
+    void sendPrivateMessage(message_s *msg);
 
 
 private:

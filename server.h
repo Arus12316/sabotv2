@@ -22,6 +22,8 @@ public:
     class QListWidget *messageView;
     class QListWidget *miscView;
     class QListWidget *gameView;
+    class QPushButton *sendButton;
+    class QPushButton *pmButton;
 
     explicit Server(int index, QObject *parent = 0);
 
