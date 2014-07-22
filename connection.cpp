@@ -54,6 +54,7 @@ Connection::Connection(int server, MainWindow *win, QObject *parent) :
     this->win = win;
     this->active = false;
     this->moveToThread(&thread);
+    this->timer.moveToThread(&thread);
 
     //temporary!!!
     this->server->userList = win->getUserList();
@@ -393,9 +394,12 @@ void Connection::test()
     qDebug() << "Slot called.";
 }
 
-void Connection::sendPublicMessage(message_s *msg)
+void Connection::sendPublicMessage(QString *msg)
 {
-    sendMessage(msg->body);
+    std::string sString = msg->toStdString();
+    const char *cstr = sString.c_str();
+
+    sendMessage(cstr);
 }
 
 Connection::~Connection()

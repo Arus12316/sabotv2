@@ -71,7 +71,7 @@ void MainWindow::loginButtonPressed()
     QString username, password;
     std::string stdUsername, stdPassword;
     int server = ui->serverList->currentIndex();
-    Connection *c = new Connection(server, this);
+    Connection *c = new Connection(server, this, NULL);
 
     currServer = c->server;
     username = ui->userName->text();
@@ -217,11 +217,16 @@ void MainWindow::userDisconnected(User *u)
 
 void MainWindow::selfUserListItemChanged(QListWidgetItem *curr, QListWidgetItem *prev)
 {
-    Connection *conn;
+    Connection *connCurr, *connPrev;
     qDebug() << "Changed! " << endl;
 
-    QVariant data = curr->data(Qt::UserRole);
-    conn = data.value<Connection *>();
+    QVariant dataCurr = curr->data(Qt::UserRole);
+    QVariant dataPrev = prev->data(Qt::UserRole);
+    connCurr = dataCurr.value<Connection *>();
+    connPrev = dataPrev.value<Connection *>();
+
+   // connect(currServer->messageInput, SIGNAL(returnPressed()), connCurr, SLOT(sendPublicMessage(QString*))
+
 
     currServer->master = conn;
 }

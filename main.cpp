@@ -4,7 +4,6 @@
 #include "connection.h"
 
 #include <time.h>
-
 #include <QApplication>
 
 int main(int argc, char *argv[])

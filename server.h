@@ -15,6 +15,7 @@ public:
     int index;
 
     class Connection *master;
+    class Connection *currConn;
     class QListWidget *userList;
     class QLineEdit *messageInput;
     class QListWidget *selfUserList;
