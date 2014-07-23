@@ -10,6 +10,7 @@
 
 #define SOCK_BUFSIZE 256
 #define LOGIN_FLAG "09"
+#define BAN_MSG "091"
 
 const quint16 Connection::PORT = 1138;
 
@@ -219,28 +220,42 @@ void Connection::sessionInit()
         n = sock->read(buf, sizeof buf);
 
         qDebug() << buf;
-//0f30;inappropriate
-        if(buf[0] == 'A') {
-            user = new User(this, buf);
-            user->isSelf = true;
-            if(!server->master) {
-                server->master = this;
-                server->currConn = this;
-                server->messageView = win->getMessageView();
-                connect(win, SIGNAL(sendPublicMessage(QString *)), this, SLOT(sendPublicMessage(QString *)));
-                connect(win, SIGNAL(sendPrivateMessage(message_s *)), this, SLOT(sendPrivateMessage(message_s *)));
-            }
-            emit newUser(user);
-            emit newSelf(user);
+
+
+        if(!server->master) {
+            server->master = this;
+            server->currConn = this;
+            server->messageView = win->getMessageView();
+            connect(win, SIGNAL(sendPublicMessage(QString *)), this, SLOT(sendPublicMessage(QString *)));
+            connect(win, SIGNAL(sendPrivateMessage(message_s *)), this, SLOT(sendPrivateMessage(message_s *)));
         }
 
-        sock->write(finishLogin, sizeof finishLogin);
 
-        connect(sock, SIGNAL(readyRead()), this, SLOT(gameEvent()));
-        connect(&timer, SIGNAL(timeout()), this, SLOT(keepAlive()));
-        timer.start(SLEEP_TIME);
+        if(!strcmp(buf, BAN_MSG)) {
 
-        active = true;
+            QString ban("[ ");
+
+            ban += username;
+            ban += " is banned ]";
+
+            emit postGeneral(ban);
+
+        }
+        else if(buf[0] == 'A') {
+            user = new User(this, buf);
+            user->isSelf = true;
+            emit newUser(user);
+            emit newSelf(user);
+
+            sock->write(finishLogin, sizeof finishLogin);
+
+            connect(sock, SIGNAL(readyRead()), this, SLOT(gameEvent()));
+            connect(&timer, SIGNAL(timeout()), this, SLOT(keepAlive()));
+            timer.start(SLEEP_TIME);
+
+            active = true;
+
+        }
     }
 }
 
@@ -383,10 +398,10 @@ void Connection::userConnected()
 
 void Connection::userDisconnected()
 {
-    QString msg("<");
+    QString msg("[ ");
 
-    msg += user->name;
-    msg += "> disconnected.";
+    msg += username;
+    msg += " disconnected ]";
     qDebug() << msg <<  endl;
     emit postGeneral(msg);
 }
