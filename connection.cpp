@@ -11,6 +11,7 @@
 #define SOCK_BUFSIZE 256
 #define LOGIN_FLAG "09"
 #define BAN_MSG "091"
+#define PLAYER_FOUND_MSG "Player is located in"
 
 const quint16 Connection::PORT = 1138;
 
@@ -73,7 +74,8 @@ Connection::Connection(int server, MainWindow *win, QObject *parent) :
     connect(this, SIGNAL(postMessage(message_s *)), win, SLOT(postMessage(message_s *)));
     connect(this, SIGNAL(userDisconnected(User *)), win, SLOT(userDisconnected(User *)));
     connect(this, SIGNAL(postGameList(Connection *)), win, SLOT(postGameList(Connection *)));
-    connect(this, SIGNAL(postGeneral(QString)), win, SLOT(postGeneral(QString)));
+    connect(this, SIGNAL(postGeneralMain(Server *, QString)), win, SLOT(postGeneralMain(Server *, QString)));
+    connect(this, SIGNAL(postGeneralMisc(Server *, QString)), win, SLOT(postGeneralMisc(Server *, QString)));
 }
 
 
@@ -137,6 +139,18 @@ void Connection::sendMessage(const char msg[])
         sock->write(buf, strlen(buf) + 1);
     }
 }
+
+void Connection::findUser(const char *name)
+{
+    char buf[32];
+
+    buf[0] = '0';
+    buf[1] = 'h';
+    strcpy(&buf[2], name);
+
+    sock->write(buf, strlen(buf) + 1);
+}
+
 
 void Connection::createAccount(const char name[], const char pass[], const char email[], quint8 r, quint8 g, quint8 b)
 {
@@ -238,7 +252,7 @@ void Connection::sessionInit()
             ban += username;
             ban += " is banned ]";
 
-            emit postGeneral(ban);
+            emit postGeneralMain(server, ban);
 
         }
         else if(buf[0] == 'A') {
@@ -270,6 +284,8 @@ void Connection::gameEvent()
     User *u;
     char id[4];
     message_s *msg;
+    static QString general;
+    static char findBuf[MAX_UNAME_PASS];
 
     while(sock->getChar(&c)) {
 
@@ -314,8 +330,21 @@ void Connection::gameEvent()
                             case 'f':
                                 break;
                             case 'g':
+                                general.clear();
+                                general += "[ warning: ";
+                                general += &bptr[1];
+                                general += " ]";
+                                emit postGeneralMain(server, general);
                                 break;
                             case 'h':
+                                if(!strncmp(&bptr[1], PLAYER_FOUND_MSG, sizeof(PLAYER_FOUND_MSG) - 1)) {
+                                    general.clear();
+                                    general += "<";
+                                    general += findBuf;
+                                    general += "> is in";
+                                    general += &bptr[sizeof(PLAYER_FOUND_MSG)];
+                                    emit postGeneralMisc(server, general);
+                                }
                                 break;
                             case 'j':
                                 break;
@@ -337,12 +366,17 @@ void Connection::gameEvent()
                         id[2] = *++bptr;
                         id[3] = '\0';
                         u = server->lookupUser(id);
+
+                        strcpy(findBuf, u->name);
+
                         emit userDisconnected(u);
 
                         //force synchronization
                         win->lock.lock();
                         win->cond.wait(&win->lock);
                         win->lock.unlock();
+
+                        findUser(findBuf);
                         break;
                     case 'C':
                         break;
@@ -383,7 +417,6 @@ void Connection::gameEvent()
     }
 }
 
-
 void Connection::keepAlive()
 {
     //sock->write(ackX0, sizeof ackX0);
@@ -403,7 +436,7 @@ void Connection::userDisconnected()
     msg += username;
     msg += " disconnected ]";
     qDebug() << msg <<  endl;
-    emit postGeneral(msg);
+    emit postGeneralMain(server, msg);
 }
 
 

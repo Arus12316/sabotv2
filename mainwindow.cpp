@@ -315,10 +315,16 @@ void MainWindow::postGameList(Connection *conn)
     conn->listLock.unlock();
 }
 
-void MainWindow::postGeneral(QString msg)
+void MainWindow::postGeneralMain(Server *server, QString msg)
 {
-    currServer->messageView->addItem(msg);
-    currServer->messageView->scrollToBottom();
+    server->messageView->addItem(msg);
+    server->messageView->scrollToBottom();
+}
+
+void MainWindow::postGeneralMisc(Server *server, QString msg)
+{
+    server->miscView->addItem(msg);
+    server->miscView->scrollToBottom();
 }
 
 MainWindow::~MainWindow()

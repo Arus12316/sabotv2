@@ -56,6 +56,8 @@ public:
 
     void sendMessage(const char msg[]);
 
+    void findUser(const char *name);
+
     /*
      * Account Creating methods. Methods with less parameters generate the values randomly. Use
      * only in 1 thread. These are not reentrant.
@@ -75,8 +77,8 @@ signals:
     void userDisconnected(class User *);
     void postGameList(Connection *conn);
 
-    void postGeneral(QString str);
-
+    void postGeneralMain(Server *server, QString str);
+    void postGeneralMisc(Server *server, QString str);
 
 public slots:
 

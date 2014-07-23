@@ -67,7 +67,8 @@ public slots:
     void preparePublicMessage();
     void preparePrivateMessage();
     void postGameList(class Connection *conn);
-    void postGeneral(QString msg);
+    void postGeneralMain(Server *server, QString msg);
+    void postGeneralMisc(Server *server, QString msg);
 
 private:
     Ui::MainWindow *ui;
