@@ -3,6 +3,20 @@
 
 #include <QObject>
 
+/*
+    statement :=  <expressionlist>
+
+    <expressionlist> := <expression> <optnext>
+
+    <optnext> := -> <expression> <optnext> | E
+
+    <expression> := <object> | <object> := <expression> | <object>(<paramlist>)
+
+
+*/
+
+
+
 class Parse : public QObject
 {
     Q_OBJECT

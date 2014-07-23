@@ -66,9 +66,14 @@ QPushButton *MainWindow::getSendButton()
     return ui->sendButton;
 }
 
-class QPushButton *MainWindow::getPmButton()
+QPushButton *MainWindow::getPmButton()
 {
     return ui->pmButton;
+}
+
+QLabel *MainWindow::getCurrUserLabel()
+{
+    return ui->currUserLabel;
 }
 
 
@@ -84,9 +89,14 @@ void MainWindow::loginButtonPressed()
     int server = ui->serverList->currentIndex();
     Connection *c = new Connection(server, this, NULL);
 
-    currServer = c->server;
     username = ui->userName->text();
     password = ui->password->text();
+
+    if(!currServer) {
+        ui->currUserLabel->setText(username);
+    }
+
+    currServer = c->server;
 
     stdUsername = username.toStdString();
     stdPassword = password.toStdString();
@@ -249,6 +259,8 @@ void MainWindow::selfUserListItemChanged(QListWidgetItem *curr, QListWidgetItem 
     currServer->currConn = conn;
     connect(this, SIGNAL(sendPublicMessage(QString *)), connCurr, SLOT(sendPublicMessage(QString *)));
     connect(this, SIGNAL(sendPrivateMessage(message_s *)), connCurr, SLOT(sendPrivateMessage(message_s *)));
+
+    ui->currUserLabel->setText(curr->text());
 }
 
 void MainWindow::preparePublicMessage()
@@ -288,6 +300,7 @@ void MainWindow::preparePrivateMessage()
     post += cstr;
 
     currServer->messageView->addItem(post);
+    currServer->messageView->scrollToBottom();
 }
 
 void MainWindow::postGameList(Connection *conn)
@@ -300,6 +313,12 @@ void MainWindow::postGameList(Connection *conn)
     conn->listLock.lock();
     conn->listCond.wakeOne();
     conn->listLock.unlock();
+}
+
+void MainWindow::postGeneral(QString msg)
+{
+    currServer->messageView->addItem(msg);
+    currServer->messageView->scrollToBottom();
 }
 
 MainWindow::~MainWindow()

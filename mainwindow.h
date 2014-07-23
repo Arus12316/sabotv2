@@ -46,6 +46,7 @@ public:
     class QListWidget *getGameView();
     class QPushButton *getSendButton();
     class QPushButton *getPmButton();
+    class QLabel *getCurrUserLabel();
     void postMessage();
 
     void newTab(class Server *server);
@@ -66,6 +67,7 @@ public slots:
     void preparePublicMessage();
     void preparePrivateMessage();
     void postGameList(class Connection *conn);
+    void postGeneral(QString msg);
 
 private:
     Ui::MainWindow *ui;

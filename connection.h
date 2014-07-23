@@ -75,6 +75,8 @@ signals:
     void userDisconnected(class User *);
     void postGameList(Connection *conn);
 
+    void postGeneral(QString str);
+
 
 public slots:
 

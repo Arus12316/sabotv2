@@ -24,6 +24,7 @@ public:
     class QListWidget *gameView;
     class QPushButton *sendButton;
     class QPushButton *pmButton;
+    class QLabel *currUserLabel;
 
     explicit Server(int index, QObject *parent = 0);
 

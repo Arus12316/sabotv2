@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1414</width>
-    <height>578</height>
+    <height>586</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -20,7 +20,7 @@
       <x>0</x>
       <y>0</y>
       <width>1401</width>
-      <height>511</height>
+      <height>531</height>
      </rect>
     </property>
     <property name="currentIndex">
@@ -220,7 +220,7 @@
       <property name="geometry">
        <rect>
         <x>180</x>
-        <y>400</y>
+        <y>410</y>
         <width>551</width>
         <height>41</height>
        </rect>
@@ -266,7 +266,7 @@
       <property name="geometry">
        <rect>
         <x>180</x>
-        <y>450</y>
+        <y>470</y>
         <width>551</width>
         <height>21</height>
        </rect>
@@ -283,6 +283,24 @@
       </property>
       <property name="text">
        <string>pm</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="currUserLabel">
+      <property name="geometry">
+       <rect>
+        <x>180</x>
+        <y>390</y>
+        <width>121</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <pointsize>10</pointsize>
+       </font>
+      </property>
+      <property name="text">
+       <string/>
       </property>
      </widget>
     </widget>

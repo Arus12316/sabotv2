@@ -64,6 +64,7 @@ Connection::Connection(int server, MainWindow *win, QObject *parent) :
     this->server->gameView = win->getGameView();
     this->server->sendButton = win->getSendButton();
     this->server->pmButton = win->getPmButton();
+    this->server->currUserLabel = win->getCurrUserLabel();
 
     connect(&thread, SIGNAL(started()), this, SLOT(sessionInit()));
     connect(this, SIGNAL(newUser(User *)), win, SLOT(newUser(User *)));
@@ -71,6 +72,7 @@ Connection::Connection(int server, MainWindow *win, QObject *parent) :
     connect(this, SIGNAL(postMessage(message_s *)), win, SLOT(postMessage(message_s *)));
     connect(this, SIGNAL(userDisconnected(User *)), win, SLOT(userDisconnected(User *)));
     connect(this, SIGNAL(postGameList(Connection *)), win, SLOT(postGameList(Connection *)));
+    connect(this, SIGNAL(postGeneral(QString)), win, SLOT(postGeneral(QString)));
 }
 
 
@@ -242,6 +244,8 @@ void Connection::sessionInit()
     }
 }
 
+//
+
 void Connection::gameEvent()
 {
     int i;
@@ -379,7 +383,12 @@ void Connection::userConnected()
 
 void Connection::userDisconnected()
 {
-    qDebug() << "Disconnected!" <<  endl;
+    QString msg("<");
+
+    msg += user->name;
+    msg += "> disconnected.";
+    qDebug() << msg <<  endl;
+    emit postGeneral(msg);
 }
 
 
