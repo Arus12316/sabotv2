@@ -216,6 +216,8 @@ void MainWindow::userDisconnected(User *u)
     Connection *conn = u->conn;
     QString *msg = new QString("<");
 
+    qDebug() << endl << u->name << " : " << u->id << " disconnected." << endl;
+
     delete u->listEntry;
 
     *msg += u->name;
@@ -290,12 +292,13 @@ void MainWindow::preparePrivateMessage()
 
 void MainWindow::postGameList(Connection *conn)
 {
-    conn->listLock.lock();
-
     conn->server->gameView->clear();
     conn->gameList.pop_front();
     conn->server->gameView->addItems(conn->gameList);
     conn->gameList.clear();
+
+    conn->listLock.lock();
+    conn->listCond.wakeOne();
     conn->listLock.unlock();
 }
 

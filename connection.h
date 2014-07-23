@@ -26,6 +26,7 @@ class Connection : public QObject
 
 public:
     QMutex listLock;
+    QWaitCondition listCond;
     QStringList gameList;
     
     /* General ACK 0 */

@@ -266,15 +266,16 @@ void Connection::gameEvent()
                     case '0':
                         switch(*++bptr) {
                             case '1':
-                                listLock.lock();
                                 while(*bptr) {
                                     for(mptr = bptr; *bptr != ';'; bptr++);
                                     *(bptr - 1) = '\0';
                                     gameList += mptr;
                                     bptr++;
                                 }
-                                listLock.unlock();
                                 emit postGameList(this);
+                                listLock.lock();
+                                listCond.wait(&listLock);
+                                listLock.unlock();
                                 break;
                             case '4':
                                 break;
