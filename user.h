@@ -8,7 +8,6 @@
 
 #define MAX_UNAME_PASS 20
 
-
 class User : public QObject
 {
     Q_OBJECT

@@ -18,14 +18,16 @@ SOURCES += main.cpp\
     parse.cpp \
     user.cpp \
     server.cpp \
-    loginmultiusers.cpp
+    loginmultiusers.cpp \
+    regex.c
 
 HEADERS  += mainwindow.h \
     connection.h \
     parse.h \
     user.h \
     server.h \
-    loginmultiusers.h
+    loginmultiusers.h \
+    regex.h
 
 FORMS    += mainwindow.ui \
     loginmultiusers.ui

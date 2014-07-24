@@ -2,7 +2,6 @@
 #define CONNECTION_H
 
 #include "mainwindow.h"
-
 #include <QObject>
 #include <QThread>
 #include <QTimer>
@@ -109,6 +108,8 @@ private:
     QTimer timer;
     class User *user;
     MainWindow *win;
+    QString general;
+    char findBuf[21];
 
     static const quint16 PORT;
 

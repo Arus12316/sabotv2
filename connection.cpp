@@ -2,6 +2,7 @@
 #include "server.h"
 #include "connection.h"
 #include "user.h"
+
 #include <QUrl>
 #include <QUrlQuery>
 #include <QNetworkRequest>
@@ -284,8 +285,6 @@ void Connection::gameEvent()
     User *u;
     char id[4];
     message_s *msg;
-    static QString general;
-    static char findBuf[MAX_UNAME_PASS];
 
     while(sock->getChar(&c)) {
 
@@ -341,7 +340,7 @@ void Connection::gameEvent()
                                     general.clear();
                                     general += "<";
                                     general += findBuf;
-                                    general += "> is in";
+                                    general += "> has joined";
                                     general += &bptr[sizeof(PLAYER_FOUND_MSG)];
                                     emit postGeneralMisc(server, general);
                                 }
@@ -408,7 +407,6 @@ void Connection::gameEvent()
 
                     t = *++bptr;
                     if(t == 'P') {
-
                     }
                 }
             }
