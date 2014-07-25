@@ -338,6 +338,7 @@ void Connection::gameEvent()
                                 general += mptr;
                                 general += "] ";
                                 general += bptr + 1;
+                                emit postGeneralMain(server, general);
                                 break;
                             case 'g':
                                 general.clear();
