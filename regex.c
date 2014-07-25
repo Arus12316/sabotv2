@@ -1,5 +1,5 @@
 /*
- Implementation of Regex parser via NFA using Thompson's Construction Algorithm
+ Implementation of Regex parser via NFA using Thompson's Construction
  Possible Goal: Implement option to convert to DFA
  */
 
@@ -42,6 +42,14 @@ enum regx_e {
  
  */
 
+typedef struct ptrstk_s ptrstk_s;
+
+struct ptrstk_s
+{
+    void *ptr;
+    ptrstk_s *next;
+} *stack;
+
 static regex_s *mach;
 static const char *start;
 static const char *c;
@@ -62,10 +70,14 @@ static void rp_add_edge(fsmnode_s *parent, fsmedge_s *edge);
 
 static void rp_error_(const char *e, size_t len);
 
+static void print_nfa(nfa_s *nfa);
+static void print_node(fsmnode_s *node);
+static void push(fsmnode_s *n);
+static bool contains(fsmnode_s *n);
+
 static void *alloc(size_t n);
 static void *allocz(size_t n);
 static void *ralloc(void *ptr, size_t n);
-
 
 
 regex_s *compile_regex(const char *src)
@@ -381,12 +393,58 @@ void rp_error_(const char *e, size_t len)
 #undef RP_ERROR_SUFFIX
 }
 
+void print_nfa(nfa_s *nfa)
+{
+
+    print_node(nfa->start);
+
+}
+
+void print_node(fsmnode_s *node)
+{
+    unsigned i;
+    push(node);
+
+    printf("At %p\n", node);
+    for(i = 0; i < node->nedges; i++) {
+        printf("\t%p -> %c -> %p\n", node, node->edges[i]->val.c, node->edges[i]->child);
+    }
+
+    putchar('\n');
+
+    for(i = 0; i < node->nedges; i++) {
+        if(!contains(node->edges[i]->child))
+            print_node(node->edges[i]->child);
+    }
+
+}
+
+void push(fsmnode_s *n)
+{
+    ptrstk_s *sn = alloc(sizeof *sn);
+
+    sn->ptr = n;
+    sn->next = stack;
+    stack = sn;
+}
+
+bool contains(fsmnode_s *n)
+{
+    ptrstk_s *i;
+
+    for(i = stack; i; i = i->next) {
+        if(i->ptr == n)
+            return true;
+    }
+    return false;
+}
+
 void *alloc(size_t n)
 {
     void *p = malloc(n);
 
     if(!p) {
-        perror("Memory Allocatoin Error");
+        perror("Memory Allocation Error");
         exit(EXIT_FAILURE);
     }
 
@@ -397,7 +455,7 @@ void *allocz(size_t n)
     void *p = calloc(1, n);
 
     if(!p) {
-        perror("Memory Allocatoin Error");
+        perror("Memory Allocation Error");
         exit(EXIT_FAILURE);
     }
 }
@@ -406,7 +464,7 @@ void *ralloc(void *ptr, size_t n)
 {
     void *p = realloc(ptr, n);
     if(!p) {
-        perror("Memory Allocatoin Error");
+        perror("Memory Allocation Error");
         exit(EXIT_FAILURE);
     }
 }

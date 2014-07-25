@@ -417,7 +417,7 @@ void Connection::gameEvent()
 
 void Connection::keepAlive()
 {
-    //sock->write(ackX0, sizeof ackX0);
+    sock->write(ackX0, sizeof ackX0);
     sock->write(ackX2, sizeof ackX2);
 }
 

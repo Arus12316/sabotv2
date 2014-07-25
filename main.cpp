@@ -2,6 +2,7 @@
 #include "server.h"
 #include "mainwindow.h"
 #include "connection.h"
+#include "regex.h"
 
 #include <time.h>
 

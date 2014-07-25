@@ -10,15 +10,38 @@
 
     <optnext> := -> <expression> <optnext> | E
 
-    <expression> := <expression> relop <expression>
-                    |
-                    ( <expression> )
-                    |
-                    <sign> <expression>
-                    |
+    <expression> := <simple_expression> <expression'>
 
+    <expression'> := relop <simple_expression>
+                    |
+                    E
 
-    <object> := id | id.suffix
+    <simple_expression> := <sign> <term> <simple_expression'>
+                           |
+                           <term> <simple_expression'>
+
+    <simple_expression'> := addop <term> <simple_expression>
+                            |
+                            E
+
+    <term> := <factor> <term'>
+
+    <term'> := mulop <factor> <term'>
+                |
+                E
+
+    <factor> := id <factor'>
+                |
+                num
+                |
+                ( <expression> )
+                |
+                not <factor>
+
+    <factor'> := [ <expression> ] | . id <factor'> | ( <expressionlist> ) | E
+
+    <sign> + | -
+
 
 */
 
@@ -62,8 +85,7 @@ signals:
 public slots:
 
 private:
-    void add_tok(Parser::token_s *t);
-    Parser::token_s *tok();
+    void tok(Parser::token_s *t);
 
     Parser::token_s *tokens;
     char *currptr;

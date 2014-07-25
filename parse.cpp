@@ -6,11 +6,9 @@ Parse::Parse(QObject *parent) :
     tokens = NULL;
 }
 
-Parser::token_s *Parse::tok()
+void Parse::tok(Parser::token_s *t)
 {
-    char *bptr;
-    Parser::token_s *tok = new Parser::token_s;
-    bptr = tok->lexeme;
+    char *bptr = t->lexeme;
 
     switch(*currptr) {
         case '(':
@@ -44,13 +42,7 @@ Parser::token_s *Parse::tok()
             }
             break;
     }
-    return tok;
 }
 
-void Parse::add_tok(Parser::token_s *t)
-{
-    if(!tokens) {
-        tokens = t;
-    }
-}
+
 

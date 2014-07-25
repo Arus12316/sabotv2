@@ -65,6 +65,12 @@ struct repet_s
     unsigned count;
 };
 
+struct ptr_rec_s
+{
+    void *key;
+    //ptr_rec_s *next;
+};
+
 extern regex_s *compile_regex(const char *src);
 
 #endif
