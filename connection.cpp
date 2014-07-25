@@ -336,6 +336,7 @@ void Connection::gameEvent()
                                 while(*++bptr != ';');
                                 *bptr = '\0';
                                 general += mptr;
+                                //add message
                                 general += "] ";
                                 general += bptr + 1;
                                 emit postGeneralMain(server, general);
@@ -400,8 +401,13 @@ void Connection::gameEvent()
                         msg = new message_s;
                         msg->type = *++bptr;
                         mptr = msg->body;
-                        while(*bptr)
+                        while(*bptr) {
                             *mptr++ = *++bptr;
+                            if(mptr - msg->body == MAX_MSGLEN) {
+                                mptr--;
+                                break;
+                            }
+                        }
 
                         *mptr = '\0';
                         msg->sender = server->lookupUser(id);

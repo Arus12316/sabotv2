@@ -4,7 +4,7 @@
 #include <QObject>
 
 /*
-    statement :=  <expressionlist>
+    <statement> :=  <expressionlist>
 
     <expressionlist> := <expression> <optnext>
 

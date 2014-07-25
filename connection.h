@@ -9,6 +9,8 @@
 #include <QTcpSocket>
 #include <QNetworkProxy>
 
+#define MAX_MSGLEN 148
+
 struct message_s {
     union {
         class User *sender;
