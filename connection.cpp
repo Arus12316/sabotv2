@@ -329,6 +329,15 @@ void Connection::gameEvent()
                                 break;
                             case 'e':
                             case 'f':
+                                general.clear();
+                                general += "[ BANNED: time: ";
+                                mptr = &bptr[1];
+                                //get time:
+                                while(*++bptr != ';');
+                                *bptr = '\0';
+                                general += mptr;
+                                general += "] ";
+                                general += bptr + 1;
                                 break;
                             case 'g':
                                 general.clear();
