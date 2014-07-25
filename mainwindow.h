@@ -47,6 +47,7 @@ public:
     class QPushButton *getSendButton();
     class QPushButton *getPmButton();
     class QLabel *getCurrUserLabel();
+    class QLineEdit *getInputRaw();
     void postMessage();
 
     void newTab(class Server *server);
@@ -55,6 +56,7 @@ signals:
     void postMiscMessage(class Server *server, QString *msg);
     void sendPublicMessage(QString *msg);
     void sendPrivateMessage(struct message_s *msg);
+    void sendRawMessage(QString msg);
 
 public slots:
     void loginButtonPressed();
@@ -66,6 +68,7 @@ public slots:
     void selfUserListItemChanged(class QListWidgetItem *curr, class QListWidgetItem *prev);
     void preparePublicMessage();
     void preparePrivateMessage();
+    void prepareRawMessage();
     void postGameList(class Connection *conn);
     void postGeneralMain(Server *server, QString msg);
     void postGeneralMisc(Server *server, QString msg);

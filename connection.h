@@ -92,6 +92,7 @@ public slots:
     void sendPublicMessage(QString *msg);
     void sendPrivateMessage(message_s *msg);
 
+    void sendRaw(QString str);
 
 private:
 

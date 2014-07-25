@@ -68,6 +68,7 @@ Connection::Connection(int server, MainWindow *win, QObject *parent) :
     this->server->sendButton = win->getSendButton();
     this->server->pmButton = win->getPmButton();
     this->server->currUserLabel = win->getCurrUserLabel();
+    this->server->inputRaw = win->getInputRaw();
 
     connect(&thread, SIGNAL(started()), this, SLOT(sessionInit()));
     connect(this, SIGNAL(newUser(User *)), win, SLOT(newUser(User *)));
@@ -243,6 +244,7 @@ void Connection::sessionInit()
             server->messageView = win->getMessageView();
             connect(win, SIGNAL(sendPublicMessage(QString *)), this, SLOT(sendPublicMessage(QString *)));
             connect(win, SIGNAL(sendPrivateMessage(message_s *)), this, SLOT(sendPrivateMessage(message_s *)));
+            connect(win, SIGNAL(sendRawMessage(QString)), this, SLOT(sendRaw(QString)));
         }
 
 
@@ -477,6 +479,14 @@ void Connection::sendPrivateMessage(message_s *msg)
 
     strcpy(msgbuf+6, msg->body);
     sock->write(msgbuf, strlen(msgbuf) + 1);
+}
+
+void Connection::sendRaw(QString str)
+{
+    std::string stdstr = str.toStdString();
+    const char *cstr = stdstr.c_str();
+
+    sock->write(cstr, str.size() + 1);
 }
 
 Connection::~Connection()

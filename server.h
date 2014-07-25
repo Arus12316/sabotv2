@@ -25,6 +25,7 @@ public:
     class QPushButton *sendButton;
     class QPushButton *pmButton;
     class QLabel *currUserLabel;
+    class QLineEdit *inputRaw;
 
     explicit Server(int index, QObject *parent = 0);
 

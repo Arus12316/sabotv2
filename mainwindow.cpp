@@ -76,6 +76,10 @@ QLabel *MainWindow::getCurrUserLabel()
     return ui->currUserLabel;
 }
 
+QLineEdit *MainWindow::getInputRaw()
+{
+    return ui->inputRaw;
+}
 
 void MainWindow::newTab(const char *server)
 {
@@ -166,6 +170,7 @@ void MainWindow::newSelf(class User *u)
         connect(server->messageInput, SIGNAL(returnPressed()), this, SLOT(preparePublicMessage()));
         connect(server->sendButton, SIGNAL(clicked()), this, SLOT(preparePublicMessage()));
         connect(server->pmButton, SIGNAL(clicked()), this, SLOT(preparePrivateMessage()));
+        connect(server->inputRaw, SIGNAL(returnPressed()), this, SLOT(prepareRawMessage()));
     }
 }
 
@@ -256,9 +261,11 @@ void MainWindow::selfUserListItemChanged(QListWidgetItem *curr, QListWidgetItem 
 
     disconnect(this, SIGNAL(sendPublicMessage(QString *)), connPrev, SLOT(sendPublicMessage(QString *)));
     disconnect(this, SIGNAL(sendPrivateMessage(message_s *)), connPrev, SLOT(sendPrivateMessage(message_s *)));
+    disconnect(this, SIGNAL(sendRawMessage(QString)), connPrev, SLOT(sendRaw(QString)));
     currServer->currConn = conn;
     connect(this, SIGNAL(sendPublicMessage(QString *)), connCurr, SLOT(sendPublicMessage(QString *)));
     connect(this, SIGNAL(sendPrivateMessage(message_s *)), connCurr, SLOT(sendPrivateMessage(message_s *)));
+    connect(this, SIGNAL(sendRawMessage(QString)), connCurr, SLOT(sendRaw(QString)));
 
     ui->currUserLabel->setText(curr->text());
 }
@@ -285,7 +292,6 @@ void MainWindow::preparePrivateMessage()
     std::string stdText = qtext.toStdString();
     const char *cstr = stdText.c_str();
 
-
     message_s *msg = new message_s;
     strcpy(msg->body, cstr);
     msg->receiver = u;
@@ -302,6 +308,20 @@ void MainWindow::preparePrivateMessage()
     currServer->messageView->addItem(post);
     currServer->messageView->scrollToBottom();
 }
+
+void MainWindow::prepareRawMessage()
+{
+    QString post("<--sent raw--> ");
+    QString msg = ui->inputRaw->text();
+
+    post += msg;
+
+    emit sendRawMessage(msg);
+
+    currServer->messageView->addItem(post);
+    currServer->messageView->scrollToBottom();
+}
+
 
 void MainWindow::postGameList(Connection *conn)
 {
