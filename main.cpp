@@ -25,6 +25,12 @@ int main(int argc, char *argv[])
 
     QNetworkProxy::setApplicationProxy(proxy);
 
+    regex_s *regex = compile_regex("^ab?aa+(adf|dsf|dsf)*");
+
+    print_nfa(regex->nfa);
+
+    return 0;
+
     QApplication a(argc, argv);
     MainWindow w;
     w.show();

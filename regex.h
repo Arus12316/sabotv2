@@ -1,6 +1,10 @@
 #ifndef REGEX_H_
 #define REGEX_H_
 
+#if defined __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 
 typedef struct regx_val_s regx_val_s;
@@ -72,5 +76,13 @@ struct ptr_rec_s
 };
 
 extern regex_s *compile_regex(const char *src);
+
+extern void print_nfa(nfa_s *nfa);
+
+
+#if defined __cplusplus
+}
+#endif
+
 
 #endif

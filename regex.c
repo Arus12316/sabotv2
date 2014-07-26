@@ -56,7 +56,7 @@ static const char *start;
 static const char *c;
 static regerr_s *errptr;
 
-static void rp_start(void);
+static nfa_s *rp_start(void);
 static nfa_s *rp_expressions();
 static void rp_expressions_(nfa_s *nfa);
 static nfa_s *rp_expression(void);
@@ -71,7 +71,6 @@ static void rp_add_edge(fsmnode_s *parent, fsmedge_s *edge);
 
 static void rp_error_(const char *e, size_t len);
 
-static void print_nfa(nfa_s *nfa);
 static void print_node(fsmnode_s *node);
 static void push(fsmnode_s *n);
 static bool contains(fsmnode_s *n);
@@ -80,14 +79,13 @@ regex_s *compile_regex(const char *src)
 {
     start = c = src;
     mach = allocz(sizeof(*mach));
-    rp_start();
+    mach->nfa = rp_start();
     return mach;
 }
 
-void rp_start(void)
+nfa_s *rp_start(void)
 {
     nfa_s *nfa;
-    
     
     if(*c == '^') {
         c++;
@@ -103,6 +101,7 @@ void rp_start(void)
     if(*c) {
         rp_error("Invalid placement of special character");
     }
+    return nfa;
 }
 
 nfa_s *rp_expressions(void)
