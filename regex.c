@@ -259,7 +259,8 @@ nfa_s *rp_expression(void)
                 return nfa;
             default:
                 val.c = *c;
-                nfa->final = rp_makenode(nfa->final, val);
+                vnfa.start = vnfa.final;
+                vnfa.final = rp_makenode(vnfa.final, val);
                 break;
         }
         c++;

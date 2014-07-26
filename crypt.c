@@ -295,15 +295,15 @@ void PBKDF(char *pass, salt_s salt, unsigned C, size_t kLen)
 }
 
 /*
+
+ CALL srand() at beginning of program!
  Salt generator
  ,,|,, standards
  */
 salt_s get_salt(void)
 {
     salt_s salt;
-    
-    srand((int)time(NULL));
-    
+        
     /*
      rand() tends to ignore the signed bit despite it returning
      type 'int'. Assign only the lower 16 bits in 4ths for
