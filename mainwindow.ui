@@ -321,6 +321,19 @@
        <string>Raw:</string>
       </property>
      </widget>
+     <widget class="QPushButton" name="createAccountButton">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>460</y>
+        <width>131</width>
+        <height>32</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Create Account</string>
+      </property>
+     </widget>
     </widget>
    </widget>
   </widget>

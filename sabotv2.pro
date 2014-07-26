@@ -19,7 +19,10 @@ SOURCES += main.cpp\
     user.cpp \
     server.cpp \
     loginmultiusers.cpp \
-    regex.c
+    regex.c \
+    createaccount.cpp \
+    crypt.c \
+    general.c
 
 HEADERS  += mainwindow.h \
     connection.h \
@@ -27,8 +30,12 @@ HEADERS  += mainwindow.h \
     user.h \
     server.h \
     loginmultiusers.h \
-    regex.h
+    regex.h \
+    createaccount.h \
+    crypt.h \
+    general.h
 
 FORMS    += mainwindow.ui \
-    loginmultiusers.ui
+    loginmultiusers.ui \
+    createaccount.ui
 CONFIG += c++11

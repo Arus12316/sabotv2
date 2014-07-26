@@ -3,6 +3,7 @@
 #include "ui_mainwindow.h"
 #include "user.h"
 #include "server.h"
+#include "createaccount.h"
 
 #include <QTabWidget>
 #include <QListWidget>
@@ -15,8 +16,10 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
     currServer = NULL;
+    ca = NULL;
     connect(ui->loginButton, SIGNAL(clicked()), this, SLOT(loginButtonPressed()));
     connect(ui->password, SIGNAL(returnPressed()), this, SLOT(loginButtonPressed()));
+    connect(ui->createAccountButton, SIGNAL(clicked()), this, SLOT(createAccount()));
 
     connect(this, &MainWindow::postMiscMessage,
         [=](Server *server, QString *msg) {
@@ -345,6 +348,15 @@ void MainWindow::postGeneralMisc(Server *server, QString msg)
 {
     server->miscView->addItem(msg);
     server->miscView->scrollToBottom();
+}
+
+void MainWindow::createAccount()
+{
+    if(!ca)
+        ca = new CreateAccount(this);
+    ca->show();
+    ca->raise();
+    ca->activateWindow();
 }
 
 MainWindow::~MainWindow()

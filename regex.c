@@ -4,6 +4,7 @@
  */
 
 #include "regex.h"
+#include "general.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -74,11 +75,6 @@ static void print_nfa(nfa_s *nfa);
 static void print_node(fsmnode_s *node);
 static void push(fsmnode_s *n);
 static bool contains(fsmnode_s *n);
-
-static void *alloc(size_t n);
-static void *allocz(size_t n);
-static void *ralloc(void *ptr, size_t n);
-
 
 regex_s *compile_regex(const char *src)
 {
@@ -437,34 +433,4 @@ bool contains(fsmnode_s *n)
             return true;
     }
     return false;
-}
-
-void *alloc(size_t n)
-{
-    void *p = malloc(n);
-
-    if(!p) {
-        perror("Memory Allocation Error");
-        exit(EXIT_FAILURE);
-    }
-
-}
-
-void *allocz(size_t n)
-{
-    void *p = calloc(1, n);
-
-    if(!p) {
-        perror("Memory Allocation Error");
-        exit(EXIT_FAILURE);
-    }
-}
-
-void *ralloc(void *ptr, size_t n)
-{
-    void *p = realloc(ptr, n);
-    if(!p) {
-        perror("Memory Allocation Error");
-        exit(EXIT_FAILURE);
-    }
 }

@@ -72,11 +72,13 @@ public slots:
     void postGameList(class Connection *conn);
     void postGeneralMain(Server *server, QString msg);
     void postGeneralMisc(Server *server, QString msg);
+    void createAccount();
 
 private:
     Ui::MainWindow *ui;
 
     class Connection *conn;
+    class CreateAccount *ca;
 };
 
 #endif // MAINWINDOW_H

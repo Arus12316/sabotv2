@@ -383,12 +383,12 @@ void Connection::gameEvent()
 
                         emit userDisconnected(u);
 
+                        findUser(findBuf);
+
                         //force synchronization
                         win->lock.lock();
                         win->cond.wait(&win->lock);
                         win->lock.unlock();
-
-                        findUser(findBuf);
                         break;
                     case 'C':
                         break;
