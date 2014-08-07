@@ -163,7 +163,7 @@ nfa_s *rp_expression(void)
     nfa = alloc(sizeof *nfa);
     vnfa.start = nfa->start = fsmnode_s_();
     vnfa.final = nfa->final = nfa->start;
-    
+
     val.is_scalar = true;
     while(*c) {
         switch(*c) {

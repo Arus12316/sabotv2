@@ -317,7 +317,7 @@ salt_s get_salt(void)
     return salt;
 }
 
-/*AES Implementation */
+/*AES Implementation as specified by nist*/
 
 #define INIT_AES_BUF_SIZE (2*AES_BLOCK_BYTELEN)
 
@@ -761,7 +761,7 @@ aes_digest_s *aes_decrypt(void *message, size_t len, char *key)
     word_u keysched[Nb*(Nr+1)];
     
     KeyExpansion((uint8_t *)key, keysched);
-    
+
     enc = alloc(sizeof(*enc)+INIT_AES_BUF_SIZE);
     enc->size = 0;
     while(len >= AES_BLOCK_BYTELEN) {

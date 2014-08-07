@@ -130,7 +130,7 @@ void Connection::login(const char name[], const char pass[])
 void Connection::sendMessage(const char msg[])
 {
     size_t mlen = strlen(msg);
-    char buf[256];
+    char buf[256];    
 
     if(mlen >= 256)
         perror("message to long");
@@ -237,7 +237,6 @@ void Connection::sessionInit()
 
         qDebug() << buf;
 
-
         if(!server->master) {
             server->master = this;
             server->currConn = this;
@@ -275,8 +274,6 @@ void Connection::sessionInit()
         }
     }
 }
-
-//
 
 void Connection::gameEvent()
 {

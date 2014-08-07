@@ -22,7 +22,8 @@ SOURCES += main.cpp\
     regex.c \
     createaccount.cpp \
     crypt.c \
-    general.c
+    general.c \
+    database.cpp
 
 HEADERS  += mainwindow.h \
     connection.h \
@@ -33,7 +34,8 @@ HEADERS  += mainwindow.h \
     regex.h \
     createaccount.h \
     crypt.h \
-    general.h
+    general.h \
+    database.h
 
 FORMS    += mainwindow.ui \
     loginmultiusers.ui \

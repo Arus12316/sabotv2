@@ -278,7 +278,6 @@ void MainWindow::preparePublicMessage()
     QString *msg;
     Connection *conn = currServer->currConn;
 
-
     msg = new QString(currServer->messageInput->text());
 
     emit sendPublicMessage(msg);

@@ -4,11 +4,14 @@
 #include <QObject>
 
 /*
-    <statement> :=  <expressionlist>
+    <statementlist> := <statement> <statementlist'>
+    <statementlist> := <statement> <statementlist> | E
 
-    <expressionlist> := <expression> <optnext>
+    <statement> :=  <expressionlist> | <control> | <dec> | return <expression>
 
-    <optnext> := -> <expression> <optnext> | E
+    <expressionlist> := <expression> <expressionlist'>
+
+    <expressionlist'> := <expression> <expressionlist'> | E
 
     <expression> := <simple_expression> <expression'>
 
@@ -37,17 +40,45 @@
                 ( <expression> )
                 |
                 not <factor>
+                |
+                string
+                |
+                regex
+                |
+                <initializer>
+                |
+                @ (<paramlist>) { <statementlist> } <optcall>
 
-    <factor'> := [ <expression> ] | . id <factor'> | ( <expressionlist> ) | E
+    <factor'> := [ <expression> ] | . id <factor'> | ( <paramlist> ) | E
+
+    <optcall> := ( <paramlist> ) | E
 
     <sign> + | -
 
+
+    <paramlist> := <expression> <paramlist'>
+    <paramlist'> := , <expression> <paramlist'> | E
+
+    <control> := if <expression> then <statementlist> <elseif>
+                 |
+                 while <expression> do <statementlist> endwhile
+                 |
+                 for id <- id do <statementlist> endfor
+
+    <elseif> := else <statementlist> endif | elif <expression> then <statementlist> endif
+
+    <dec> := var id := <expression>
+
+    <initializer> := { <paramlist> <optmap> }
+
+    <optmap> := -> <expression>
 
 */
 
 namespace Parser {
 
-#define MAX_TOK_SIZE 32
+#define TOK_CHUNK_SIZE 16
+
 
 //typedef struct token_s token_s;
 
@@ -63,11 +94,15 @@ enum tok_attr_e {
 };
 
 struct token_s {
-
-    char lexeme[MAX_TOK_SIZE];
+    char *lexeme;
     tok_type_e type;
     tok_type_e att;
-    token_s *next;
+};
+
+struct tokchunk_s {
+    int size;
+    token_s toks[TOK_CHUNK_SIZE];
+    tokchunk_s *next;
 };
 
 class Parse;
@@ -78,7 +113,8 @@ class Parse : public QObject
 {
     Q_OBJECT
 public:
-    explicit Parse(QObject *parent = 0);
+
+    explicit Parse(char *src, QObject *parent = 0);
 
 signals:
 
@@ -87,8 +123,12 @@ public slots:
 private:
     void tok(Parser::token_s *t);
 
-    Parser::token_s *tokens;
+    void addTok(char *lexeme, size_t len, int type, int att);
+
+    char *src;
     char *currptr;
+    Parser::tokchunk_s *head;
+    Parser::tokchunk_s *currchunk;
 };
 
 #endif // PARSE_H
