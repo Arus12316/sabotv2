@@ -2,11 +2,7 @@
  <statementlist> := <statement> <statementlist'>
  <statementlist> := <statement> <statementlist> | E
  
- <statement> :=  <expressionlist> | <control> | <dec> | return <expression>
- 
- <expressionlist> := <expression> <expressionlist'>
- 
- <expressionlist'> := <expression> <expressionlist'> | E
+ <statement> :=  <expression> | <control> | <dec> | return <expression>
  
  <expression> := <simple_expression> <expression'>
  
@@ -28,7 +24,11 @@
  |
  E
  
- <factor> := id <factor'>
+ <factor> := <factor'> <optexp>
+ 
+ <optexp> := ^ <expression>
+ 
+ <factor'> := id <factor''>
  |
  num
  |
@@ -44,15 +44,15 @@
  |
  @ (<paramlist>) { <statementlist> } <optcall>
  
- <factor'> := [ <expression> ] | . id <factor'> | ( <paramlist> ) | E
+ <factor''> := [ <expression> ] <factor''> | . id <factor''> | ( <arglist> ) | E
  
- <optcall> := ( <paramlist> ) | E
+ <optcall> := ( <arglist> ) | E
  
  <sign> + | -
  
  
- <paramlist> := <expression> <paramlist'>
- <paramlist'> := , <expression> <paramlist'> | E
+ <arglist> := <expression> <arglist'>
+ <arglist'> := , <expression> <arglist'> | E
  
  <control> := if <expression> then <statementlist> <elseif>
  |
@@ -62,7 +62,17 @@
  
  <elseif> := else <statementlist> endif | elif <expression> then <statementlist> endif
  
- <dec> := var id := <expression>
+ <dec> := var id : <opttype> := <expression>
+ 
+ <opttype> := <type> | E
+ 
+ <type> := _int <array> | _real <array> | _string <array> | _regex <array> | ( <optparamlist> ) -> <type>
+ 
+ <array> := [ <expression> ] <array> | E
+ 
+ <optparamlist> := <paramlist> | E
+ <paramlist> := <dec> <paramlist'>
+ <paramlist'> := , <dec> <paramlist'>
  
  <initializer> := { <paramlist> <optmap> }
  
@@ -72,6 +82,7 @@
 
 #include "parse.h"
 #include "general.h"
+#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
@@ -87,30 +98,40 @@ enum {
     TOKTYPE_DOT,
     TOKTYPE_LAMBDA,
     TOKTYPE_MAP,
-    TOKTYPE_FMAP,
+    TOKTYPE_FORRANGE,
     TOKTYPE_OPENPAREN,
     TOKTYPE_CLOSEPAREN,
     TOKTYPE_OPENBRACKET,
     TOKTYPE_CLOSEBRACKET,
     TOKTYPE_OPENBRACE,
     TOKTYPE_CLOSEBRACE,
+    TOKTYPE_EXPOP,
     TOKTYPE_MULOP,
     TOKTYPE_ADDOP,
     TOKTYPE_RELOP,
-    TOKTYPE_REGEX
+    TOKTYPE_REGEX,
+    TOKTYPE_ASSIGN,
+    TOKTYPE_COLON
 };
 
 enum {
     TOKATT_DEFAULT,
     TOKATT_NUMREAL,
     TOKATT_NUMINT,
+    TOKATT_EQ,
+    TOKATT_NEQ,
+    TOKATT_GEQ,
+    TOKATT_LEQ,
+    TOKATT_G,
+    TOKATT_L,
     TOKATT_MULT,
     TOKATT_AND,
     TOKATT_DIV,
     TOKATT_MOD,
     TOKATT_OR,
     TOKATT_ADD,
-    TOKATT_SUB
+    TOKATT_SUB,
+    TOKATT_EXP
 };
 
 typedef struct tok_s tok_s;
@@ -132,6 +153,16 @@ struct tokchunk_s
 
 static tokchunk_s *lex(char *src);
 static void tok(tokchunk_s **list, char *lexeme, size_t len, uint8_t type, uint8_t att);
+static void printtoks(tokchunk_s *list);
+
+void parse(char *src)
+{
+    tokchunk_s *tok;
+    
+    tok = lex(src);
+    printtoks(tok);
+
+}
 
 tokchunk_s *lex(char *src)
 {
@@ -145,28 +176,183 @@ tokchunk_s *lex(char *src)
     
     while(*src) {
         switch(*src) {
+            case ' ':
+            case '\t':
+            case '\v':
+            case '\n':
+            case '\r':
+                src++;
+                break;
             case ',':
                 tok(&curr, ",", 1, TOKTYPE_COMMA, TOKATT_DEFAULT);
                 src++;
                 break;
             case '.':
+                tok(&curr, ".", 1, TOKTYPE_DOT, TOKATT_DEFAULT);
+                src++;
+                break;
             case '(':
+                tok(&curr, "(", 1, TOKTYPE_OPENPAREN, TOKATT_DEFAULT);
+                src++;
+                break;
             case ')':
+                tok(&curr, ")", 1, TOKTYPE_CLOSEPAREN, TOKATT_DEFAULT);
+                src++;
+                break;
             case '[':
+                tok(&curr, "[", 1, TOKTYPE_OPENBRACKET, TOKATT_DEFAULT);
+                src++;
+                break;
             case ']':
+                tok(&curr, "]", 1, TOKTYPE_CLOSEBRACKET, TOKATT_DEFAULT);
+                src++;
+                break;
             case '{':
+                tok(&curr, "{", 1, TOKTYPE_OPENBRACE, TOKATT_DEFAULT);
+                src++;
+                break;
             case '}':
+                tok(&curr, "}", 1, TOKTYPE_CLOSEBRACE, TOKATT_DEFAULT);
+                src++;
+                break;
             case '@':
+                tok(&curr, "@", 1, TOKTYPE_LAMBDA, TOKATT_DEFAULT);
+                src++;
+                break;
             case '<':
+                if(*(src + 1) == '-') {
+                    tok(&curr, "<-", 2, TOKTYPE_FORRANGE, TOKATT_DEFAULT);
+                    src += 2;
+                }
+                else if(*(src + 1) == '>') {
+                    tok(&curr, "<>", 2, TOKTYPE_RELOP, TOKATT_NEQ);
+                    src += 2;
+                }
+                else if(*(src + 1) == '=') {
+                    tok(&curr, "<=", 2, TOKTYPE_RELOP, TOKATT_LEQ);
+                    src += 2;
+                }
+                else {
+                    tok(&curr, "<", 1, TOKTYPE_RELOP, TOKATT_L);
+                    src++;
+                }
+                break;
             case '>':
+                if(*(src + 1) == '=') {
+                    tok(&curr, ">=", 2, TOKTYPE_RELOP, TOKATT_GEQ);
+                    src += 2;
+                }
+                else {
+                    tok(&curr, ">", 1, TOKTYPE_RELOP, TOKATT_G);
+                    src++;
+                }
+                break;
             case '+':
+                if(*(src + 1) == '=') {
+                    tok(&curr, "+=", 2, TOKTYPE_ASSIGN, TOKATT_ADD);
+                    src++;
+                }
+                else {
+                    tok(&curr, "}", 1, TOKTYPE_ADDOP, TOKATT_ADD);
+                    src++;
+                }
+                break;
             case '-':
+                if(*(src + 1) == '>') {
+                    tok(&curr, "->", 2, TOKTYPE_MAP, TOKATT_DEFAULT);
+                    src += 2;
+                }
+                else if(*(src + 1) == '=') {
+                    tok(&curr, "-=", 2, TOKTYPE_ASSIGN, TOKATT_SUB);
+                    src += 2;
+                }
+                else {
+                    tok(&curr, "-", 1, TOKTYPE_ADDOP, TOKATT_SUB);
+                    src++;
+                }
+                break;
             case '*':
+                if(*(src + 1) == '=') {
+                    tok(&curr, "*=", 2, TOKTYPE_ASSIGN, TOKATT_MULT);
+                    src += 2;
+                }
+                else {
+                    tok(&curr, "*", 1, TOKTYPE_MULOP, TOKATT_MULT);
+                    src++;
+                }
+                break;
             case '/':
+                if(*(src + 1) == '=') {
+                    tok(&curr, "/=", 2, TOKTYPE_ASSIGN, TOKATT_DIV);
+                    src += 2;
+                }
+                else {
+                    tok(&curr, "/", 1, TOKTYPE_MULOP, TOKATT_DIV);
+                    src++;
+                }
+                break;
             case '%':
+                if(*(src + 1) == '=') {
+                    tok(&curr, "%=", 2, TOKTYPE_ASSIGN, TOKATT_MOD);
+                    src += 2;
+                }
+                else {
+                    tok(&curr, "%", 1, TOKTYPE_MULOP, TOKATT_MOD);
+                    src++;
+                }
+                break;
             case ':':
+                if(*(src + 1) == '=') {
+                    tok(&curr, ":=", 2, TOKTYPE_ASSIGN, TOKATT_DEFAULT);
+                    src += 2;
+                }
+                else {
+                    tok(&curr, ":", 1, TOKTYPE_COLON, TOKATT_DEFAULT);
+                    src++;
+                }
+                break;
+            case '^':
+                if(*(src + 1) == '=') {
+                    tok(&curr, "^=", 2, TOKTYPE_ASSIGN, TOKATT_EXP);
+                    src += 2;
+                }
+                else {
+                    tok(&curr, "^", 1, TOKTYPE_EXPOP, TOKATT_DEFAULT);
+                    src++;
+                }
+                break;
             case '=':
+                tok(&curr, "=", 1, TOKTYPE_RELOP, TOKATT_DEFAULT);
+                src++;
+                break;
+            case '"':
+                bptr = src++;
+                while(*src != '"') {
+                    if(*src)
+                        src++;
+                    else {
+                        //badly formed string error
+                    }
+                }
+                tok(&curr, "=", 1, TOKTYPE_RELOP, TOKATT_DEFAULT);
+                c = *src;
+                *src = '\0';
+                tok(&curr, bptr, src - bptr, TOKTYPE_STRING, TOKATT_DEFAULT);
+                *src = c;
+                break;
             case '#':
+                bptr = src++;
+                while(*src != '#') {
+                    if(*src)
+                        src++;
+                    else {
+                        //badly formed regex error
+                    }
+                }
+                c = *src;
+                *src = '\0';
+                tok(&curr, bptr, src - bptr, TOKTYPE_REGEX, TOKATT_DEFAULT);
+                *src = c;
                 break;
             default:
                 if(isdigit(*src)) {
@@ -193,12 +379,13 @@ tokchunk_s *lex(char *src)
                             else
                                 tok(&curr, bptr, src - bptr, TOKTYPE_NUM, TOKATT_NUMINT);
                             *src = c;
+                            break;
                         }
                     }
                 }
                 else if(isalpha(*src) || *src == '_') {
                     bptr = src++;
-                    while(isalpha(*src) || *src == '_')
+                    while(isalnum(*src) || *src == '_')
                         src++;
                     c = *src;
                     *src = '\0';
@@ -206,6 +393,10 @@ tokchunk_s *lex(char *src)
                     tok(&curr, bptr, src - bptr, TOKTYPE_NUM, TOKATT_NUMINT);
                     *src = c;
                 }
+                else {
+                    //lexical error
+                }
+                    
                 break;
         }
     }
@@ -232,4 +423,16 @@ void tok(tokchunk_s **list, char *lexeme, size_t len, uint8_t type, uint8_t att)
     l->tok[size].type = type;
     l->tok[size].att = att;
     l->size++;
+}
+
+void printtoks(tokchunk_s *list)
+{
+    int i;
+    
+    while(list) {
+        for(i = 0; i < list->size; i++) {
+            printf("%s %d %d\n", list->tok[i].lex, list->tok[i].type, list->tok[i].att);
+        }
+        list = list->next;
+    }
 }
