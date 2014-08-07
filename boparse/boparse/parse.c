@@ -58,7 +58,8 @@
  |
  while <expression> do <statementlist> endwhile
  |
- for id <- id do <statementlist> endfor
+ for id <- <expression> do <statementlist> endfor
+ 
  
  <elseif> := else <statementlist> endif | elif <expression> then <statementlist> endif
  
@@ -66,7 +67,7 @@
  
  <opttype> := <type> | E
  
- <type> := _int <array> | _real <array> | _string <array> | _regex <array> | ( <optparamlist> ) -> <type>
+ <type> := void | _int <array> | _real <array> | _string <array> | _regex <array> | ( <optparamlist> ) -> <type>
  
  <array> := [ <expression> ] <array> | E
  
@@ -96,6 +97,7 @@ enum {
     TOKTYPE_STRING,
     TOKTYPE_COMMA,
     TOKTYPE_DOT,
+    TOKTYPE_RANGE,
     TOKTYPE_LAMBDA,
     TOKTYPE_MAP,
     TOKTYPE_FORRANGE,
@@ -322,8 +324,14 @@ tokchunk_s *lex(char *src)
                 }
                 break;
             case '=':
-                tok(&curr, "=", 1, TOKTYPE_RELOP, TOKATT_DEFAULT);
-                src++;
+                if(*(src + 1) == '>') {
+                    tok(&curr, "=>", 2, TOKTYPE_RANGE, TOKATT_DEFAULT);
+                    src += 2;
+                }
+                else {
+                    tok(&curr, "=", 1, TOKTYPE_RELOP, TOKATT_DEFAULT);
+                    src++;
+                }
                 break;
             case '"':
                 bptr = src++;
@@ -368,6 +376,7 @@ tokchunk_s *lex(char *src)
                             }
                             else {
                                 //lexical error
+                                src++;
                             }
                         }
                         else {
