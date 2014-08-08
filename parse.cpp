@@ -1,5 +1,6 @@
 #include "parse.h"
 
+/*
 enum {
     TOKTYPE_IDENT,
     TOKTYPE_NUM,
@@ -46,4 +47,4 @@ void Parse::addTok(char *lexeme, size_t len, int type, int att)
 }
 
 
-
+*/

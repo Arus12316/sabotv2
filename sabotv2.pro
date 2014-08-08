@@ -15,7 +15,6 @@ TEMPLATE = app
 SOURCES += main.cpp\
         mainwindow.cpp \
     connection.cpp \
-    parse.cpp \
     user.cpp \
     server.cpp \
     loginmultiusers.cpp \
@@ -27,7 +26,6 @@ SOURCES += main.cpp\
 
 HEADERS  += mainwindow.h \
     connection.h \
-    parse.h \
     user.h \
     server.h \
     loginmultiusers.h \

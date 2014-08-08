@@ -124,6 +124,7 @@ enum {
     TOKTYPE_REGEX,
     TOKTYPE_ASSIGN,
     TOKTYPE_COLON,
+    TOKTYPE_SEMICOLON,
     TOKTYPE_NOT,
     TOKTYPE_IF,
     TOKTYPE_THEN,
@@ -197,6 +198,7 @@ static void mtok(tokchunk_s **list, char *lexeme, size_t len, uint8_t type, uint
 static void printtoks(tokchunk_s *list);
 
 static tok_s *tok(tokiter_s *ti);
+static tok_s *nexttok(tokiter_s *ti);
 
 static void start(tokchunk_s *tokens);
 static void p_statementlist(tokiter_s *ti);
@@ -237,6 +239,8 @@ void parse(char *src)
     
     tok = lex(src);
     printtoks(tok);
+    
+    start(tok);
 
 }
 
@@ -399,6 +403,10 @@ tokchunk_s *lex(char *src)
                     src++;
                 }
                 break;
+            case ';':
+                mtok(&curr, ";", 1, TOKTYPE_SEMICOLON, TOKATT_DEFAULT);
+                src++;
+                break;
             case '^':
                 if(*(src + 1) == '=') {
                     mtok(&curr, "^=", 2, TOKTYPE_ASSIGN, TOKATT_EXP);
@@ -533,6 +541,17 @@ void printtoks(tokchunk_s *list)
 
 tok_s *tok(tokiter_s *ti)
 {
+    if(ti->curr->size == TOKCHUNK_SIZE) {
+        if(ti->curr->next)
+            return &ti->curr->next->tok[0];
+        else
+            return NULL;
+    }
+    return &ti->curr->tok[ti->i];
+}
+
+tok_s *nexttok(tokiter_s *ti)
+{
     uint8_t i = ti->i;
     
     if(i < ti->curr->size) {
@@ -547,7 +566,6 @@ tok_s *tok(tokiter_s *ti)
     return NULL;
 }
 
-
 void start(tokchunk_s *tokens)
 {
     tokiter_s iter = { .i = 0, .curr = tokens};
@@ -557,32 +575,11 @@ void start(tokchunk_s *tokens)
 
 void p_statementlist(tokiter_s *ti)
 {
-    tok_s *t = tok(ti);
-    
-    if(t) {
+    if(tok(ti)) {
         do {
-            switch(t->type) {
-                case TOKTYPE_IDENT:
-                case TOKTYPE_NUM:
-                case TOKTYPE_OPENPAREN:
-                case TOKTYPE_NOT:
-                case TOKTYPE_STRING:
-                case TOKTYPE_REGEX:
-                case TOKTYPE_LAMBDA:
-                case TOKTYPE_OPENBRACE:
-                case TOKTYPE_ADDOP:
-                    break;
-                case TOKTYPE_IF:
-                case TOKTYPE_WHILE:
-                case TOKTYPE_FOR:
-                case TOKTYPE_SWITCH:
-                    break;
-                case TOKTYPE_VAR:
-                    break;
-                    
-            }
+            p_statement(ti);
         }
-        while((t = tok(ti)));
+        while(tok(ti));
     }
     else {
         //error blank program
@@ -592,7 +589,56 @@ void p_statementlist(tokiter_s *ti)
 
 void p_statement(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    switch(t->type) {
+        case TOKTYPE_IDENT:
+        case TOKTYPE_NUM:
+        case TOKTYPE_OPENPAREN:
+        case TOKTYPE_NOT:
+        case TOKTYPE_STRING:
+        case TOKTYPE_REGEX:
+        case TOKTYPE_LAMBDA:
+        case TOKTYPE_OPENBRACE:
+        case TOKTYPE_ADDOP:
+            p_expression(ti);
+            t = tok(ti);
+            if(t->type == TOKTYPE_SEMICOLON) {
+                nexttok(ti);
+            }
+            else {
+                //syntax error
+            }
+            break;
+        case TOKTYPE_IF:
+        case TOKTYPE_WHILE:
+        case TOKTYPE_FOR:
+        case TOKTYPE_SWITCH:
+            p_control(ti);
+            break;
+        case TOKTYPE_VAR:
+            p_dec(ti);
+            if(t->type == TOKTYPE_SEMICOLON) {
+                nexttok(ti);
+            }
+            else {
+                //syntax error
+            }
+            break;
+        case TOKTYPE_RETURN:
+            nexttok(ti);
+            p_expression(ti);
+            if(t->type == TOKTYPE_SEMICOLON) {
+                nexttok(ti);
+            }
+            else {
+                //syntax error
+            }
+            break;
+        default:
+            //syntax error
+            break;
+    }
 }
 
 void p_expression(tokiter_s *ti)
