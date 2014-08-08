@@ -71,9 +71,9 @@
 
  <elseif> -> elif <expression> then <statementlist> | else <statementlist>
  
- <dec> -> var id : <opttype> <assign>
+ <dec> -> var id <opttype> <assign>
  
- <opttype> -> <type> | ε
+ <opttype> -> : <type> | ε
  
  <type> -> void | integer <array> | real <array> | String <array> | Regex <array> | ( <optparamlist> ) <array> map <type>
  
@@ -1187,16 +1187,9 @@ void p_dec(tokiter_s *ti)
     if(t->type == TOKTYPE_VAR) {
         t = nexttok(ti);
         if(t->type == TOKTYPE_IDENT) {
-            t = nexttok(ti);
-            if(t->type == TOKTYPE_COLON) {
-                nexttok(ti);
-                p_opttype(ti);
-                p_assign(ti);
-            }
-            else {
-                //syntax error
-                synerr_rec(ti);
-            }
+            nexttok(ti);
+            p_opttype(ti);
+            p_assign(ti);
         }
         else {
             //syntax error
@@ -1213,20 +1206,13 @@ void p_opttype(tokiter_s *ti)
 {
     tok_s *t = tok(ti);
     
-    switch(t->type) {
-        case TOKTYPE_REGEXTYPE:
-        case TOKTYPE_STRINGTYPE:
-        case TOKTYPE_REAL:
-        case TOKTYPE_INTEGER:
-        case TOKTYPE_VOID:
-        case TOKTYPE_OPENPAREN:
-            p_type(ti);
-            break;
-        default:
-            //epsilon production
-            break;
+    if(t->type == TOKTYPE_COLON) {
+        nexttok(ti);
+        p_type(ti);
     }
-    
+    else {
+        //epsilon production
+    }
 }
 
 
