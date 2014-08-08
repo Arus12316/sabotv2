@@ -40,15 +40,15 @@
                 <lambda>
  
  
- <factor''> -> [ <expression> ] <factor''> | . id <factor''> | ( <arglist> ) | ε
+ <factor''> -> [ <expression> ] <factor''> | . id <factor''> | ( <optarglist> ) | ε
  
  <assign> -> assignop <expression> | ε
  
- <lambda> -> @ (<paramlist>) openbrace <statementlist> closebrace
+ <lambda> -> @ (<optparamlist>) openbrace <statementlist> closebrace
  
  <sign> -> + | -
  
- 
+ <optarglist> -> <arglist> | ε
  <arglist> -> <expression> <arglist'>
  <arglist'> -> , <expression> <arglist'> | ε
  
@@ -247,6 +247,7 @@ static tok_s *nexttok(tokiter_s *ti);
 
 static void start(tokchunk_s *tokens);
 static void p_statementlist(tokiter_s *ti);
+static void p_statementlist_(tokiter_s *ti);
 static void p_statement(tokiter_s *ti);
 static void p_expression(tokiter_s *ti);
 static void p_expression_(tokiter_s *ti);
@@ -261,6 +262,7 @@ static void p_factor__(tokiter_s *ti);
 static void p_assign(tokiter_s *ti);
 static void p_lambda(tokiter_s *ti);
 static void p_sign(tokiter_s *ti);
+static void p_optarglist(tokiter_s *ti);
 static void p_arglist(tokiter_s *ti);
 static void p_arglist_(tokiter_s *ti);
 static void p_control(tokiter_s *ti);
@@ -659,7 +661,8 @@ void adderr(tokiter_s *ti, char *prefix, char *got, uint16_t line, ...)
 
 tok_s *tok(tokiter_s *ti)
 {
-    if(ti->curr->size == TOKCHUNK_SIZE) {
+    
+    if(ti->i == ti->curr->size) {
         if(ti->curr->next)
             return &ti->curr->next->tok[0];
         else {
@@ -676,7 +679,7 @@ tok_s *nexttok(tokiter_s *ti)
     
     if(i < ti->curr->size) {
         ti->i++;
-        return &ti->curr->tok[i];
+        return &ti->curr->tok[i + 1];
     }
     else if(ti->curr->size == TOKCHUNK_SIZE) {
         ti->curr = ti->curr->next;
@@ -691,22 +694,47 @@ void start(tokchunk_s *tokens)
 {
     tokiter_s iter = { .i = 0, .curr = tokens, .err = NULL, .ecurr = NULL};
     
+    
     p_statementlist(&iter);
 }
 
 void p_statementlist(tokiter_s *ti)
 {
-    if(tok(ti)->type != TOKTYPE_EOF) {
-        do {
-            p_statement(ti);
-        }
-        while(tok(ti)->type != TOKTYPE_EOF);
-    }
-    else {
-        //error blank program
-    }
+    tok_s *t = tok(ti);
+    
+    
+    p_statement(ti);
+    p_statementlist_(ti);
 }
 
+void p_statementlist_(tokiter_s *ti)
+{
+    tok_s *t = tok(ti);
+    
+    switch(t->type) {
+        case TOKTYPE_VAR:
+        case TOKTYPE_SWITCH:
+        case TOKTYPE_FOR:
+        case TOKTYPE_WHILE:
+        case TOKTYPE_IF:
+        case TOKTYPE_ADDOP:
+        case TOKTYPE_OPENBRACE:
+        case TOKTYPE_LAMBDA:
+        case TOKTYPE_REGEX:
+        case TOKTYPE_STRING:
+        case TOKTYPE_NOT:
+        case TOKTYPE_OPENPAREN:
+        case TOKTYPE_NUM:
+        case TOKTYPE_IDENT:
+        case TOKTYPE_RETURN:
+            p_statement(ti);
+            p_statementlist_(ti);
+            break;
+        default:
+            //epsilon production
+            break;
+    }
+}
 
 void p_statement(tokiter_s *ti)
 {
@@ -740,6 +768,7 @@ void p_statement(tokiter_s *ti)
             break;
         case TOKTYPE_VAR:
             p_dec(ti);
+            t = tok(ti);
             if(t->type == TOKTYPE_SEMICOLON) {
                 nexttok(ti);
             }
@@ -751,6 +780,7 @@ void p_statement(tokiter_s *ti)
         case TOKTYPE_RETURN:
             nexttok(ti);
             p_expression(ti);
+            t = tok(ti);
             if(t->type == TOKTYPE_SEMICOLON) {
                 nexttok(ti);
             }
@@ -909,7 +939,7 @@ void p_factor__(tokiter_s *ti)
             break;
         case TOKTYPE_OPENPAREN:
             nexttok(ti);
-            p_arglist(ti);
+            p_optarglist(ti);
             t = tok(ti);
             if(t->type == TOKTYPE_CLOSEPAREN) {
                 nexttok(ti);
@@ -945,7 +975,7 @@ void p_lambda(tokiter_s *ti)
     
     if(t->type == TOKTYPE_OPENPAREN) {
         nexttok(ti);
-        p_paramlist(ti);
+        p_optparamlist(ti);
         t = tok(ti);
         if(t->type == TOKTYPE_CLOSEPAREN) {
             t = nexttok(ti);
@@ -955,6 +985,7 @@ void p_lambda(tokiter_s *ti)
                 t = tok(ti);
                 if(t->type == TOKTYPE_CLOSEBRACE) {
                     nexttok(ti);
+                    printf("%s\n", tok(ti)->lex);
                 }
                 else {
                     //syntax error
@@ -985,6 +1016,28 @@ void p_sign(tokiter_s *ti)
     else {
         //syntax error
         synerr_rec(ti);
+    }
+}
+
+void p_optarglist(tokiter_s *ti)
+{
+    tok_s *t = tok(ti);
+    
+    switch(t->type) {
+        case TOKTYPE_ADDOP:
+        case TOKTYPE_OPENBRACE:
+        case TOKTYPE_LAMBDA:
+        case TOKTYPE_REGEX:
+        case TOKTYPE_STRING:
+        case TOKTYPE_NOT:
+        case TOKTYPE_OPENPAREN:
+        case TOKTYPE_NUM:
+        case TOKTYPE_IDENT:
+            p_arglist(ti);
+            break;
+        default:
+            //epsilon production
+            break;
     }
 }
 
@@ -1386,6 +1439,8 @@ void synerr_rec(tokiter_s *ti)
     tok_s *t = tok(ti);
     
     printf("Syntax Error at token %s at line %u\n", t->lex, t->line);
+    
+    asm("hlt");
     
     if(t->type != TOKTYPE_EOF)
         nexttok(ti);
