@@ -8,4 +8,3 @@ int main(int argc, const char *argv[])
     parse(testcase1);
     return 0;
 }
-

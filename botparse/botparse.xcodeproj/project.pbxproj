@@ -7,40 +7,40 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2F84DE5719940DBA00527AFF /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 2F84DE5619940DBA00527AFF /* main.c */; };
-		2F84DE5919940DBA00527AFF /* boparse.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = 2F84DE5819940DBA00527AFF /* boparse.1 */; };
-		2F84DE6319940DEC00527AFF /* regex.c in Sources */ = {isa = PBXBuildFile; fileRef = 2F84DE5F19940DEC00527AFF /* regex.c */; };
-		2F84DE6419940DEC00527AFF /* general.c in Sources */ = {isa = PBXBuildFile; fileRef = 2F84DE6019940DEC00527AFF /* general.c */; };
-		2F84DE6719940E1200527AFF /* parse.c in Sources */ = {isa = PBXBuildFile; fileRef = 2F84DE6619940E1200527AFF /* parse.c */; };
+		2F84DE75199473E100527AFF /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 2F84DE74199473E100527AFF /* main.c */; };
+		2F84DE77199473E100527AFF /* botparse.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = 2F84DE76199473E100527AFF /* botparse.1 */; };
+		2F84DE821994741100527AFF /* parse.c in Sources */ = {isa = PBXBuildFile; fileRef = 2F84DE7D1994741100527AFF /* parse.c */; };
+		2F84DE831994741100527AFF /* regex.c in Sources */ = {isa = PBXBuildFile; fileRef = 2F84DE7F1994741100527AFF /* regex.c */; };
+		2F84DE841994741100527AFF /* general.c in Sources */ = {isa = PBXBuildFile; fileRef = 2F84DE801994741100527AFF /* general.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		2F84DE5119940DBA00527AFF /* CopyFiles */ = {
+		2F84DE6F199473E100527AFF /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = /usr/share/man/man1/;
 			dstSubfolderSpec = 0;
 			files = (
-				2F84DE5919940DBA00527AFF /* boparse.1 in CopyFiles */,
+				2F84DE77199473E100527AFF /* botparse.1 in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 1;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		2F84DE5319940DBA00527AFF /* boparse */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = boparse; sourceTree = BUILT_PRODUCTS_DIR; };
-		2F84DE5619940DBA00527AFF /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
-		2F84DE5819940DBA00527AFF /* boparse.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = boparse.1; sourceTree = "<group>"; };
-		2F84DE5F19940DEC00527AFF /* regex.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = regex.c; path = ../../regex.c; sourceTree = "<group>"; };
-		2F84DE6019940DEC00527AFF /* general.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = general.c; path = ../../general.c; sourceTree = "<group>"; };
-		2F84DE6119940DEC00527AFF /* regex.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = regex.h; path = ../../regex.h; sourceTree = "<group>"; };
-		2F84DE6219940DEC00527AFF /* general.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = general.h; path = ../../general.h; sourceTree = "<group>"; };
-		2F84DE6519940DF800527AFF /* parse.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = parse.h; sourceTree = "<group>"; };
-		2F84DE6619940E1200527AFF /* parse.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = parse.c; sourceTree = "<group>"; };
+		2F84DE71199473E100527AFF /* botparse */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = botparse; sourceTree = BUILT_PRODUCTS_DIR; };
+		2F84DE74199473E100527AFF /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+		2F84DE76199473E100527AFF /* botparse.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = botparse.1; sourceTree = "<group>"; };
+		2F84DE7D1994741100527AFF /* parse.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = parse.c; path = ../../parse.c; sourceTree = "<group>"; };
+		2F84DE7E1994741100527AFF /* parse.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = parse.h; path = ../../parse.h; sourceTree = "<group>"; };
+		2F84DE7F1994741100527AFF /* regex.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = regex.c; path = ../../regex.c; sourceTree = "<group>"; };
+		2F84DE801994741100527AFF /* general.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = general.c; path = ../../general.c; sourceTree = "<group>"; };
+		2F84DE811994741100527AFF /* regex.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = regex.h; path = ../../regex.h; sourceTree = "<group>"; };
+		2F84DE851994743900527AFF /* general.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = general.h; path = ../../general.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		2F84DE5019940DBA00527AFF /* Frameworks */ = {
+		2F84DE6E199473E100527AFF /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -50,99 +50,99 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		2F84DE4A19940DBA00527AFF = {
+		2F84DE68199473E100527AFF = {
 			isa = PBXGroup;
 			children = (
-				2F84DE5519940DBA00527AFF /* boparse */,
-				2F84DE5419940DBA00527AFF /* Products */,
+				2F84DE73199473E100527AFF /* botparse */,
+				2F84DE72199473E100527AFF /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		2F84DE5419940DBA00527AFF /* Products */ = {
+		2F84DE72199473E100527AFF /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				2F84DE5319940DBA00527AFF /* boparse */,
+				2F84DE71199473E100527AFF /* botparse */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		2F84DE5519940DBA00527AFF /* boparse */ = {
+		2F84DE73199473E100527AFF /* botparse */ = {
 			isa = PBXGroup;
 			children = (
-				2F84DE5619940DBA00527AFF /* main.c */,
-				2F84DE6519940DF800527AFF /* parse.h */,
-				2F84DE6619940E1200527AFF /* parse.c */,
-				2F84DE5F19940DEC00527AFF /* regex.c */,
-				2F84DE6019940DEC00527AFF /* general.c */,
-				2F84DE6119940DEC00527AFF /* regex.h */,
-				2F84DE6219940DEC00527AFF /* general.h */,
-				2F84DE5819940DBA00527AFF /* boparse.1 */,
+				2F84DE74199473E100527AFF /* main.c */,
+				2F84DE7D1994741100527AFF /* parse.c */,
+				2F84DE7E1994741100527AFF /* parse.h */,
+				2F84DE7F1994741100527AFF /* regex.c */,
+				2F84DE801994741100527AFF /* general.c */,
+				2F84DE811994741100527AFF /* regex.h */,
+				2F84DE851994743900527AFF /* general.h */,
+				2F84DE76199473E100527AFF /* botparse.1 */,
 			);
-			path = boparse;
+			path = botparse;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		2F84DE5219940DBA00527AFF /* boparse */ = {
+		2F84DE70199473E100527AFF /* botparse */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 2F84DE5C19940DBA00527AFF /* Build configuration list for PBXNativeTarget "boparse" */;
+			buildConfigurationList = 2F84DE7A199473E100527AFF /* Build configuration list for PBXNativeTarget "botparse" */;
 			buildPhases = (
-				2F84DE4F19940DBA00527AFF /* Sources */,
-				2F84DE5019940DBA00527AFF /* Frameworks */,
-				2F84DE5119940DBA00527AFF /* CopyFiles */,
+				2F84DE6D199473E100527AFF /* Sources */,
+				2F84DE6E199473E100527AFF /* Frameworks */,
+				2F84DE6F199473E100527AFF /* CopyFiles */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = boparse;
-			productName = boparse;
-			productReference = 2F84DE5319940DBA00527AFF /* boparse */;
+			name = botparse;
+			productName = botparse;
+			productReference = 2F84DE71199473E100527AFF /* botparse */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		2F84DE4B19940DBA00527AFF /* Project object */ = {
+		2F84DE69199473E100527AFF /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				LastUpgradeCheck = 0500;
 				ORGANIZATIONNAME = "Jonathan Hamm";
 			};
-			buildConfigurationList = 2F84DE4E19940DBA00527AFF /* Build configuration list for PBXProject "boparse" */;
+			buildConfigurationList = 2F84DE6C199473E100527AFF /* Build configuration list for PBXProject "botparse" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 			);
-			mainGroup = 2F84DE4A19940DBA00527AFF;
-			productRefGroup = 2F84DE5419940DBA00527AFF /* Products */;
+			mainGroup = 2F84DE68199473E100527AFF;
+			productRefGroup = 2F84DE72199473E100527AFF /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				2F84DE5219940DBA00527AFF /* boparse */,
+				2F84DE70199473E100527AFF /* botparse */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
-		2F84DE4F19940DBA00527AFF /* Sources */ = {
+		2F84DE6D199473E100527AFF /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2F84DE5719940DBA00527AFF /* main.c in Sources */,
-				2F84DE6419940DEC00527AFF /* general.c in Sources */,
-				2F84DE6319940DEC00527AFF /* regex.c in Sources */,
-				2F84DE6719940E1200527AFF /* parse.c in Sources */,
+				2F84DE841994741100527AFF /* general.c in Sources */,
+				2F84DE831994741100527AFF /* regex.c in Sources */,
+				2F84DE75199473E100527AFF /* main.c in Sources */,
+				2F84DE821994741100527AFF /* parse.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		2F84DE5A19940DBA00527AFF /* Debug */ = {
+		2F84DE78199473E100527AFF /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -179,7 +179,7 @@
 			};
 			name = Debug;
 		};
-		2F84DE5B19940DBA00527AFF /* Release */ = {
+		2F84DE79199473E100527AFF /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -210,14 +210,14 @@
 			};
 			name = Release;
 		};
-		2F84DE5D19940DBA00527AFF /* Debug */ = {
+		2F84DE7B199473E100527AFF /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
 		};
-		2F84DE5E19940DBA00527AFF /* Release */ = {
+		2F84DE7C199473E100527AFF /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -227,24 +227,24 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		2F84DE4E19940DBA00527AFF /* Build configuration list for PBXProject "boparse" */ = {
+		2F84DE6C199473E100527AFF /* Build configuration list for PBXProject "botparse" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2F84DE5A19940DBA00527AFF /* Debug */,
-				2F84DE5B19940DBA00527AFF /* Release */,
+				2F84DE78199473E100527AFF /* Debug */,
+				2F84DE79199473E100527AFF /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		2F84DE5C19940DBA00527AFF /* Build configuration list for PBXNativeTarget "boparse" */ = {
+		2F84DE7A199473E100527AFF /* Build configuration list for PBXNativeTarget "botparse" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2F84DE5D19940DBA00527AFF /* Debug */,
-				2F84DE5E19940DBA00527AFF /* Release */,
+				2F84DE7B199473E100527AFF /* Debug */,
+				2F84DE7C199473E100527AFF /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 2F84DE4B19940DBA00527AFF /* Project object */;
+	rootObject = 2F84DE69199473E100527AFF /* Project object */;
 }
