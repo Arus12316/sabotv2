@@ -37,7 +37,8 @@
                 |
                 <set>
                 |
-                <lambda>
+                <lambda> { <factor'>.type := closure; <factor'>.val := label }
+ 
  
  
  <factor''> -> [ <expression> ] <factor''> | . id <factor''> | ( <optarglist> ) | ε
@@ -59,6 +60,8 @@
                 for id <- <expression> do <statementlist> endfor
                 |
                 switch(<expression>) <caselist> endswitch
+                |
+                listener(<arglist>) openbrace <statementlist> closebrace
  
 
  <caselist> ->  
@@ -143,6 +146,7 @@ enum {
     TOKTYPE_DO,
     TOKTYPE_FOR,
     TOKTYPE_ENDFOR,
+    TOKTYPE_LISENER,
     TOKTYPE_VAR,
     TOKTYPE_VOID,
     TOKTYPE_INTEGER,
@@ -227,6 +231,7 @@ keywords[] = {
     {"case", TOKTYPE_CASE},
     {"default", TOKTYPE_DEFAULT},
     {"endswitch", TOKTYPE_ENDSWITCH},
+    {"listener", TOKTYPE_LISENER},
     {"var", TOKTYPE_VAR},
     {"void", TOKTYPE_VOID},
     {"int", TOKTYPE_INTEGER},
@@ -672,6 +677,7 @@ void p_statementlist_(tokiter_s *ti)
         case TOKTYPE_FOR:
         case TOKTYPE_WHILE:
         case TOKTYPE_IF:
+        case TOKTYPE_LISENER:
         case TOKTYPE_ADDOP:
         case TOKTYPE_OPENBRACE:
         case TOKTYPE_LAMBDA:
@@ -720,6 +726,7 @@ void p_statement(tokiter_s *ti)
         case TOKTYPE_WHILE:
         case TOKTYPE_FOR:
         case TOKTYPE_SWITCH:
+        case TOKTYPE_LISENER:
             p_control(ti);
             break;
         case TOKTYPE_VAR:
@@ -883,6 +890,7 @@ void p_factor__(tokiter_s *ti)
             t = tok(ti);
             if(t->type == TOKTYPE_CLOSEBRACKET) {
                 nexttok(ti);
+                p_factor__(ti);
             }
             else {
                 //syntax error
@@ -1134,6 +1142,45 @@ void p_control(tokiter_s *ti)
                 if(t->type == TOKTYPE_CLOSEPAREN) {
                     nexttok(ti);
                     p_caselist(ti);
+                }
+                else {
+                    //syntax error
+                    adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
+                    synerr_rec(ti);
+                }
+            }
+            else {
+                //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, "(", NULL);
+                synerr_rec(ti);
+            }
+            break;
+        case TOKTYPE_LISENER:
+            t = nexttok(ti);
+            if(t->type == TOKTYPE_OPENPAREN) {
+                nexttok(ti);
+                p_arglist(ti);
+                t = tok(ti);
+                if(t->type == TOKTYPE_CLOSEPAREN) {
+                    t = nexttok(ti);
+                    if(t->type == TOKTYPE_OPENBRACE) {
+                        nexttok(ti);
+                        p_statementlist(ti);
+                        t =tok(ti);
+                        if(t->type == TOKTYPE_CLOSEBRACE) {
+                            nexttok(ti);
+                        }
+                        else {
+                            //syntax error
+                            adderr(ti, "Syntax Error", t->lex, t->line, "}", NULL);
+                            synerr_rec(ti);
+                        }
+                    }
+                    else {
+                        //syntax error
+                        adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
+                        synerr_rec(ti);
+                    }
                 }
                 else {
                     //syntax error

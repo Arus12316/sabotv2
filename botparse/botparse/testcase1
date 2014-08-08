@@ -1,6 +1,10 @@
 var x : int := 32;
 
+var y : real[3] := {1.1, 2.2, 3.3};
+
 var x : (var a : int)[50] -> int[32][32] := 32;
+
+x[3](33);
 
 var y : set[3] := { a, b, {c, d}};
 
@@ -10,9 +14,22 @@ users.foreach(
     }
 );
 
-while x<>4 do 
+while x <= 4 do
     1+1;
     
     a := "32";
-
+    x += 1;
 endwhile
+
+switch(x) 
+    case #^[abc]*+?(a+)(b+)|32# -> @() {
+            print(derp);
+        }
+
+endswitch
+
+var a : int[3];
+
+listener(<arglist>) {
+    1 + 1;
+}
