@@ -482,6 +482,7 @@ void Connection::sendPublicMessage(QString *msg)
 
 void Connection::sendPrivateMessage(message_s *msg)
 {
+    size_t len = strlen(msg->body) + 1;
     char msgbuf[256];
 
     msgbuf[0] = '0';
@@ -491,7 +492,13 @@ void Connection::sendPrivateMessage(message_s *msg)
     msgbuf[5] = 'P';
 
     strcpy(msgbuf+6, msg->body);
-    sock->write(msgbuf, strlen(msgbuf) + 1);
+    strcpy(msgbuf+6+len, "Mabc");
+    msgbuf[10+len] = '9';
+    msgbuf[11+len] = '\0';
+
+    //sock->write(msgbuf, strlen(msgbuf) + 1);
+    sock->write(msgbuf, strlen(msgbuf) + 7);
+
 }
 
 void Connection::sendRaw(QString str)

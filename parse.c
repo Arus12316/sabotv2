@@ -742,14 +742,20 @@ void p_factor_(tokiter_s *ti)
             }
             break;
         case TOKTYPE_STRING:
+            nexttok(ti);
             break;
         case TOKTYPE_REGEX:
+            nexttok(ti);
             break;
         case TOKTYPE_OPENBRACE:
+            p_set(ti);
             break;
         case TOKTYPE_LAMBDA:
+            p_lambda(ti);
             break;
-            
+        default:
+            //syntax error
+            break;
     }
 }
 
