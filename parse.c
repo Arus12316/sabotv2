@@ -276,6 +276,7 @@ static void p_paramlist_(tokiter_s *ti);
 static void p_set(tokiter_s *ti);
 static void p_optnext(tokiter_s *ti);
 static void p_set_(tokiter_s *ti);
+static void synerr_rec(tokiter_s *ti);
 
 void parse(char *src)
 {
@@ -287,7 +288,6 @@ void parse(char *src)
     start(tok);
     
     
-
 }
 
 tokchunk_s *lex(char *src)
@@ -295,11 +295,15 @@ tokchunk_s *lex(char *src)
     uint16_t line = 0;
     char *bptr, c;
     tokchunk_s *head, *curr;
+    tokiter_s ti;
     
     curr = head = alloc(sizeof *head);
     
     head->size = 0;
     head->next = NULL;
+    
+    ti.err = NULL;
+    ti.ecurr = NULL;
     
     while(*src) {
         switch(*src) {
@@ -481,7 +485,7 @@ tokchunk_s *lex(char *src)
                     if(*src)
                         src++;
                     else {
-                        //badly formed string error
+                        adderr(&ti, "Lexical Error", "EOF", line, "null byte", NULL);
                     }
                 }
                 c = *src;
@@ -613,7 +617,6 @@ void adderr(tokiter_s *ti, char *prefix, char *got, uint16_t line, ...)
     size_t totallen = strlen(prefix), nargs, curr;
     char *args[MAX_ERRARGS], *s;
     
-    
     va_start(argp, line);
     
     while((s = va_arg(argp, char *))) {
@@ -622,18 +625,28 @@ void adderr(tokiter_s *ti, char *prefix, char *got, uint16_t line, ...)
     }
     
     nargs = i;
-    totallen += (sizeof(" at line: ") - 1) + ndigits(line) + (sizeof(". Expected ") - 1) +
-                (nargs - 1)*2 + sizeof("or ") + sizeof(" but got ") + strlen(got);
     
-    e = alloc(sizeof(*e) + totallen);
-    e->next = NULL;
-    
-    curr = sprintf(e->msg, "%s at line: %u. Expected ", prefix , line);
-    
-    for(i = 0; i < nargs - 1; i++)
-        curr += sprintf(&e->msg[curr], "%s, ", args[i]);
-    
-    sprintf(&e->msg[curr], "or %s but got %s.", args[i], got);
+    if(nargs > 1) {
+        totallen += (sizeof(" at line: ") - 1) + ndigits(line) + (sizeof(". Expected ") - 1) +
+                    (nargs - 1)*2 + sizeof("or ") + sizeof(" but got ") + strlen(got);
+        e = alloc(sizeof(*e) + totallen);
+        e->next = NULL;
+        
+        curr = sprintf(e->msg, "%s at line: %u. Expected ", prefix , line);
+        
+        for(i = 0; i < nargs - 1; i++)
+            curr += sprintf(&e->msg[curr], "%s, ", args[i]);
+        
+        sprintf(&e->msg[curr], "or %s but got %s.", args[i], got);
+    }
+    else {
+        totallen += (sizeof(" at line: ") - 1) + ndigits(line) + (sizeof(". Expected ") - 1) +
+                    sizeof(" but got ") + strlen(got) + 1;
+        e = alloc(sizeof(*e) + totallen);
+        e->next = NULL;
+        
+        curr = sprintf(e->msg, "%s at line: %u. Expected %s but got %s.", prefix , line, args[0], got);
+    }
     
     va_end(argp);
     
@@ -716,6 +729,7 @@ void p_statement(tokiter_s *ti)
             }
             else {
                 //syntax error
+                synerr_rec(ti);
             }
             break;
         case TOKTYPE_IF:
@@ -731,6 +745,7 @@ void p_statement(tokiter_s *ti)
             }
             else {
                 //syntax error
+                synerr_rec(ti);
             }
             break;
         case TOKTYPE_RETURN:
@@ -741,10 +756,12 @@ void p_statement(tokiter_s *ti)
             }
             else {
                 //syntax error
+                synerr_rec(ti);
             }
             break;
         default:
             //syntax error
+            synerr_rec(ti);
             break;
     }
 }
@@ -840,6 +857,7 @@ void p_factor_(tokiter_s *ti)
             }
             else {
                 //syntax error
+                synerr_rec(ti);
             }
             break;
         case TOKTYPE_STRING:
@@ -856,6 +874,7 @@ void p_factor_(tokiter_s *ti)
             break;
         default:
             //syntax error
+            synerr_rec(ti);
             break;
     }
 }
@@ -874,6 +893,7 @@ void p_factor__(tokiter_s *ti)
             }
             else {
                 //syntax error
+                synerr_rec(ti);
             }
             break;
         case TOKTYPE_DOT:
@@ -884,6 +904,7 @@ void p_factor__(tokiter_s *ti)
             }
             else {
                 //syntax error
+                synerr_rec(ti);
             }
             break;
         case TOKTYPE_OPENPAREN:
@@ -895,6 +916,7 @@ void p_factor__(tokiter_s *ti)
             }
             else {
                 //syntax error
+                synerr_rec(ti);
             }
             break;
         default:
@@ -936,16 +958,19 @@ void p_lambda(tokiter_s *ti)
                 }
                 else {
                     //syntax error
+                    synerr_rec(ti);
                 }
             }
             
         }
         else {
             //syntax error
+            synerr_rec(ti);
         }
     }
     else {
         //syntax error
+        synerr_rec(ti);
     }
     
 }
@@ -959,6 +984,7 @@ void p_sign(tokiter_s *ti)
     }
     else {
         //syntax error
+        synerr_rec(ti);
     }
 }
 
@@ -1001,10 +1027,12 @@ void p_control(tokiter_s *ti)
                 }
                 else {
                     //syntax error
+                    synerr_rec(ti);
                 }
             }
             else {
                 //syntax error
+                synerr_rec(ti);
             }
             break;
         case TOKTYPE_WHILE:
@@ -1020,10 +1048,12 @@ void p_control(tokiter_s *ti)
                 }
                 else {
                     //syntax error
+                    synerr_rec(ti);
                 }
             }
             else {
                 //syntax error
+                synerr_rec(ti);
             }
             break;
         case TOKTYPE_FOR:
@@ -1043,18 +1073,22 @@ void p_control(tokiter_s *ti)
                         }
                         else {
                             //syntax error
+                            synerr_rec(ti);
                         }
                     }
                     else {
                         //syntax error
+                        synerr_rec(ti);
                     }
                 }
                 else {
                     //syntax error
+                    synerr_rec(ti);
                 }
             }
             else {
                 //syntax error
+                synerr_rec(ti);
             }
             break;
         case TOKTYPE_SWITCH:
@@ -1069,14 +1103,17 @@ void p_control(tokiter_s *ti)
                 }
                 else {
                     //syntax error
+                    synerr_rec(ti);
                 }
             }
             else {
                 //syntax error
+                synerr_rec(ti);
             }
             break;
         default:
             //syntax error
+            synerr_rec(ti);
             break;
     }
 }
@@ -1096,6 +1133,7 @@ void p_caselist(tokiter_s *ti)
         }
         else {
             //syntax error
+            synerr_rec(ti);
         }
     }
     else if(t->type == TOKTYPE_DEFAULT) {
@@ -1107,6 +1145,7 @@ void p_caselist(tokiter_s *ti)
         }
         else {
             //syntax error
+            synerr_rec(ti);
         }
     }
     else {
@@ -1128,6 +1167,7 @@ void p_elseif(tokiter_s *ti)
         }
         else {
             //syntax error
+            synerr_rec(ti);
         }
     }
     else if(t->type == TOKTYPE_ELSE) {
@@ -1136,6 +1176,7 @@ void p_elseif(tokiter_s *ti)
     }
     else {
         //syntax error
+        synerr_rec(ti);
     }
 }
 
@@ -1154,14 +1195,17 @@ void p_dec(tokiter_s *ti)
             }
             else {
                 //syntax error
+                synerr_rec(ti);
             }
         }
         else {
             //syntax error
+            synerr_rec(ti);
         }
     }
     else {
         //syntax error
+        synerr_rec(ti);
     }
 }
 
@@ -1224,14 +1268,17 @@ void p_type(tokiter_s *ti)
                 }
                 else {
                     //syntax error
+                    synerr_rec(ti);
                 }
             }
             else {
                 //syntax error
+                synerr_rec(ti);
             }
             break;
         default:
             //syntax error
+            synerr_rec(ti);
             break;
     }
 
@@ -1251,6 +1298,7 @@ void p_array(tokiter_s *ti)
         }
         else {
             //syntax error
+            synerr_rec(ti);
         }
     }
     else {
@@ -1306,10 +1354,12 @@ void p_set(tokiter_s *ti)
         }
         else {
             //syntax error
+            synerr_rec(ti);
         }
     }
     else {
         //syntax error
+        synerr_rec(ti);
     }
 }
 
@@ -1343,5 +1393,15 @@ void p_set_(tokiter_s *ti)
     else {
         //epsilon production
     }
+}
+
+void synerr_rec(tokiter_s *ti)
+{
+    tok_s *t = tok(ti);
+    
+    printf("Syntax Error at token %s at line %u\n", t->lex, t->line);
+    
+    if(t->type != TOKTYPE_EOF)
+        nexttok(ti);
 }
 
