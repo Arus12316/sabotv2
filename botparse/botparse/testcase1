@@ -16,12 +16,11 @@ users.foreach(
 
 while x <= 4 do
     1+1;
-    
     a := "32";
     x += 1;
 endwhile
 
-switch(x) 
+switch(x)
     case #^[abc]*+?(a+)(b+)|32# -> @() {
             print(derp);
         }
@@ -30,6 +29,11 @@ endswitch
 
 var a : int[3];
 
-listener(<arglist>) {
+listener(1) {
     1 + 1;
+    var y := @(var x, var y, var z) {
+        3+3;
+    };
 }
+
+1+1;

@@ -37,7 +37,7 @@
                 |
                 <set>
                 |
-                <lambda> { <factor'>.type := closure; <factor'>.val := label }
+                <lambda> { <factor'>.type := closure; <factor'>.val := <lambda>.val }
  
  
  
@@ -658,7 +658,15 @@ tok_s *nexttok(tokiter_s *ti)
 
 void start(tokiter_s *ti)
 {
+    tok_s *t;
+    
     p_statementlist(ti);
+    t = tok(ti);
+    
+    if(t->type != TOKTYPE_EOF) {
+        //syntax error
+        adderr(ti, "Syntax Error", t->lex, t->line, "EOF", NULL);
+    }
 }
 
 void p_statementlist(tokiter_s *ti)
@@ -1142,6 +1150,15 @@ void p_control(tokiter_s *ti)
                 if(t->type == TOKTYPE_CLOSEPAREN) {
                     nexttok(ti);
                     p_caselist(ti);
+                    t = tok(ti);
+                    if(t->type == TOKTYPE_ENDSWITCH) {
+                        nexttok(ti);
+                    }
+                    else {
+                        //syntax error
+                        adderr(ti, "Syntax Error", t->lex, t->line, "endswitch", NULL);
+                        synerr_rec(ti);
+                    }
                 }
                 else {
                     //syntax error
