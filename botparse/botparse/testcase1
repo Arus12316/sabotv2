@@ -1,0 +1,18 @@
+var x : int := 32;
+
+var x : (var a : int)[50] -> int[32][32] := 32;
+
+var y : set[3] := { a, b, {c, d}};
+
+users.foreach(
+    @(var a := 3, var b) {
+        print(derp);
+    }
+);
+
+while x<>4 do 
+    1+1;
+    
+    a := "32";
+
+endwhile

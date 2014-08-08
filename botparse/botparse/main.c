@@ -1,13 +1,52 @@
 #include "parse.h"
 #include <stdio.h>
-#include "general.h";
+#include "general.h"
 
-char testcase1[] = "23.23 hello 23.1 _234_23 2332 -> => @ 2323 *= 234 ^= 23 for x <- {10 => 20} do ";
+char testcase1f[] = "/Users/jhamm/sabotv2/botparse/botparse/testcase1";
 
-char testcase2[] = "var bob := @(){1 + 1;}; bob(1, 2, 3, 4);";
+
+char *readsrc(char *file);
 
 int main(int argc, const char *argv[])
 {
-    parse(testcase2);
+    char *src;
+    errlist_s *err;
+    
+    src = readsrc(testcase1f);
+    
+    err = parse(src);
+    
+    printerrs(err);
+    
+    free(src);
+    
     return 0;
+}
+
+
+char *readsrc(char *file)
+{
+    int c;
+    int size = 0;
+    char *src;
+    FILE *f;
+    
+    f = fopen(file, "r");
+    if(!f) {
+        perror("file io");
+        exit(EXIT_FAILURE);
+    }
+    
+    src = alloc(1);
+    
+    while((c = fgetc(f)) != EOF) {
+        src[size++] = c;
+        src = realloc(src, size + 1);
+        if(!src) {
+            perror("realloc failure");
+            exit(EXIT_FAILURE);
+        }
+    }
+    src[size] = '\0';
+    return src;
 }

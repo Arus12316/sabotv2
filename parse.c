@@ -75,7 +75,7 @@
  
  <opttype> -> : <type> | ε
  
- <type> -> void | integer <array> | real <array> | String <array> | Regex <array> | ( <optparamlist> ) <array> map <type>
+ <type> -> void | integer <array> | real <array> | String <array> | Regex <array> | set <array> |( <optparamlist> ) <array> map <type>
  
  <array> -> [ <expression> ] <array> | ε
  
@@ -149,6 +149,7 @@ enum {
     TOKTYPE_REAL,
     TOKTYPE_STRINGTYPE,
     TOKTYPE_REGEXTYPE,
+    TOKTYPE_SET,
     TOKTYPE_RETURN
 };
 
@@ -232,20 +233,19 @@ keywords[] = {
     {"real", TOKTYPE_REAL},
     {"string", TOKTYPE_STRINGTYPE},
     {"regex", TOKTYPE_REGEXTYPE},
+    {"set", TOKTYPE_SET},
     {"return", TOKTYPE_RETURN}
 };
 
-static tokchunk_s *lex(char *src);
+static tokiter_s *lex(char *src);
 static void mtok(tokchunk_s **list, uint16_t line, char *lexeme, size_t len, uint8_t type, uint8_t att);
 static bool trykeyword(tokchunk_s **list, uint16_t line, char *str);
 static void printtoks(tokchunk_s *list);
 
-static void adderr(tokiter_s *ti, char *prefix, char *got, uint16_t line, ...);
-
 static tok_s *tok(tokiter_s *ti);
 static tok_s *nexttok(tokiter_s *ti);
 
-static void start(tokchunk_s *tokens);
+static void start(tokiter_s *ti);
 static void p_statementlist(tokiter_s *ti);
 static void p_statementlist_(tokiter_s *ti);
 static void p_statement(tokiter_s *ti);
@@ -280,32 +280,36 @@ static void p_optnext(tokiter_s *ti);
 static void p_set_(tokiter_s *ti);
 static void synerr_rec(tokiter_s *ti);
 
-void parse(char *src)
+static void adderr(tokiter_s *ti, char *prefix, char *got, uint16_t line, ...);
+
+errlist_s *parse(char *src)
 {
-    tokchunk_s *tok;
+    tokiter_s *ti;
     
-    tok = lex(src);
-    printtoks(tok);
+    ti = lex(src);
     
-    start(tok);
+    start(ti);
     
-    
+    return ti->err;
 }
 
-tokchunk_s *lex(char *src)
+tokiter_s *lex(char *src)
 {
-    uint16_t line = 0;
+    uint16_t line = 1;
     char *bptr, c;
     tokchunk_s *head, *curr;
-    tokiter_s ti;
+    tokiter_s *ti;
     
+    ti = alloc(sizeof *ti);
     curr = head = alloc(sizeof *head);
     
     head->size = 0;
     head->next = NULL;
     
-    ti.err = NULL;
-    ti.ecurr = NULL;
+    ti->err = NULL;
+    ti->ecurr = NULL;
+    ti->i = 0;
+    ti->curr = head;
     
     while(*src) {
         switch(*src) {
@@ -396,7 +400,7 @@ tokchunk_s *lex(char *src)
             case '+':
                 if(*(src + 1) == '=') {
                     mtok(&curr, line, "+=", 2, TOKTYPE_ASSIGN, TOKATT_ADD);
-                    src++;
+                    src += 2;
                 }
                 else {
                     mtok(&curr, line, "}", 1, TOKTYPE_ADDOP, TOKATT_ADD);
@@ -487,10 +491,11 @@ tokchunk_s *lex(char *src)
                     if(*src)
                         src++;
                     else {
-                        adderr(&ti, "Lexical Error", "EOF", line, "null byte", NULL);
+                        adderr(ti, "Lexical Error", "EOF", line, "null byte", NULL);
+                        break;
                     }
                 }
-                c = *src;
+                c = *++src;
                 *src = '\0';
                 mtok(&curr, line, bptr, src - bptr, TOKTYPE_STRING, TOKATT_DEFAULT);
                 *src = c;
@@ -501,10 +506,11 @@ tokchunk_s *lex(char *src)
                     if(*src)
                         src++;
                     else {
-                        //badly formed regex error
+                        adderr(ti, "Lexical Error", "EOF", line, "#", NULL);
+                        break;
                     }
                 }
-                c = *src;
+                c = *++src;
                 *src = '\0';
                 mtok(&curr, line, bptr, src - bptr, TOKTYPE_REGEX, TOKATT_DEFAULT);
                 *src = c;
@@ -539,9 +545,9 @@ tokchunk_s *lex(char *src)
                         }
                     }
                 }
-                else if(isalpha(*src) || *src == '_') {
+                else if(isalpha(*src) || *src == '_' || *src == '$') {
                     bptr = src++;
-                    while(isalnum(*src) || *src == '_')
+                    while(isalnum(*src) || *src == '_' || *src == '$')
                         src++;
                     c = *src;
                     *src = '\0';
@@ -550,14 +556,17 @@ tokchunk_s *lex(char *src)
                     *src = c;
                 }
                 else {
-                    //lexical error
+                    c = *++src;
+                    *src = '\0';
+                    adderr(ti, "Lexical Error", src - 1, line, "language chararacter", NULL);
+                    *src = c;
                 }
-                    
                 break;
         }
     }
     mtok(&curr, line, "`EOF`", 5, TOKTYPE_EOF, TOKATT_DEFAULT);
-    return head;
+    
+    return ti;
 }
 
 void mtok(tokchunk_s **list, uint16_t line, char *lexeme, size_t len, uint8_t type, uint8_t att)
@@ -611,54 +620,6 @@ void printtoks(tokchunk_s *list)
     }
 }
 
-void adderr(tokiter_s *ti, char *prefix, char *got, uint16_t line, ...)
-{
-    va_list argp;
-    uint8_t i = 0;
-    errlist_s *e;
-    size_t totallen = strlen(prefix), nargs, curr;
-    char *args[MAX_ERRARGS], *s;
-    
-    va_start(argp, line);
-    
-    while((s = va_arg(argp, char *))) {
-        totallen += strlen(s);
-        args[i++] = s;
-    }
-    
-    nargs = i;
-    
-    if(nargs > 1) {
-        totallen += (sizeof(" at line: ") - 1) + ndigits(line) + (sizeof(". Expected ") - 1) +
-                    (nargs - 1)*2 + sizeof("or ") + sizeof(" but got ") + strlen(got);
-        e = alloc(sizeof(*e) + totallen);
-        e->next = NULL;
-        
-        curr = sprintf(e->msg, "%s at line: %u. Expected ", prefix , line);
-        
-        for(i = 0; i < nargs - 1; i++)
-            curr += sprintf(&e->msg[curr], "%s, ", args[i]);
-        
-        sprintf(&e->msg[curr], "or %s but got %s.", args[i], got);
-    }
-    else {
-        totallen += (sizeof(" at line: ") - 1) + ndigits(line) + (sizeof(". Expected ") - 1) +
-                    sizeof(" but got ") + strlen(got) + 1;
-        e = alloc(sizeof(*e) + totallen);
-        e->next = NULL;
-        
-        curr = sprintf(e->msg, "%s at line: %u. Expected %s but got %s.", prefix , line, args[0], got);
-    }
-    
-    va_end(argp);
-    
-    if(ti->err)
-        ti->ecurr->next = e;
-    else
-        ti->err = e;
-    ti->ecurr = e;
-}
-
 tok_s *tok(tokiter_s *ti)
 {
     
@@ -677,32 +638,26 @@ tok_s *nexttok(tokiter_s *ti)
 {
     uint8_t i = ti->i;
     
-    if(i < ti->curr->size) {
+    if(i < ti->curr->size-1) {
         ti->i++;
         return &ti->curr->tok[i + 1];
     }
-    else if(ti->curr->size == TOKCHUNK_SIZE) {
+    else if(ti->i == ti->curr->size - 1) {
         ti->curr = ti->curr->next;
-        ti->i = 1;
+        ti->i = 0;
         return &ti->curr->tok[0];
     }
     perror("nexttok error");
     return &eoftok;
 }
 
-void start(tokchunk_s *tokens)
+void start(tokiter_s *ti)
 {
-    tokiter_s iter = { .i = 0, .curr = tokens, .err = NULL, .ecurr = NULL};
-    
-    
-    p_statementlist(&iter);
+    p_statementlist(ti);
 }
 
 void p_statementlist(tokiter_s *ti)
 {
-    tok_s *t = tok(ti);
-    
-    
     p_statement(ti);
     p_statementlist_(ti);
 }
@@ -757,6 +712,7 @@ void p_statement(tokiter_s *ti)
             }
             else {
                 //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, ";", NULL);
                 synerr_rec(ti);
             }
             break;
@@ -774,6 +730,7 @@ void p_statement(tokiter_s *ti)
             }
             else {
                 //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, ";", NULL);
                 synerr_rec(ti);
             }
             break;
@@ -786,11 +743,14 @@ void p_statement(tokiter_s *ti)
             }
             else {
                 //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, ";", NULL);
                 synerr_rec(ti);
             }
             break;
         default:
             //syntax error
+            adderr(ti, "Syntax Error", t->lex, t->line, "identifier", "number", "(", "not", "string",
+                   "regex", "@", "{", "+", "-", "|", "if", "while", "for", "switch", "var", "return", NULL);
             synerr_rec(ti);
             break;
     }
@@ -874,6 +834,7 @@ void p_factor_(tokiter_s *ti)
         case TOKTYPE_IDENT:
             nexttok(ti);
             p_factor__(ti);
+            p_assign(ti);
             break;
         case TOKTYPE_NUM:
             nexttok(ti);
@@ -887,6 +848,7 @@ void p_factor_(tokiter_s *ti)
             }
             else {
                 //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
                 synerr_rec(ti);
             }
             break;
@@ -904,6 +866,7 @@ void p_factor_(tokiter_s *ti)
             break;
         default:
             //syntax error
+            adderr(ti, "Syntax Error", t->lex, t->line, "identifier", "number", "(", "string", "regex", "{", "@", NULL);
             synerr_rec(ti);
             break;
     }
@@ -923,6 +886,7 @@ void p_factor__(tokiter_s *ti)
             }
             else {
                 //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, "]", NULL);
                 synerr_rec(ti);
             }
             break;
@@ -934,6 +898,7 @@ void p_factor__(tokiter_s *ti)
             }
             else {
                 //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
                 synerr_rec(ti);
             }
             break;
@@ -946,6 +911,7 @@ void p_factor__(tokiter_s *ti)
             }
             else {
                 //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
                 synerr_rec(ti);
             }
             break;
@@ -985,22 +951,28 @@ void p_lambda(tokiter_s *ti)
                 t = tok(ti);
                 if(t->type == TOKTYPE_CLOSEBRACE) {
                     nexttok(ti);
-                    printf("%s\n", tok(ti)->lex);
                 }
                 else {
                     //syntax error
+                    adderr(ti, "Syntax Error", t->lex, t->line, "}", NULL);
                     synerr_rec(ti);
                 }
             }
-            
+            else {
+                //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
+                synerr_rec(ti);
+            }
         }
         else {
             //syntax error
+            adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
             synerr_rec(ti);
         }
     }
     else {
         //syntax error
+        adderr(ti, "Syntax Error", t->lex, t->line, "(", NULL);
         synerr_rec(ti);
     }
     
@@ -1015,6 +987,7 @@ void p_sign(tokiter_s *ti)
     }
     else {
         //syntax error
+        adderr(ti, "Syntax Error", t->lex, t->line, "+", "-", NULL);
         synerr_rec(ti);
     }
 }
@@ -1080,11 +1053,13 @@ void p_control(tokiter_s *ti)
                 }
                 else {
                     //syntax error
+                    adderr(ti, "Syntax Error", t->lex, t->line, "endif", NULL);
                     synerr_rec(ti);
                 }
             }
             else {
                 //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, "then", NULL);
                 synerr_rec(ti);
             }
             break;
@@ -1101,11 +1076,13 @@ void p_control(tokiter_s *ti)
                 }
                 else {
                     //syntax error
+                    adderr(ti, "Syntax Error", t->lex, t->line, "endwhile", NULL);
                     synerr_rec(ti);
                 }
             }
             else {
                 //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, "do", NULL);
                 synerr_rec(ti);
             }
             break;
@@ -1126,21 +1103,25 @@ void p_control(tokiter_s *ti)
                         }
                         else {
                             //syntax error
+                            adderr(ti, "Syntax Error", t->lex, t->line, "endfor", NULL);
                             synerr_rec(ti);
                         }
                     }
                     else {
                         //syntax error
+                        adderr(ti, "Syntax Error", t->lex, t->line, "do", NULL);
                         synerr_rec(ti);
                     }
                 }
                 else {
                     //syntax error
+                    adderr(ti, "Syntax Error", t->lex, t->line, "<-", NULL);
                     synerr_rec(ti);
                 }
             }
             else {
                 //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
                 synerr_rec(ti);
             }
             break;
@@ -1156,16 +1137,19 @@ void p_control(tokiter_s *ti)
                 }
                 else {
                     //syntax error
+                    adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
                     synerr_rec(ti);
                 }
             }
             else {
                 //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, "(", NULL);
                 synerr_rec(ti);
             }
             break;
         default:
             //syntax error
+            adderr(ti, "Syntax Error", t->lex, t->line, "if", "while", "for", "switch", NULL);
             synerr_rec(ti);
             break;
     }
@@ -1186,6 +1170,7 @@ void p_caselist(tokiter_s *ti)
         }
         else {
             //syntax error
+            adderr(ti, "Syntax Error", t->lex, t->line, "->", NULL);
             synerr_rec(ti);
         }
     }
@@ -1198,6 +1183,7 @@ void p_caselist(tokiter_s *ti)
         }
         else {
             //syntax error
+            adderr(ti, "Syntax Error", t->lex, t->line, "->", NULL);
             synerr_rec(ti);
         }
     }
@@ -1220,6 +1206,7 @@ void p_elseif(tokiter_s *ti)
         }
         else {
             //syntax error
+            adderr(ti, "Syntax Error", t->lex, t->line, "then", NULL);
             synerr_rec(ti);
         }
     }
@@ -1229,6 +1216,7 @@ void p_elseif(tokiter_s *ti)
     }
     else {
         //syntax error
+        adderr(ti, "Syntax Error", t->lex, t->line, "else", "elif", NULL);
         synerr_rec(ti);
     }
 }
@@ -1246,11 +1234,13 @@ void p_dec(tokiter_s *ti)
         }
         else {
             //syntax error
+            adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
             synerr_rec(ti);
         }
     }
     else {
         //syntax error
+        adderr(ti, "Syntax Error", t->lex, t->line, "var", NULL);
         synerr_rec(ti);
     }
 }
@@ -1293,6 +1283,10 @@ void p_type(tokiter_s *ti)
             nexttok(ti);
             p_array(ti);
             break;
+        case TOKTYPE_SET:
+            nexttok(ti);
+            p_array(ti);
+            break;
         case TOKTYPE_OPENPAREN:
             nexttok(ti);
             p_optparamlist(ti);
@@ -1307,16 +1301,19 @@ void p_type(tokiter_s *ti)
                 }
                 else {
                     //syntax error
+                    adderr(ti, "Syntax Error", t->lex, t->line, "->", NULL);
                     synerr_rec(ti);
                 }
             }
             else {
                 //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
                 synerr_rec(ti);
             }
             break;
         default:
             //syntax error
+            adderr(ti, "Syntax Error", t->lex, t->line, "void", "int", "real", "string", "regex", "set", "(", NULL);
             synerr_rec(ti);
             break;
     }
@@ -1337,6 +1334,7 @@ void p_array(tokiter_s *ti)
         }
         else {
             //syntax error
+            adderr(ti, "Syntax Error", t->lex, t->line, "]", NULL);
             synerr_rec(ti);
         }
     }
@@ -1393,11 +1391,13 @@ void p_set(tokiter_s *ti)
         }
         else {
             //syntax error
+            adderr(ti, "Syntax Error", t->lex, t->line, "}", NULL);
             synerr_rec(ti);
         }
     }
     else {
         //syntax error
+        adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
         synerr_rec(ti);
     }
 }
@@ -1438,11 +1438,67 @@ void synerr_rec(tokiter_s *ti)
 {
     tok_s *t = tok(ti);
     
-    printf("Syntax Error at token %s at line %u\n", t->lex, t->line);
-    
-    asm("hlt");
-    
     if(t->type != TOKTYPE_EOF)
         nexttok(ti);
 }
 
+void printerrs(errlist_s *err)
+{
+    if(err) {
+        while(err) {
+            puts(err->msg);
+            err = err->next;
+        }
+    }
+    else {
+        puts("no errors");
+    }
+}
+
+void adderr(tokiter_s *ti, char *prefix, char *got, uint16_t line, ...)
+{
+    va_list argp;
+    uint8_t i = 0;
+    errlist_s *e;
+    size_t totallen = strlen(prefix), nargs, curr;
+    char *args[MAX_ERRARGS], *s;
+    
+    va_start(argp, line);
+    
+    while((s = va_arg(argp, char *))) {
+        totallen += strlen(s);
+        args[i++] = s;
+    }
+    
+    nargs = i;
+    
+    if(nargs > 1) {
+        totallen += (sizeof(" at line: ") - 1) + ndigits(line) + (sizeof(". Expected ") - 1) +
+        (nargs - 1)*2 + sizeof("or ") + sizeof(" but got ") + strlen(got);
+        e = alloc(sizeof(*e) + totallen);
+        e->next = NULL;
+        
+        curr = sprintf(e->msg, "%s at line: %u. Expected ", prefix , line);
+        
+        for(i = 0; i < nargs - 1; i++)
+            curr += sprintf(&e->msg[curr], "%s, ", args[i]);
+        
+        sprintf(&e->msg[curr], "or %s but got %s.", args[i], got);
+    }
+    else {
+        totallen += (sizeof(" at line: ") - 1) + ndigits(line) + (sizeof(". Expected ") - 1) +
+        sizeof(" but got ") + strlen(got) + 1;
+        e = alloc(sizeof(*e) + totallen);
+        e->next = NULL;
+        
+        curr = sprintf(e->msg, "%s at line: %u. Expected %s but got %s.", prefix , line, args[0], got);
+    }
+    
+    va_end(argp);
+    
+    if(ti->err)
+        ti->ecurr->next = e;
+    else
+        ti->err = e;
+    ti->ecurr = e;
+}

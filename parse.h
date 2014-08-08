@@ -9,6 +9,8 @@ struct errlist_s
     char msg[];
 };
 
-extern void parse(char *src);
+extern errlist_s *parse(char *src);
+
+extern void printerrs(errlist_s *err);
 
 #endif
