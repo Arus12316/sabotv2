@@ -1,4 +1,5 @@
 #include "general.h"
+#include <stdio.h>
 
 void *alloc(size_t n)
 {
@@ -31,4 +32,16 @@ void *ralloc(void *ptr, size_t n)
     }
 
     return p;
+}
+
+
+short ndigits(int num)
+{
+    int c;
+    
+    if(!num)
+        return 1;
+    for(c = 0; num; c++)
+        num /= 10;
+    return c;
 }

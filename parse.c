@@ -98,8 +98,10 @@
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdarg.h>
 
 #define TOKCHUNK_SIZE 16
+#define MAX_ERRARGS 256
 
 enum {
     TOKTYPE_EOF,
@@ -199,11 +201,46 @@ struct tokiter_s
 {
     uint8_t i;
     tokchunk_s *curr;
+    errlist_s *err;
+    errlist_s *ecurr;
+};
+
+
+static struct keyw_s {
+    char *str;
+    uint8_t type;
+}
+keywords[] = {
+    {"not", TOKTYPE_NOT},
+    {"if", TOKTYPE_IF},
+    {"then", TOKTYPE_THEN},
+    {"elif", TOKTYPE_ELIF},
+    {"else", TOKTYPE_ELSE},
+    {"endif", TOKTYPE_ENDIF},
+    {"while", TOKTYPE_WHILE},
+    {"do", TOKTYPE_DO},
+    {"endwhile", TOKTYPE_ENDWHILE},
+    {"for", TOKTYPE_FOR},
+    {"endfor", TOKTYPE_ENDFOR},
+    {"switch", TOKTYPE_SWITCH},
+    {"case", TOKTYPE_CASE},
+    {"default", TOKTYPE_DEFAULT},
+    {"endswitch", TOKTYPE_ENDSWITCH},
+    {"var", TOKTYPE_VAR},
+    {"void", TOKTYPE_VOID},
+    {"int", TOKTYPE_INTEGER},
+    {"real", TOKTYPE_REAL},
+    {"string", TOKTYPE_STRINGTYPE},
+    {"regex", TOKTYPE_REGEXTYPE},
+    {"return", TOKTYPE_RETURN}
 };
 
 static tokchunk_s *lex(char *src);
 static void mtok(tokchunk_s **list, uint16_t line, char *lexeme, size_t len, uint8_t type, uint8_t att);
+static bool trykeyword(tokchunk_s **list, uint16_t line, char *str);
 static void printtoks(tokchunk_s *list);
+
+static void adderr(tokiter_s *ti, char *prefix, char *got, uint16_t line, ...);
 
 static tok_s *tok(tokiter_s *ti);
 static tok_s *nexttok(tokiter_s *ti);
@@ -240,7 +277,6 @@ static void p_set(tokiter_s *ti);
 static void p_optnext(tokiter_s *ti);
 static void p_set_(tokiter_s *ti);
 
-
 void parse(char *src)
 {
     tokchunk_s *tok;
@@ -249,6 +285,8 @@ void parse(char *src)
     printtoks(tok);
     
     start(tok);
+    
+    
 
 }
 
@@ -501,8 +539,8 @@ tokchunk_s *lex(char *src)
                         src++;
                     c = *src;
                     *src = '\0';
-
-                    mtok(&curr, line, bptr, src - bptr, TOKTYPE_NUM, TOKATT_NUMINT);
+                    if(!trykeyword(&curr, line, bptr))
+                        mtok(&curr, line, bptr, src - bptr, TOKTYPE_IDENT, TOKATT_DEFAULT);
                     *src = c;
                 }
                 else {
@@ -539,6 +577,22 @@ void mtok(tokchunk_s **list, uint16_t line, char *lexeme, size_t len, uint8_t ty
     l->size++;
 }
 
+bool trykeyword(tokchunk_s **list, uint16_t line, char *str)
+{
+    int i;
+    size_t len;
+    
+    for(i = 0; i < sizeof(keywords) / sizeof(struct keyw_s); i++) {
+        if(!strcmp(str, keywords[i].str)) {
+            len = strlen(keywords[i].str);
+            mtok(list, line, keywords[i].str, len, keywords[i].type, TOKATT_DEFAULT);
+            return true;
+        }
+    }
+    return false;
+}
+
+
 void printtoks(tokchunk_s *list)
 {
     int i;
@@ -549,6 +603,45 @@ void printtoks(tokchunk_s *list)
         }
         list = list->next;
     }
+}
+
+void adderr(tokiter_s *ti, char *prefix, char *got, uint16_t line, ...)
+{
+    va_list argp;
+    uint8_t i = 0;
+    errlist_s *e;
+    size_t totallen = strlen(prefix), nargs, curr;
+    char *args[MAX_ERRARGS], *s;
+    
+    
+    va_start(argp, line);
+    
+    while((s = va_arg(argp, char *))) {
+        totallen += strlen(s);
+        args[i++] = s;
+    }
+    
+    nargs = i;
+    totallen += (sizeof(" at line: ") - 1) + ndigits(line) + (sizeof(". Expected ") - 1) +
+                (nargs - 1)*2 + sizeof("or ") + sizeof(" but got ") + strlen(got);
+    
+    e = alloc(sizeof(*e) + totallen);
+    e->next = NULL;
+    
+    curr = sprintf(e->msg, "%s at line: %u. Expected ", prefix , line);
+    
+    for(i = 0; i < nargs - 1; i++)
+        curr += sprintf(&e->msg[curr], "%s, ", args[i]);
+    
+    sprintf(&e->msg[curr], "or %s but got %s.", args[i], got);
+    
+    va_end(argp);
+    
+    if(ti->err)
+        ti->ecurr->next = e;
+    else
+        ti->err = e;
+    ti->ecurr = e;
 }
 
 tok_s *tok(tokiter_s *ti)
@@ -583,7 +676,7 @@ tok_s *nexttok(tokiter_s *ti)
 
 void start(tokchunk_s *tokens)
 {
-    tokiter_s iter = { .i = 0, .curr = tokens};
+    tokiter_s iter = { .i = 0, .curr = tokens, .err = NULL, .ecurr = NULL};
     
     p_statementlist(&iter);
 }
