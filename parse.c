@@ -52,7 +52,7 @@
  <arglist> -> <expression> <arglist'>
  <arglist'> -> , <expression> <arglist'> | ε
  
- <control> ->   if <expression> then <statementlist> <elseif>
+ <control> ->   if <expression> then <statementlist> <elseif> endif
                 |
                 while <expression> do <statementlist> endwhile
                 |
@@ -69,19 +69,19 @@
                 ε
 
 
- <elseif> -> else <statementlist> endif | elif <expression> then <statementlist> endif
+ <elseif> -> elif <expression> then <statementlist> | else <statementlist>
  
  <dec> -> var id : <opttype> <assign>
  
  <opttype> -> <type> | ε
  
- <type> -> void | integer <array> | real <array> | String <array> | Regex <array> | ( <optparamlist> ) map <type>
+ <type> -> void | integer <array> | real <array> | String <array> | Regex <array> | ( <optparamlist> ) <array> map <type>
  
  <array> -> [ <expression> ] <array> | ε
  
  <optparamlist> -> <paramlist> | ε
  <paramlist> -> <dec> <paramlist'>
- <paramlist'> -> , <dec> <paramlist'>
+ <paramlist'> -> , <dec> <paramlist'> | ε
  
  <set> -> openbrace <expression> <optnext> <set'> closebrace
  
@@ -111,7 +111,7 @@ enum {
     TOKTYPE_RANGE,
     TOKTYPE_LAMBDA,
     TOKTYPE_MAP,
-    TOKTYPE_FORRANGE,
+    TOKTYPE_FORVAR,
     TOKTYPE_OPENPAREN,
     TOKTYPE_CLOSEPAREN,
     TOKTYPE_OPENBRACKET,
@@ -174,13 +174,18 @@ typedef struct tok_s tok_s;
 typedef struct tokchunk_s tokchunk_s;
 typedef struct tokiter_s tokiter_s;
 
-struct tok_s
+static struct tok_s
 {
     uint8_t type;
     uint8_t att;
     uint16_t line;
     char *lex;
-    
+}
+eoftok = {
+    TOKTYPE_EOF,
+    TOKATT_DEFAULT,
+    0,
+    "`EOF`"
 };
 
 struct tokchunk_s
@@ -318,7 +323,7 @@ tokchunk_s *lex(char *src)
                 break;
             case '<':
                 if(*(src + 1) == '-') {
-                    mtok(&curr, line, "<-", 2, TOKTYPE_FORRANGE, TOKATT_DEFAULT);
+                    mtok(&curr, line, "<-", 2, TOKTYPE_FORVAR, TOKATT_DEFAULT);
                     src += 2;
                 }
                 else if(*(src + 1) == '>') {
@@ -551,8 +556,10 @@ tok_s *tok(tokiter_s *ti)
     if(ti->curr->size == TOKCHUNK_SIZE) {
         if(ti->curr->next)
             return &ti->curr->next->tok[0];
-        else
-            return NULL;
+        else {
+            perror("tok peek error");
+            return &eoftok;
+        }
     }
     return &ti->curr->tok[ti->i];
 }
@@ -570,7 +577,8 @@ tok_s *nexttok(tokiter_s *ti)
         ti->i = 1;
         return &ti->curr->tok[0];
     }
-    return NULL;
+    perror("nexttok error");
+    return &eoftok;
 }
 
 void start(tokchunk_s *tokens)
@@ -735,7 +743,7 @@ void p_factor_(tokiter_s *ti)
             p_expression(ti);
             t = tok(ti);
             if(t->type == TOKTYPE_CLOSEPAREN) {
-                
+                nexttok(ti);
             }
             else {
                 //syntax error
@@ -761,97 +769,486 @@ void p_factor_(tokiter_s *ti)
 
 void p_factor__(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    switch(t->type) {
+        case TOKTYPE_OPENBRACKET:
+            nexttok(ti);
+            p_expression(ti);
+            t = tok(ti);
+            if(t->type == TOKTYPE_CLOSEBRACKET) {
+                nexttok(ti);
+            }
+            else {
+                //syntax error
+            }
+            break;
+        case TOKTYPE_DOT:
+            t = nexttok(ti);
+            if(t->type == TOKTYPE_IDENT) {
+                nexttok(ti);
+                p_factor__(ti);
+            }
+            else {
+                //syntax error
+            }
+            break;
+        case TOKTYPE_OPENPAREN:
+            nexttok(ti);
+            p_arglist(ti);
+            t = tok(ti);
+            if(t->type == TOKTYPE_CLOSEPAREN) {
+                nexttok(ti);
+            }
+            else {
+                //syntax error
+            }
+            break;
+        default:
+            //epsilon production
+            break;
+    }
 }
 
 void p_assign(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    if(t->type == TOKTYPE_ASSIGN) {
+        nexttok(ti);
+        p_expression(ti);
+    }
+    else {
+        //epsilon production
+    }
 }
 
 void p_lambda(tokiter_s *ti)
 {
+    //so far, a check that token is '@' is redundant
+    tok_s *t = nexttok(ti);
+    
+    if(t->type == TOKTYPE_OPENPAREN) {
+        nexttok(ti);
+        p_paramlist(ti);
+        t = tok(ti);
+        if(t->type == TOKTYPE_CLOSEPAREN) {
+            t = nexttok(ti);
+            if(t->type == TOKTYPE_OPENBRACE) {
+                nexttok(ti);
+                p_statementlist(ti);
+                t = tok(ti);
+                if(t->type == TOKTYPE_CLOSEBRACE) {
+                    nexttok(ti);
+                }
+                else {
+                    //syntax error
+                }
+            }
+            
+        }
+        else {
+            //syntax error
+        }
+    }
+    else {
+        //syntax error
+    }
     
 }
 
 void p_sign(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    if(t->att == TOKATT_ADD || t->att == TOKATT_SUB) {
+        nexttok(ti);
+    }
+    else {
+        //syntax error
+    }
 }
 
 void p_arglist(tokiter_s *ti)
 {
-    
+    p_expression(ti);
+    p_arglist_(ti);
 }
 
 void p_arglist_(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    if(t->type == TOKTYPE_COMMA) {
+        nexttok(ti);
+        p_expression(ti);
+        p_arglist_(ti);
+    }
+    else {
+        //epsilon production
+    }
 }
 
 void p_control(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    switch(t->type) {
+        case TOKTYPE_IF:
+            nexttok(ti);
+            p_expression(ti);
+            t = tok(ti);
+            if(t->type == TOKTYPE_THEN) {
+                nexttok(ti);
+                p_statementlist(ti);
+                p_elseif(ti);
+                t = tok(ti);
+                if(t->type == TOKTYPE_ENDIF) {
+                    nexttok(ti);
+                }
+                else {
+                    //syntax error
+                }
+            }
+            else {
+                //syntax error
+            }
+            break;
+        case TOKTYPE_WHILE:
+            nexttok(ti);
+            p_expression(ti);
+            t = tok(ti);
+            if(t->type == TOKTYPE_DO) {
+                nexttok(ti);
+                p_statementlist(ti);
+                t = tok(ti);
+                if(t->type == TOKTYPE_ENDWHILE) {
+                    nexttok(ti);
+                }
+                else {
+                    //syntax error
+                }
+            }
+            else {
+                //syntax error
+            }
+            break;
+        case TOKTYPE_FOR:
+            t = nexttok(ti);
+            if(t->type == TOKTYPE_IDENT) {
+                t = nexttok(ti);
+                if(t->type == TOKTYPE_FORVAR) {
+                    nexttok(ti);
+                    p_expression(ti);
+                    t = tok(ti);
+                    if(t->type == TOKTYPE_DO) {
+                        nexttok(ti);
+                        p_statementlist(ti);
+                        t = tok(ti);
+                        if(t->type == TOKTYPE_ENDFOR) {
+                            nexttok(ti);
+                        }
+                        else {
+                            //syntax error
+                        }
+                    }
+                    else {
+                        //syntax error
+                    }
+                }
+                else {
+                    //syntax error
+                }
+            }
+            else {
+                //syntax error
+            }
+            break;
+        case TOKTYPE_SWITCH:
+            t = nexttok(ti);
+            if(t->type == TOKTYPE_OPENPAREN) {
+                nexttok(ti);
+                p_expression(ti);
+                t = tok(ti);
+                if(t->type == TOKTYPE_CLOSEPAREN) {
+                    nexttok(ti);
+                    p_caselist(ti);
+                }
+                else {
+                    //syntax error
+                }
+            }
+            else {
+                //syntax error
+            }
+            break;
+        default:
+            //syntax error
+            break;
+    }
 }
 
 void p_caselist(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    if(t->type == TOKTYPE_CASE) {
+        nexttok(ti);
+        p_arglist(ti);
+        t = tok(ti);
+        if(t->type == TOKTYPE_MAP) {
+            nexttok(ti);
+            p_expression(ti);
+            p_caselist(ti);
+        }
+        else {
+            //syntax error
+        }
+    }
+    else if(t->type == TOKTYPE_DEFAULT) {
+        t = nexttok(ti);
+        if(t->type == TOKTYPE_MAP) {
+            nexttok(ti);
+            p_expression(ti);
+            p_caselist(ti);
+        }
+        else {
+            //syntax error
+        }
+    }
+    else {
+        //epsilon production
+    }
 }
 
 void p_elseif(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    if(t->type == TOKTYPE_ELIF) {
+        nexttok(ti);
+        p_expression(ti);
+        t = tok(ti);
+        if(t->type == TOKTYPE_THEN) {
+            nexttok(ti);
+            p_statementlist(ti);
+        }
+        else {
+            //syntax error
+        }
+    }
+    else if(t->type == TOKTYPE_ELSE) {
+        nexttok(ti);
+        p_statementlist(ti);
+    }
+    else {
+        //syntax error
+    }
 }
 
 void p_dec(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    if(t->type == TOKTYPE_VAR) {
+        t = nexttok(ti);
+        if(t->type == TOKTYPE_IDENT) {
+            t = nexttok(ti);
+            if(t->type == TOKTYPE_COLON) {
+                nexttok(ti);
+                p_opttype(ti);
+                p_assign(ti);
+            }
+            else {
+                //syntax error
+            }
+        }
+        else {
+            //syntax error
+        }
+    }
+    else {
+        //syntax error
+    }
 }
 
 void p_opttype(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
+    
+    switch(t->type) {
+        case TOKTYPE_REGEXTYPE:
+        case TOKTYPE_STRINGTYPE:
+        case TOKTYPE_REAL:
+        case TOKTYPE_INTEGER:
+        case TOKTYPE_VOID:
+        case TOKTYPE_OPENPAREN:
+            p_type(ti);
+            break;
+        default:
+            //epsilon production
+            break;
+    }
     
 }
 
 
 void p_type(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    switch(t->type) {
+        case TOKTYPE_VOID:
+            nexttok(ti);
+            break;
+        case TOKTYPE_INTEGER:
+            nexttok(ti);
+            p_array(ti);
+            break;
+        case TOKTYPE_REAL:
+            nexttok(ti);
+            p_array(ti);
+            break;
+        case TOKTYPE_STRINGTYPE:
+            nexttok(ti);
+            p_array(ti);
+            break;
+        case TOKTYPE_REGEXTYPE:
+            nexttok(ti);
+            p_array(ti);
+            break;
+        case TOKTYPE_OPENPAREN:
+            nexttok(ti);
+            p_optparamlist(ti);
+            t = tok(ti);
+            if(t->type == TOKTYPE_CLOSEPAREN) {
+                nexttok(ti);
+                p_array(ti);
+                t = tok(ti);
+                if(t->type == TOKTYPE_MAP) {
+                    nexttok(ti);
+                    p_type(ti);
+                }
+                else {
+                    //syntax error
+                }
+            }
+            else {
+                //syntax error
+            }
+            break;
+        default:
+            //syntax error
+            break;
+    }
+
 }
 
 void p_array(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    if(t->type == TOKTYPE_OPENBRACKET) {
+        nexttok(ti);
+        p_expression(ti);
+        t = tok(ti);
+        if(t->type == TOKTYPE_CLOSEBRACKET) {
+            nexttok(ti);
+            p_array(ti);
+        }
+        else {
+            //syntax error
+        }
+    }
+    else {
+        //epsilon production
+    }
 }
 
 void p_optparamlist(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    if(t->type == TOKTYPE_VAR) {
+        p_paramlist(ti);
+    }
+    else {
+        //epsilon production
+    }
 }
 
 void p_paramlist(tokiter_s *ti)
 {
-    
+    p_dec(ti);
+    p_paramlist_(ti);
 }
 
 void p_paramlist_(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    if(t->type == TOKTYPE_COMMA) {
+        nexttok(ti);
+        p_dec(ti);
+        p_paramlist_(ti);
+    }
+    else {
+        //epsilon production
+    }
 }
 
 void p_set(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    if(t->type == TOKTYPE_OPENBRACE) {
+        nexttok(ti);
+        p_expression(ti);
+        p_optnext(ti);
+        p_set_(ti);
+        t = tok(ti);
+        if(t->type == TOKTYPE_CLOSEBRACE) {
+            nexttok(ti);
+            
+        }
+        else {
+            //syntax error
+        }
+    }
+    else {
+        //syntax error
+    }
 }
 
 void p_optnext(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    if(t->type == TOKTYPE_MAP) {
+        nexttok(ti);
+        p_expression(ti);
+    }
+    else if(t->type == TOKTYPE_RANGE) {
+        nexttok(ti);
+        p_expression(ti);
+    }
+    else {
+        //epsilon production
+    }
 }
 
 void p_set_(tokiter_s *ti)
 {
+    tok_s *t = tok(ti);
     
+    if(t->type == TOKTYPE_COMMA) {
+        nexttok(ti);
+        p_expression(ti);
+        p_optnext(ti);
+        p_set_(ti);
+    }
+    else {
+        //epsilon production
+    }
 }
 
