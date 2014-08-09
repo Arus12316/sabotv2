@@ -177,9 +177,21 @@ enum {
     TOKATT_EXP
 };
 
+enum {
+    TYPE_VOID,
+    TYPE_INTEGER,
+    TYPE_REAL,
+    TYPE_STRING,
+    TYPE_REGEX,
+    TYPE_SET,
+    TYPE_CLOSURE
+};
+
 typedef struct tok_s tok_s;
 typedef struct tokchunk_s tokchunk_s;
 typedef struct tokiter_s tokiter_s;
+typedef struct type_s type_s;
+typedef struct paramlist_s paramlist_s;
 
 static struct tok_s
 {
@@ -210,7 +222,6 @@ struct tokiter_s
     errlist_s *ecurr;
 };
 
-
 static struct keyw_s {
     char *str;
     uint8_t type;
@@ -240,6 +251,20 @@ keywords[] = {
     {"regex", TOKTYPE_REGEXTYPE},
     {"set", TOKTYPE_SET},
     {"return", TOKTYPE_RETURN}
+};
+
+struct type_s
+{
+    uint8_t prim;
+    uint8_t ndim;
+    unsigned *dim;
+    paramlist_s *param;
+};
+
+struct paramlist_s
+{
+    uint8_t n;
+    type_s *types;
 };
 
 static tokiter_s *lex(char *src);
@@ -276,7 +301,7 @@ static void p_elseif(tokiter_s *ti);
 static void p_dec(tokiter_s *ti);
 static void p_opttype(tokiter_s *ti);
 static void p_type(tokiter_s *ti);
-static void p_array(tokiter_s *ti);
+static unsigned *p_array(tokiter_s *ti, unsigned *dimcount);
 static void p_optparamlist(tokiter_s *ti);
 static void p_paramlist(tokiter_s *ti);
 static void p_paramlist_(tokiter_s *ti);
@@ -843,6 +868,7 @@ void p_optexp(tokiter_s *ti)
 
 void p_factor_(tokiter_s *ti)
 {
+    type_s type;
     tok_s *t = tok(ti);
     
     switch(t->type) {
@@ -852,9 +878,18 @@ void p_factor_(tokiter_s *ti)
             p_assign(ti);
             break;
         case TOKTYPE_NUM:
+            if(t->att == TOKATT_NUMINT)
+                type.prim = TYPE_INTEGER;
+            else
+                type.prim = TYPE_REAL;
+            type.ndim = 0;
+            type.param = NULL;
             nexttok(ti);
             break;
         case TOKTYPE_OPENPAREN:
+            
+            //type = <expression>.type
+            
             nexttok(ti);
             p_expression(ti);
             t = tok(ti);
@@ -868,16 +903,28 @@ void p_factor_(tokiter_s *ti)
             }
             break;
         case TOKTYPE_STRING:
+            type.prim = TYPE_STRING;
+            type.ndim = 0;
+            type.param = NULL;
             nexttok(ti);
             break;
         case TOKTYPE_REGEX:
+            type.prim = TYPE_REGEX;
+            type.ndim = 0;
+            type.param = NULL;
             nexttok(ti);
             break;
         case TOKTYPE_OPENBRACE:
             p_set(ti);
+            type.prim = TYPE_SET;
+            type.ndim = 0;
+            type.param = NULL;
             break;
         case TOKTYPE_LAMBDA:
             p_lambda(ti);
+            type.prim = TYPE_CLOSURE;
+            type.ndim = 0;
+            type.param = NULL;
             break;
         default:
             //syntax error
@@ -924,6 +971,7 @@ void p_factor__(tokiter_s *ti)
             t = tok(ti);
             if(t->type == TOKTYPE_CLOSEPAREN) {
                 nexttok(ti);
+                
             }
             else {
                 //syntax error
@@ -1325,6 +1373,7 @@ void p_opttype(tokiter_s *ti)
 
 void p_type(tokiter_s *ti)
 {
+    unsigned dim = 0;
     tok_s *t = tok(ti);
     
     switch(t->type) {
@@ -1333,23 +1382,28 @@ void p_type(tokiter_s *ti)
             break;
         case TOKTYPE_INTEGER:
             nexttok(ti);
-            p_array(ti);
+            p_array(ti, &dim);
+            printf("dim int: %d\n", dim);
             break;
         case TOKTYPE_REAL:
             nexttok(ti);
-            p_array(ti);
+            p_array(ti, &dim);
+            printf("dim real: %d\n", dim);
             break;
         case TOKTYPE_STRINGTYPE:
             nexttok(ti);
-            p_array(ti);
+            p_array(ti, &dim);
+            printf("dim string: %d\n", dim);
             break;
         case TOKTYPE_REGEXTYPE:
             nexttok(ti);
-            p_array(ti);
+            p_array(ti, &dim);
+            printf("dim regex: %d\n", dim);
             break;
         case TOKTYPE_SET:
             nexttok(ti);
-            p_array(ti);
+            p_array(ti, &dim);
+            printf("dim set: %d\n", dim);
             break;
         case TOKTYPE_OPENPAREN:
             nexttok(ti);
@@ -1357,7 +1411,7 @@ void p_type(tokiter_s *ti)
             t = tok(ti);
             if(t->type == TOKTYPE_CLOSEPAREN) {
                 nexttok(ti);
-                p_array(ti);
+                p_array(ti, &dim);
                 t = tok(ti);
                 if(t->type == TOKTYPE_MAP) {
                     nexttok(ti);
@@ -1384,9 +1438,10 @@ void p_type(tokiter_s *ti)
 
 }
 
-void p_array(tokiter_s *ti)
+unsigned *p_array(tokiter_s *ti, unsigned *dimcount)
 {
     tok_s *t = tok(ti);
+    unsigned *dim;
     
     if(t->type == TOKTYPE_OPENBRACKET) {
         nexttok(ti);
@@ -1394,17 +1449,21 @@ void p_array(tokiter_s *ti)
         t = tok(ti);
         if(t->type == TOKTYPE_CLOSEBRACKET) {
             nexttok(ti);
-            p_array(ti);
+            ++*dimcount;
+            dim = p_array(ti, dimcount);
         }
         else {
             //syntax error
             adderr(ti, "Syntax Error", t->lex, t->line, "]", NULL);
             synerr_rec(ti);
+            dim = NULL;
         }
     }
     else {
         //epsilon production
+        dim = alloc(*dimcount);
     }
+    return dim;
 }
 
 void p_optparamlist(tokiter_s *ti)

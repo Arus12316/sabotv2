@@ -37,3 +37,10 @@ listener(1) {
 }
 
 1+1;
+
+var dict := {
+    "abc" -> "hahahahahah", 
+    "hererr" -> "adfadsf",
+    "adsf" -> "adsfadsf"
+};
+
