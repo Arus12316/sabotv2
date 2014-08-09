@@ -883,7 +883,7 @@ aesblock_s *newblock(aes_digest_s **d, size_t *bufsize)
 void print_block(aesblock_s *bl)
 {
     unsigned i, j;
-    
+
     for(i = 0; i < 4; i++) {
         for(j = 0; j < Nb; j++) {
             printf("0x%02x, ", bl->b[i][j]);
