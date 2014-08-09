@@ -27,7 +27,7 @@ switch(x) {
 
 }
 
-if x = 4 { 
+if x = 4 {
     3 + 3;
 }
 elif x = 5 {
@@ -54,3 +54,4 @@ var dict := {
     "adsf" -> "adsfadsf"
 };
 
+var x : string[23][23][23][23][23];

@@ -177,7 +177,8 @@ enum {
     TYPE_STRING,
     TYPE_REGEX,
     TYPE_SET,
-    TYPE_CLOSURE
+    TYPE_CLOSURE,
+    TYPE_TYPEEXP
 };
 
 typedef struct tok_s tok_s;
@@ -185,6 +186,8 @@ typedef struct tokchunk_s tokchunk_s;
 typedef struct tokiter_s tokiter_s;
 typedef struct type_s type_s;
 typedef struct paramlist_s paramlist_s;
+typedef struct expressions_s expressions_s;
+typedef struct explist_s explist_s;
 
 static struct tok_s
 {
@@ -244,7 +247,7 @@ struct type_s
 {
     uint8_t prim;
     uint8_t ndim;
-    unsigned *dim;
+    explist_s *dim;
     paramlist_s *param;
 };
 
@@ -252,6 +255,27 @@ struct paramlist_s
 {
     uint8_t n;
     type_s *types;
+};
+
+struct expressions_s
+{
+    bool iseval;
+    bool isvar;
+    type_s type;
+    
+    union {
+        char *str;
+        double real;
+        long integer;
+        uint8_t type_exp;
+    };
+    
+};
+
+struct explist_s
+{
+    expressions_s exp;
+    explist_s *next;
 };
 
 static tokiter_s *lex(char *src);
@@ -279,16 +303,16 @@ static void p_factor__(tokiter_s *ti);
 static void p_assign(tokiter_s *ti);
 static void p_lambda(tokiter_s *ti);
 static void p_sign(tokiter_s *ti);
-static void p_optarglist(tokiter_s *ti);
-static void p_arglist(tokiter_s *ti);
-static void p_arglist_(tokiter_s *ti);
+static explist_s *p_optarglist(tokiter_s *ti);
+static explist_s *p_arglist(tokiter_s *ti);
+static void p_arglist_(tokiter_s *ti, explist_s **list);
 static void p_control(tokiter_s *ti);
 static void p_caselist(tokiter_s *ti);
 static void p_elseif(tokiter_s *ti);
 static void p_dec(tokiter_s *ti);
 static void p_opttype(tokiter_s *ti);
 static void p_type(tokiter_s *ti);
-static unsigned *p_array(tokiter_s *ti, unsigned *dimcount);
+static uint8_t p_array(tokiter_s *ti, explist_s **list);
 static void p_optparamlist(tokiter_s *ti);
 static void p_paramlist(tokiter_s *ti);
 static void p_paramlist_(tokiter_s *ti);
@@ -545,7 +569,7 @@ tokiter_s *lex(char *src)
                                 src++;
                             }
                             else {
-                                //lexical error
+                                adderr(ti, "Lexical Error", ".", line, "valid number", NULL);
                                 src++;
                             }
                         }
@@ -1043,7 +1067,7 @@ void p_sign(tokiter_s *ti)
     }
 }
 
-void p_optarglist(tokiter_s *ti)
+explist_s *p_optarglist(tokiter_s *ti)
 {
     tok_s *t = tok(ti);
     
@@ -1057,28 +1081,41 @@ void p_optarglist(tokiter_s *ti)
         case TOKTYPE_OPENPAREN:
         case TOKTYPE_NUM:
         case TOKTYPE_IDENT:
-            p_arglist(ti);
+            return p_arglist(ti);
             break;
         default:
             //epsilon production
-            break;
+            return NULL;
     }
 }
 
-void p_arglist(tokiter_s *ti)
+explist_s *p_arglist(tokiter_s *ti)
 {
+    explist_s *list = alloc(sizeof *list);
+    
+    list->next = NULL;
+    
     p_expression(ti);
-    p_arglist_(ti);
+    p_arglist_(ti, &list);
+
+    return list;
 }
 
-void p_arglist_(tokiter_s *ti)
+void p_arglist_(tokiter_s *ti, explist_s **list)
 {
+    explist_s *exp;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_COMMA) {
         nexttok(ti);
         p_expression(ti);
-        p_arglist_(ti);
+        
+        exp = alloc(sizeof *exp);
+        exp->next = NULL;
+        
+        (*list)->next = exp;
+        
+        p_arglist_(ti, &(*list)->next);
     }
     else {
         //epsilon production
@@ -1396,37 +1433,64 @@ void p_opttype(tokiter_s *ti)
 
 void p_type(tokiter_s *ti)
 {
-    unsigned dim = 0;
+    expressions_s exp;
+    explist_s *list = NULL;
     tok_s *t = tok(ti);
     
     switch(t->type) {
         case TOKTYPE_VOID:
             nexttok(ti);
+            exp.type.prim = TYPE_TYPEEXP;
+            exp.type.ndim = 0;
+            exp.type.param = NULL;
+            exp.type_exp = TYPE_VOID;
+            exp.iseval = true;
+            exp.isvar = false;
             break;
         case TOKTYPE_INTEGER:
             nexttok(ti);
-            p_array(ti, &dim);
-            printf("dim int: %d\n", dim);
+            exp.iseval = true;
+            exp.isvar = false;
+            exp.type.prim = TYPE_TYPEEXP;
+            exp.type.param = NULL;
+            exp.type_exp = TYPE_INTEGER;
+            exp.type.ndim = p_array(ti, &list);
             break;
         case TOKTYPE_REAL:
             nexttok(ti);
-            p_array(ti, &dim);
-            printf("dim real: %d\n", dim);
+            exp.iseval = true;
+            exp.isvar = false;
+            exp.type.prim = TYPE_TYPEEXP;
+            exp.type.param = NULL;
+            exp.type_exp = TYPE_REAL;
+            exp.type.ndim = p_array(ti, &list);
             break;
         case TOKTYPE_STRINGTYPE:
             nexttok(ti);
-            p_array(ti, &dim);
-            printf("dim string: %d\n", dim);
+            exp.iseval = true;
+            exp.isvar = false;
+            exp.type.prim = TYPE_TYPEEXP;
+            exp.type.param = NULL;
+            exp.type_exp = TYPE_STRING;
+            exp.type.ndim = p_array(ti, &list);
             break;
         case TOKTYPE_REGEXTYPE:
             nexttok(ti);
-            p_array(ti, &dim);
-            printf("dim regex: %d\n", dim);
+            exp.iseval = true;
+            exp.isvar = false;
+            exp.type.prim = TYPE_TYPEEXP;
+            exp.type.param = NULL;
+            exp.type_exp = TYPE_REGEX;
+            exp.type.ndim = p_array(ti, &list);
             break;
         case TOKTYPE_SET:
             nexttok(ti);
-            p_array(ti, &dim);
-            printf("dim set: %d\n", dim);
+            exp.iseval = true;
+            exp.isvar = false;
+            exp.type.prim = TYPE_TYPEEXP;
+            exp.type.param = NULL;
+            exp.type_exp = TYPE_SET;
+            exp.type.ndim = p_array(ti, &list);
             break;
         case TOKTYPE_OPENPAREN:
             nexttok(ti);
@@ -1434,7 +1498,7 @@ void p_type(tokiter_s *ti)
             t = tok(ti);
             if(t->type == TOKTYPE_CLOSEPAREN) {
                 nexttok(ti);
-                p_array(ti, &dim);
+                p_array(ti, &list);
                 t = tok(ti);
                 if(t->type == TOKTYPE_MAP) {
                     nexttok(ti);
@@ -1461,35 +1525,39 @@ void p_type(tokiter_s *ti)
 
 }
 
-unsigned *p_array(tokiter_s *ti, unsigned *dimcount)
+uint8_t p_array(tokiter_s *ti, explist_s **list)
 {
+    explist_s *exp;
     tok_s *t = tok(ti);
-    unsigned *dim, currdim;
     
     if(t->type == TOKTYPE_OPENBRACKET) {
         nexttok(ti);
         p_expression(ti);
+        
+        exp = alloc(sizeof *exp);
+        exp->next = NULL;
+        
+        if(*list)
+            (*list)->next = exp;
+        else
+            *list = exp;
+        
         t = tok(ti);
         if(t->type == TOKTYPE_CLOSEBRACKET) {
             nexttok(ti);
-            currdim = *dimcount;
-            printf("currdim %d\n", currdim);
-            ++*dimcount;
-            dim = p_array(ti, dimcount);
-            
+            return 1 + p_array(ti, &(*list)->next);
         }
         else {
             //syntax error
             adderr(ti, "Syntax Error", t->lex, t->line, "]", NULL);
             synerr_rec(ti);
-            dim = NULL;
+            return 0;
         }
     }
     else {
         //epsilon production
-        dim = alloc(*dimcount);
+        return 0;
     }
-    return dim;
 }
 
 void p_optparamlist(tokiter_s *ti)
@@ -1611,7 +1679,6 @@ void adderr(tokiter_s *ti, char *prefix, char *got, uint16_t line, ...)
     errlist_s *e;
     size_t totallen = strlen(prefix), nargs, curr;
     char *args[MAX_ERRARGS], *s;
-    
     
     va_start(argp, line);
     
