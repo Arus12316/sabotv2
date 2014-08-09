@@ -14,18 +14,28 @@ users.foreach(
     }
 );
 
-while x <= 4 do
+while x <= 4 {
     1+1;
     a := "32";
     x += 1;
-endwhile
+}
 
-switch(x)
+switch(x) {
     case #^[abc]*+?(a+)(b+)|32# -> @() {
             print(derp);
         }
 
-endswitch
+}
+
+if x = 4 { 
+    3 + 3;
+}
+elif x = 5 {
+    2 + 2;
+}
+else {
+    1 + 1;
+}
 
 var a : int[3];
 
