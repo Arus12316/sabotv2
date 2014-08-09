@@ -101,6 +101,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdarg.h>
+#include <assert.h>
 
 #define TOKCHUNK_SIZE 16
 #define MAX_ERRARGS 256
@@ -178,7 +179,8 @@ enum {
     TYPE_REGEX,
     TYPE_SET,
     TYPE_CLOSURE,
-    TYPE_TYPEEXP
+    TYPE_TYPEEXP,
+    TYPE_EPSILON
 };
 
 typedef struct tok_s tok_s;
@@ -188,6 +190,7 @@ typedef struct type_s type_s;
 typedef struct paramlist_s paramlist_s;
 typedef struct expressions_s expressions_s;
 typedef struct explist_s explist_s;
+typedef struct set_s set_s;
 
 static struct tok_s
 {
@@ -262,11 +265,14 @@ struct expressions_s
     bool iseval;
     bool isvar;
     type_s type;
-    
+    tok_s *tok;
+
     union {
         char *str;
         double real;
         long integer;
+        set_s *set;
+        void *array;
         uint8_t type_exp;
     };
     
@@ -276,6 +282,21 @@ struct explist_s
 {
     expressions_s exp;
     explist_s *next;
+};
+
+struct set_s
+{
+    unsigned n;
+    type_s type;
+    
+    union {
+        char *str;
+        double real;
+        long integer;
+        set_s *set;
+        void *array;
+    };
+
 };
 
 static tokiter_s *lex(char *src);
@@ -290,15 +311,15 @@ static void start(tokiter_s *ti);
 static void p_statementlist(tokiter_s *ti);
 static void p_statementlist_(tokiter_s *ti);
 static void p_statement(tokiter_s *ti);
-static void p_expression(tokiter_s *ti);
-static void p_expression_(tokiter_s *ti);
-static void p_simple_expression(tokiter_s *ti);
-static void p_simple_expression_(tokiter_s *ti);
-static void p_term(tokiter_s *ti);
-static void p_term_(tokiter_s *ti);
-static void p_factor(tokiter_s *ti);
-static void p_optexp(tokiter_s *ti);
-static void p_factor_(tokiter_s *ti);
+static expressions_s p_expression(tokiter_s *ti);
+static expressions_s p_expression_(tokiter_s *ti);
+static expressions_s p_simple_expression(tokiter_s *ti);
+static expressions_s p_simple_expression_(tokiter_s *ti);
+static expressions_s p_term(tokiter_s *ti);
+static expressions_s p_term_(tokiter_s *ti);
+static expressions_s p_factor(tokiter_s *ti);
+static expressions_s p_optexp(tokiter_s *ti);
+static expressions_s p_factor_(tokiter_s *ti);
 static void p_factor__(tokiter_s *ti);
 static void p_assign(tokiter_s *ti);
 static void p_lambda(tokiter_s *ti);
@@ -807,79 +828,150 @@ void p_statement(tokiter_s *ti)
     }
 }
 
-void p_expression(tokiter_s *ti)
+expressions_s p_expression(tokiter_s *ti)
 {
-    p_simple_expression(ti);
+    expressions_s exp;
+    
+    exp = p_simple_expression(ti);
     p_expression_(ti);
+    
+    return exp;
 }
 
-void p_expression_(tokiter_s *ti)
+expressions_s p_expression_(tokiter_s *ti)
 {
+    expressions_s exp;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_RELOP) {
         nexttok(ti);
-        p_simple_expression(ti);
+        exp = p_simple_expression(ti);
     }
+    return exp;
 }
 
-void p_simple_expression(tokiter_s *ti)
+expressions_s p_simple_expression(tokiter_s *ti)
 {
+    expressions_s exp;
     tok_s *t = tok(ti);
 
     if(t->type == TOKTYPE_ADDOP)
         p_sign(ti);
-    p_term(ti);
+    exp = p_term(ti);
     p_simple_expression_(ti);
+    
+    return exp;
 }
 
-void p_simple_expression_(tokiter_s *ti)
+expressions_s p_simple_expression_(tokiter_s *ti)
 {
+    expressions_s exp;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_ADDOP) {
         nexttok(ti);
-        p_term(ti);
+        exp = p_term(ti);
         p_simple_expression_(ti);
     }
+    exp.type.prim = TYPE_EPSILON;
+    return exp;
 }
 
-void p_term(tokiter_s *ti)
+expressions_s p_term(tokiter_s *ti)
 {
-    p_factor(ti);
+    expressions_s exp;
+    
+    exp = p_factor(ti);
     p_term_(ti);
+    
+    return exp;
 }
 
-void p_term_(tokiter_s *ti)
+expressions_s p_term_(tokiter_s *ti)
 {
+    expressions_s exp;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_MULOP) {
         nexttok(ti);
-        p_factor(ti);
+        exp = p_factor(ti);
         p_term_(ti);
     }
+    
+    return exp;
 }
 
-void p_factor(tokiter_s *ti)
+expressions_s p_factor(tokiter_s *ti)
 {
-    p_factor_(ti);
-    p_optexp(ti);
+    expressions_s exp1, exp2;
+    
+    exp1 = p_factor_(ti);
+    exp2 = p_optexp(ti);
+    if(exp2.type.prim != TYPE_EPSILON) {
+        if(exp1.type.param) {
+            adderr(ti, "Type Error for exponentiation", "closure", exp1.tok->line, "numeric or string type", NULL);
+        }
+        else if(exp1.type.ndim) {
+            adderr(ti, "Type Error for exponentiation", "array", exp1.tok->line, "numeric or string type", NULL);
+        }
+        
+        if(exp2.type.param) {
+            adderr(ti, "Type Error for exponentiation", "closure", exp2.tok->line, "numeric type", NULL);
+        }
+        else if(exp2.type.ndim) {
+            adderr(ti, "Type Error for exponentiation", "array", exp2.tok->line, "numeric type", NULL);
+        }
+        else {
+            switch(exp2.type.prim) {
+                case TYPE_STRING:
+                    adderr(ti, "Type Error for exponentiation", "string", exp2.tok->line, "numeric type", NULL);
+                    break;
+                case TYPE_REGEX:
+                    adderr(ti, "Type Error for exponentiation", "regex", exp2.tok->line, "numeric type", NULL);
+                    break;
+                case TYPE_SET:
+                    adderr(ti, "Type Error for exponentiation", "set", exp2.tok->line, "numeric type", NULL);
+                    break;
+                case TYPE_REAL:
+                    if(exp1.type.prim == TYPE_STRING)
+                        adderr(ti, "Type Error for exponentiation on string", "set", exp2.tok->line, "integer type", NULL);
+                    else if(exp1.type.prim == TYPE_REGEX)
+                        adderr(ti, "Type Error for exponentiation on regex", "set", exp2.tok->line, "integer type", NULL);
+                    else
+                        exp1.type.prim = TYPE_REAL;
+                    break;
+                case TYPE_INTEGER:
+                    
+                    break;
+                case TYPE_CLOSURE:
+                case TYPE_TYPEEXP:
+                    assert(false);
+                    break;
+            }
+        }
+    }
+    
+    return exp1;
 }
 
-void p_optexp(tokiter_s *ti)
+expressions_s p_optexp(tokiter_s *ti)
 {
     tok_s *t = tok(ti);
     
+    expressions_s exp;
+    
     if(t->type == TOKTYPE_EXPOP) {
         nexttok(ti);
-        p_expression(ti);
+        exp = p_expression(ti);
+        return exp;
     }
+    exp.type.prim = TYPE_EPSILON;
+    return exp;
 }
 
-void p_factor_(tokiter_s *ti)
+expressions_s p_factor_(tokiter_s *ti)
 {
-    type_s type;
+    expressions_s exp;
     tok_s *t = tok(ti);
     
     switch(t->type) {
@@ -890,11 +982,13 @@ void p_factor_(tokiter_s *ti)
             break;
         case TOKTYPE_NUM:
             if(t->att == TOKATT_NUMINT)
-                type.prim = TYPE_INTEGER;
+                exp.type.prim = TYPE_INTEGER;
             else
-                type.prim = TYPE_REAL;
-            type.ndim = 0;
-            type.param = NULL;
+                exp.type.prim = TYPE_REAL;
+            exp.type.ndim = 0;
+            exp.type.param = NULL;
+            exp.integer = atol(t->lex);
+            exp.tok = t;
             nexttok(ti);
             break;
         case TOKTYPE_OPENPAREN:
@@ -914,28 +1008,33 @@ void p_factor_(tokiter_s *ti)
             }
             break;
         case TOKTYPE_STRING:
-            type.prim = TYPE_STRING;
-            type.ndim = 0;
-            type.param = NULL;
+            exp.type.prim = TYPE_STRING;
+            exp.type.ndim = 0;
+            exp.type.param = NULL;
+            exp.tok = t;
             nexttok(ti);
             break;
         case TOKTYPE_REGEX:
-            type.prim = TYPE_REGEX;
-            type.ndim = 0;
-            type.param = NULL;
+            exp.type.prim = TYPE_REGEX;
+            exp.type.ndim = 0;
+            exp.type.param = NULL;
+            exp.tok = t;
             nexttok(ti);
             break;
         case TOKTYPE_OPENBRACE:
             p_set(ti);
-            type.prim = TYPE_SET;
-            type.ndim = 0;
-            type.param = NULL;
+            exp.type.prim = TYPE_SET;
+            exp.type.ndim = 0;
+            exp.type.param = NULL;
+            exp.tok = t;
             break;
         case TOKTYPE_LAMBDA:
             p_lambda(ti);
-            type.prim = TYPE_CLOSURE;
-            type.ndim = 0;
-            type.param = NULL;
+            exp.type.prim = TYPE_CLOSURE;
+            exp.type.ndim = 0;
+            exp.type.param = NULL;
+            exp.str = "code";
+            exp.tok = t;
             break;
         default:
             //syntax error
@@ -943,6 +1042,7 @@ void p_factor_(tokiter_s *ti)
             synerr_rec(ti);
             break;
     }
+    return exp;
 }
 
 void p_factor__(tokiter_s *ti)
