@@ -21,8 +21,11 @@ while x <= 4 {
 }
 
 switch(x) {
-    case #^[abc]*+?(a+)(b+)|32# -> @() {
+    case #^[abc]*+?(a+)(b+)|32# -> @(var x, var x) {
             print(derp);
+            print(ahah);
+            print(10^"30");
+
         }
 
 }

@@ -191,6 +191,7 @@ typedef struct type_s type_s;
 typedef struct expressions_s expressions_s;
 typedef struct explist_s explist_s;
 typedef struct set_s set_s;
+typedef struct scope_s scope_s;
 
 static struct tok_s
 {
@@ -293,6 +294,13 @@ struct set_s
     };
 };
 
+struct scope_s
+{
+    unsigned nchildren;
+    expressions_s exp;
+    scope_s **children;
+};
+
 static tokiter_s *lex(char *src);
 static void mtok(tokchunk_s **list, uint16_t line, char *lexeme, size_t len, uint8_t type, uint8_t att);
 static bool trykeyword(tokchunk_s **list, uint16_t line, char *str);
@@ -330,7 +338,7 @@ static expressions_s p_type(tokiter_s *ti);
 static uint8_t p_array(tokiter_s *ti, explist_s **list);
 static explist_s *p_optparamlist(tokiter_s *ti);
 static explist_s *p_paramlist(tokiter_s *ti);
-static void p_paramlist_(tokiter_s *ti, explist_s **list);
+static void p_paramlist_(tokiter_s *ti, explist_s *list);
 static void p_set(tokiter_s *ti);
 static void p_optnext(tokiter_s *ti);
 static void p_set_(tokiter_s *ti);
@@ -1728,25 +1736,38 @@ explist_s *p_paramlist(tokiter_s *ti)
     
     list->next = NULL;
     list->exp = p_dec(ti);
-    p_paramlist_(ti, &list);
+    p_paramlist_(ti, list);
     
     return list;
 }
 
-void p_paramlist_(tokiter_s *ti, explist_s **list)
+void p_paramlist_(tokiter_s *ti, explist_s *list)
 {
-    explist_s *exp;
+    explist_s *it, *expl;
+    expressions_s dec;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_COMMA) {
         nexttok(ti);
         
-        exp = alloc(sizeof *exp);
-        exp->next = NULL;
-        exp->exp = p_dec(ti);
-        (*list)->next = exp;
+        dec = p_dec(ti);
         
-        p_paramlist_(ti, &(*list)->next);
+        for(it = list; it->next; it = it->next) {
+            if(!strcmp(it->exp.tok->lex, dec.tok->lex)) {
+                adderr(ti, "Duplicate identifier name in paramater list", dec.tok->lex, dec.tok->line, NULL);
+            }
+        }
+        
+        if(!strcmp(it->exp.tok->lex, dec.tok->lex)) {
+            adderr(ti, "Duplicate identifier name in paramater list", dec.tok->lex, dec.tok->line, "unique name", NULL);
+        }
+        
+        expl = alloc(sizeof *expl);
+        expl->exp = dec;
+        expl->next = NULL;
+        it->next = expl;
+        
+        p_paramlist_(ti, list);
     }
     else {
         //epsilon production
@@ -1796,6 +1817,7 @@ void p_optnext(tokiter_s *ti)
         //epsilon production
     }
 }
+
 
 void p_set_(tokiter_s *ti)
 {
@@ -1847,8 +1869,6 @@ void adderr(tokiter_s *ti, char *prefix, char *got, uint16_t line, ...)
         totallen += strlen(s);
         args[i++] = s;
     }
-    
-    asm("hlt");
     
     nargs = i;
     

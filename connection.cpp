@@ -451,6 +451,8 @@ void Connection::userDisconnected()
     msg += " disconnected ]";
     qDebug() << msg <<  endl;
     emit postGeneralMain(server, msg);
+
+
 }
 
 
