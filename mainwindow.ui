@@ -334,6 +334,19 @@
        <string>Create Account</string>
       </property>
      </widget>
+     <widget class="QPushButton" name="raidButton">
+      <property name="geometry">
+       <rect>
+        <x>870</x>
+        <y>400</y>
+        <width>114</width>
+        <height>32</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>raid</string>
+      </property>
+     </widget>
     </widget>
    </widget>
   </widget>

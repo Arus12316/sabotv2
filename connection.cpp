@@ -44,7 +44,7 @@ const char Connection::finishLogin[] = {
 };
 
 const char Connection::charset1[] =
-        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890.";
+        "abcdefghijklmnopqrstuvwxyz1234567890.";
 
 const char Connection::charset2[] =
         "abcdefghijklmnopqrstuvwxyz1234567890";
@@ -177,6 +177,7 @@ void Connection::createAccount(const char name[], const char pass[], const char 
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     request.setHeader(QNetworkRequest::UserAgentHeader, "I am Kim Jong Un. All Your Base are Belong To Us.");
     netAccess.post(request, url.toPercentEncoding(query.toString(),  excl, incl));
+
 }
 
 void Connection::createAccount(const char name[], const char pass[], const char email[])
@@ -273,6 +274,7 @@ void Connection::sessionInit()
 
         }
     }
+
 }
 
 

@@ -4,7 +4,7 @@
 #include "user.h"
 #include "server.h"
 #include "createaccount.h"
-
+#include <QtTest/QTest>
 #include <QTabWidget>
 #include <QListWidget>
 #include <QListWidgetItem>
@@ -17,9 +17,15 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     currServer = NULL;
     ca = NULL;
+    raidSched.setInterval(500);
+
     connect(ui->loginButton, SIGNAL(clicked()), this, SLOT(loginButtonPressed()));
     connect(ui->password, SIGNAL(returnPressed()), this, SLOT(loginButtonPressed()));
     connect(ui->createAccountButton, SIGNAL(clicked()), this, SLOT(createAccount()));
+
+
+    connect(ui->raidButton, SIGNAL(pressed()), &raidSched, SLOT(start()));
+    connect(&raidSched, SIGNAL(timeout()), this, SLOT(raid()));
 
     connect(this, &MainWindow::postMiscMessage,
         [=](Server *server, QString *msg) {
@@ -27,6 +33,7 @@ MainWindow::MainWindow(QWidget *parent) :
             server->miscView->scrollToBottom();
             delete msg;
     } );
+
 }
 
 void MainWindow::setConn(class Connection *conn)
@@ -356,6 +363,20 @@ void MainWindow::createAccount()
     ca->show();
     ca->raise();
     ca->activateWindow();
+}
+
+void MainWindow::raid()
+{
+    char *name;
+    int server = ui->serverList->currentIndex();
+
+    for(int i = 0; i < 1; i++) {
+        name = new char[20];
+        Connection *c = new Connection(server, this, NULL);
+        Connection::randName(name, 15);
+        Connection::createAccount(name, "derp");
+        c->login(name, "derp");
+    }
 }
 
 MainWindow::~MainWindow()

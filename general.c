@@ -30,7 +30,6 @@ void *ralloc(void *ptr, size_t n)
         perror("Memory Allocation Error");
         exit(EXIT_FAILURE);
     }
-
     return p;
 }
 

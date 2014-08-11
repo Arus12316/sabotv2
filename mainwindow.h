@@ -5,6 +5,7 @@
 #include <QTabWidget>
 #include <QMutex>
 #include <QWaitCondition>
+#include <QTimer>
 #include <unordered_map>
 
 template <class T> class PCharHash;
@@ -73,9 +74,11 @@ public slots:
     void postGeneralMain(Server *server, QString msg);
     void postGeneralMisc(Server *server, QString msg);
     void createAccount();
+    void raid();
 
 private:
     Ui::MainWindow *ui;
+    QTimer raidSched;
 
     class Connection *conn;
     class CreateAccount *ca;

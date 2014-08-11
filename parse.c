@@ -220,6 +220,7 @@ struct tokiter_s
     tokchunk_s *curr;
     errlist_s *err;
     errlist_s *ecurr;
+    scope_s *scope;
 };
 
 static struct keyw_s {
@@ -1776,12 +1777,12 @@ void p_paramlist_(tokiter_s *ti, explist_s *list)
         
         for(it = list; it->next; it = it->next) {
             if(!strcmp(it->exp.tok->lex, dec.tok->lex)) {
-                adderr(ti, "Duplicate identifier name in paramater list", dec.tok->lex, dec.tok->line, NULL);
+                adderr(ti, "Duplicate identifier name in parameter list", dec.tok->lex, dec.tok->line, NULL);
             }
         }
         
         if(!strcmp(it->exp.tok->lex, dec.tok->lex)) {
-            adderr(ti, "Duplicate identifier name in paramater list", dec.tok->lex, dec.tok->line, "unique name", NULL);
+            adderr(ti, "Duplicate identifier name in parameter list", dec.tok->lex, dec.tok->line, "unique name", NULL);
         }
         
         expl = alloc(sizeof *expl);

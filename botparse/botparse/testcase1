@@ -20,7 +20,7 @@ users.foreach(
     }
 );
 
-while x <= 4 {
+while(x <= 4) {
     1+1;
     a := "32";
     x += 1;
@@ -31,12 +31,17 @@ switch(x) {
             print(derp);
             print(ahah);
             print(10^"30");
-            
-            32/32//234//;
 
             5 + /abc/;
         }
-        
+    case /^hello$/ -> @() {
+        omnom;
+    }
+    
+    default -> @() {
+    
+        ahaha;
+    }
 
 }
 
@@ -62,6 +67,11 @@ listener(1) {
 }
 
 1+1;
+
+for x <- {1 => 100} {
+1+1;
+
+}
 
 var dict := {
     "abc" -> "hahahahahah", 
