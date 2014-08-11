@@ -302,8 +302,8 @@ struct scope_s
 };
 
 static tokiter_s *lex(char *src);
-static void mtok(tokchunk_s **list, uint16_t line, char *lexeme, size_t len, uint8_t type, uint8_t att);
-static bool trykeyword(tokchunk_s **list, uint16_t line, char *str);
+static tok_s *mtok(tokchunk_s **list, uint16_t line, char *lexeme, size_t len, uint8_t type, uint8_t att);
+static bool trykeyword(tokchunk_s **list, tok_s **prev, uint16_t line, char *str);
 static void printtoks(tokchunk_s *list);
 
 static tok_s *tok(tokiter_s *ti);
@@ -361,6 +361,7 @@ tokiter_s *lex(char *src)
 {
     uint16_t line = 1;
     char *bptr, c;
+    tok_s *prev = NULL;
     tokchunk_s *head, *curr;
     tokiter_s *ti;
     
@@ -386,166 +387,195 @@ tokiter_s *lex(char *src)
                 src++;
                 break;
             case ',':
-                mtok(&curr, line, ",", 1, TOKTYPE_COMMA, TOKATT_DEFAULT);
+                prev = mtok(&curr, line, ",", 1, TOKTYPE_COMMA, TOKATT_DEFAULT);
                 src++;
                 break;
             case '.':
-                mtok(&curr, line, ".", 1, TOKTYPE_DOT, TOKATT_DEFAULT);
+                prev = mtok(&curr, line, ".", 1, TOKTYPE_DOT, TOKATT_DEFAULT);
                 src++;
                 break;
             case '(':
-                mtok(&curr, line, "(", 1, TOKTYPE_OPENPAREN, TOKATT_DEFAULT);
+                prev = mtok(&curr, line, "(", 1, TOKTYPE_OPENPAREN, TOKATT_DEFAULT);
                 src++;
                 break;
             case ')':
-                mtok(&curr, line, ")", 1, TOKTYPE_CLOSEPAREN, TOKATT_DEFAULT);
+                prev = mtok(&curr, line, ")", 1, TOKTYPE_CLOSEPAREN, TOKATT_DEFAULT);
                 src++;
                 break;
             case '[':
-                mtok(&curr, line, "[", 1, TOKTYPE_OPENBRACKET, TOKATT_DEFAULT);
+                prev = mtok(&curr, line, "[", 1, TOKTYPE_OPENBRACKET, TOKATT_DEFAULT);
                 src++;
                 break;
             case ']':
-                mtok(&curr, line, "]", 1, TOKTYPE_CLOSEBRACKET, TOKATT_DEFAULT);
+                prev = mtok(&curr, line, "]", 1, TOKTYPE_CLOSEBRACKET, TOKATT_DEFAULT);
                 src++;
                 break;
             case '{':
-                mtok(&curr, line, "{", 1, TOKTYPE_OPENBRACE, TOKATT_DEFAULT);
+                prev = mtok(&curr, line, "{", 1, TOKTYPE_OPENBRACE, TOKATT_DEFAULT);
                 src++;
                 break;
             case '}':
-                mtok(&curr, line, "}", 1, TOKTYPE_CLOSEBRACE, TOKATT_DEFAULT);
+                prev = mtok(&curr, line, "}", 1, TOKTYPE_CLOSEBRACE, TOKATT_DEFAULT);
                 src++;
                 break;
             case '@':
-                mtok(&curr, line, "@", 1, TOKTYPE_LAMBDA, TOKATT_DEFAULT);
+                prev = mtok(&curr, line, "@", 1, TOKTYPE_LAMBDA, TOKATT_DEFAULT);
                 src++;
                 break;
             case '!':
-                mtok(&curr, line, "!", 1, TOKTYPE_NOT, TOKATT_DEFAULT);
+                prev = mtok(&curr, line, "!", 1, TOKTYPE_NOT, TOKATT_DEFAULT);
                 src++;
                 break;
             case '&':
-                mtok(&curr, line, "!", 1, TOKTYPE_MULOP, TOKATT_AND);
+                prev = mtok(&curr, line, "!", 1, TOKTYPE_MULOP, TOKATT_AND);
                 src++;
                 break;
             case '|':
-                mtok(&curr, line, "!", 1, TOKTYPE_ADDOP, TOKATT_OR);
+                prev = mtok(&curr, line, "!", 1, TOKTYPE_ADDOP, TOKATT_OR);
                 src++;
                 break;
             case '<':
                 if(*(src + 1) == '-') {
-                    mtok(&curr, line, "<-", 2, TOKTYPE_FORVAR, TOKATT_DEFAULT);
+                    prev = mtok(&curr, line, "<-", 2, TOKTYPE_FORVAR, TOKATT_DEFAULT);
                     src += 2;
                 }
                 else if(*(src + 1) == '>') {
-                    mtok(&curr, line, "<>", 2, TOKTYPE_RELOP, TOKATT_NEQ);
+                    prev = mtok(&curr, line, "<>", 2, TOKTYPE_RELOP, TOKATT_NEQ);
                     src += 2;
                 }
                 else if(*(src + 1) == '=') {
-                    mtok(&curr, line, "<=", 2, TOKTYPE_RELOP, TOKATT_LEQ);
+                    prev = mtok(&curr, line, "<=", 2, TOKTYPE_RELOP, TOKATT_LEQ);
                     src += 2;
                 }
                 else {
-                    mtok(&curr, line, "<", 1, TOKTYPE_RELOP, TOKATT_L);
+                    prev = mtok(&curr, line, "<", 1, TOKTYPE_RELOP, TOKATT_L);
                     src++;
                 }
                 break;
             case '>':
                 if(*(src + 1) == '=') {
-                    mtok(&curr, line, ">=", 2, TOKTYPE_RELOP, TOKATT_GEQ);
+                    prev = mtok(&curr, line, ">=", 2, TOKTYPE_RELOP, TOKATT_GEQ);
                     src += 2;
                 }
                 else {
-                    mtok(&curr, line, ">", 1, TOKTYPE_RELOP, TOKATT_G);
+                    prev = mtok(&curr, line, ">", 1, TOKTYPE_RELOP, TOKATT_G);
                     src++;
                 }
                 break;
             case '+':
                 if(*(src + 1) == '=') {
-                    mtok(&curr, line, "+=", 2, TOKTYPE_ASSIGN, TOKATT_ADD);
+                    prev = mtok(&curr, line, "+=", 2, TOKTYPE_ASSIGN, TOKATT_ADD);
                     src += 2;
                 }
                 else {
-                    mtok(&curr, line, "}", 1, TOKTYPE_ADDOP, TOKATT_ADD);
+                    prev = mtok(&curr, line, "+", 1, TOKTYPE_ADDOP, TOKATT_ADD);
                     src++;
                 }
                 break;
             case '-':
                 if(*(src + 1) == '>') {
-                    mtok(&curr, line, "->", 2, TOKTYPE_MAP, TOKATT_DEFAULT);
+                    prev = mtok(&curr, line, "->", 2, TOKTYPE_MAP, TOKATT_DEFAULT);
                     src += 2;
                 }
                 else if(*(src + 1) == '=') {
-                    mtok(&curr, line, "-=", 2, TOKTYPE_ASSIGN, TOKATT_SUB);
+                    prev = mtok(&curr, line, "-=", 2, TOKTYPE_ASSIGN, TOKATT_SUB);
                     src += 2;
                 }
                 else {
-                    mtok(&curr, line, "-", 1, TOKTYPE_ADDOP, TOKATT_SUB);
+                    prev = mtok(&curr, line, "-", 1, TOKTYPE_ADDOP, TOKATT_SUB);
                     src++;
                 }
                 break;
             case '*':
                 if(*(src + 1) == '=') {
-                    mtok(&curr, line, "*=", 2, TOKTYPE_ASSIGN, TOKATT_MULT);
+                    prev = mtok(&curr, line, "*=", 2, TOKTYPE_ASSIGN, TOKATT_MULT);
                     src += 2;
                 }
                 else {
-                    mtok(&curr, line, "*", 1, TOKTYPE_MULOP, TOKATT_MULT);
+                    prev = mtok(&curr, line, "*", 1, TOKTYPE_MULOP, TOKATT_MULT);
                     src++;
                 }
                 break;
             case '/':
-                if(*(src + 1) == '=') {
-                    mtok(&curr, line, "/=", 2, TOKTYPE_ASSIGN, TOKATT_DIV);
-                    src += 2;
+                if(prev) {
+                    switch(prev->type) {
+                        case TOKTYPE_NUM:
+                        case TOKTYPE_STRING:
+                        case TOKTYPE_REGEX:
+                        case TOKTYPE_CLOSEPAREN:
+                        case TOKTYPE_CLOSEBRACKET:
+                        case TOKTYPE_CLOSEBRACE:
+                            if(*(src + 1) == '=') {
+                                prev = mtok(&curr, line, "/=", 2, TOKTYPE_ASSIGN, TOKATT_DIV);
+                                src += 2;
+                            }
+                            else {
+                                prev = mtok(&curr, line, "/", 1, TOKTYPE_MULOP, TOKATT_DIV);
+                                src++;
+                            }
+                            break;
+                        default:
+                            goto parse_regex;
+                    }
                 }
                 else {
-                    mtok(&curr, line, "/", 1, TOKTYPE_MULOP, TOKATT_DIV);
-                    src++;
+                parse_regex:
+                    bptr = src++;
+                    while(*src != '/') {
+                        if(*src)
+                            src++;
+                        else {
+                            adderr(ti, "Lexical Error", "EOF", line, "/", NULL);
+                            break;
+                        }
+                    }
+                    c = *++src;
+                    *src = '\0';
+                    prev = mtok(&curr, line, bptr, src - bptr, TOKTYPE_REGEX, TOKATT_DEFAULT);
+                    *src = c;
                 }
                 break;
             case '%':
                 if(*(src + 1) == '=') {
-                    mtok(&curr, line, "%=", 2, TOKTYPE_ASSIGN, TOKATT_MOD);
+                    prev = mtok(&curr, line, "%=", 2, TOKTYPE_ASSIGN, TOKATT_MOD);
                     src += 2;
                 }
                 else {
-                    mtok(&curr, line, "%", 1, TOKTYPE_MULOP, TOKATT_MOD);
+                    prev = mtok(&curr, line, "%", 1, TOKTYPE_MULOP, TOKATT_MOD);
                     src++;
                 }
                 break;
             case ':':
                 if(*(src + 1) == '=') {
-                    mtok(&curr, line, ":=", 2, TOKTYPE_ASSIGN, TOKATT_DEFAULT);
+                    prev = mtok(&curr, line, ":=", 2, TOKTYPE_ASSIGN, TOKATT_DEFAULT);
                     src += 2;
                 }
                 else {
-                    mtok(&curr, line, ":", 1, TOKTYPE_COLON, TOKATT_DEFAULT);
+                    prev = mtok(&curr, line, ":", 1, TOKTYPE_COLON, TOKATT_DEFAULT);
                     src++;
                 }
                 break;
             case ';':
-                mtok(&curr, line, ";", 1, TOKTYPE_SEMICOLON, TOKATT_DEFAULT);
+                prev = mtok(&curr, line, ";", 1, TOKTYPE_SEMICOLON, TOKATT_DEFAULT);
                 src++;
                 break;
             case '^':
                 if(*(src + 1) == '=') {
-                    mtok(&curr, line, "^=", 2, TOKTYPE_ASSIGN, TOKATT_EXP);
+                    prev = mtok(&curr, line, "^=", 2, TOKTYPE_ASSIGN, TOKATT_EXP);
                     src += 2;
                 }
                 else {
-                    mtok(&curr, line, "^", 1, TOKTYPE_EXPOP, TOKATT_DEFAULT);
+                    prev = mtok(&curr, line, "^", 1, TOKTYPE_EXPOP, TOKATT_DEFAULT);
                     src++;
                 }
                 break;
             case '=':
                 if(*(src + 1) == '>') {
-                    mtok(&curr, line, "=>", 2, TOKTYPE_RANGE, TOKATT_DEFAULT);
+                    prev = mtok(&curr, line, "=>", 2, TOKTYPE_RANGE, TOKATT_DEFAULT);
                     src += 2;
                 }
                 else {
-                    mtok(&curr, line, "=", 1, TOKTYPE_RELOP, TOKATT_DEFAULT);
+                    prev = mtok(&curr, line, "=", 1, TOKTYPE_RELOP, TOKATT_DEFAULT);
                     src++;
                 }
                 break;
@@ -561,22 +591,7 @@ tokiter_s *lex(char *src)
                 }
                 c = *++src;
                 *src = '\0';
-                mtok(&curr, line, bptr, src - bptr, TOKTYPE_STRING, TOKATT_DEFAULT);
-                *src = c;
-                break;
-            case '#':
-                bptr = src++;
-                while(*src != '#') {
-                    if(*src)
-                        src++;
-                    else {
-                        adderr(ti, "Lexical Error", "EOF", line, "#", NULL);
-                        break;
-                    }
-                }
-                c = *++src;
-                *src = '\0';
-                mtok(&curr, line, bptr, src - bptr, TOKTYPE_REGEX, TOKATT_DEFAULT);
+                prev = mtok(&curr, line, bptr, src - bptr, TOKTYPE_STRING, TOKATT_DEFAULT);
                 *src = c;
                 break;
             default:
@@ -601,9 +616,9 @@ tokiter_s *lex(char *src)
                             *src = '\0';
                             
                             if(gotdot)
-                                mtok(&curr, line, bptr, src - bptr, TOKTYPE_NUM, TOKATT_NUMREAL);
+                                prev = mtok(&curr, line, bptr, src - bptr, TOKTYPE_NUM, TOKATT_NUMREAL);
                             else
-                                mtok(&curr, line, bptr, src - bptr, TOKTYPE_NUM, TOKATT_NUMINT);
+                                prev = mtok(&curr, line, bptr, src - bptr, TOKTYPE_NUM, TOKATT_NUMINT);
                             *src = c;
                             break;
                         }
@@ -615,8 +630,8 @@ tokiter_s *lex(char *src)
                         src++;
                     c = *src;
                     *src = '\0';
-                    if(!trykeyword(&curr, line, bptr))
-                        mtok(&curr, line, bptr, src - bptr, TOKTYPE_IDENT, TOKATT_DEFAULT);
+                    if(!trykeyword(&curr, &prev, line, bptr))
+                        prev = mtok(&curr, line, bptr, src - bptr, TOKTYPE_IDENT, TOKATT_DEFAULT);
                     *src = c;
                 }
                 else {
@@ -633,7 +648,7 @@ tokiter_s *lex(char *src)
     return ti;
 }
 
-void mtok(tokchunk_s **list, uint16_t line, char *lexeme, size_t len, uint8_t type, uint8_t att)
+tok_s *mtok(tokchunk_s **list, uint16_t line, char *lexeme, size_t len, uint8_t type, uint8_t att)
 {
     char *lex;
     tokchunk_s *l = *list;
@@ -654,9 +669,11 @@ void mtok(tokchunk_s **list, uint16_t line, char *lexeme, size_t len, uint8_t ty
     l->tok[size].att = att;
     l->tok[size].line = line;
     l->size++;
+    
+    return &l->tok[size];;
 }
 
-bool trykeyword(tokchunk_s **list, uint16_t line, char *str)
+bool trykeyword(tokchunk_s **list, tok_s **prev, uint16_t line, char *str)
 {
     int i;
     size_t len;
@@ -664,7 +681,7 @@ bool trykeyword(tokchunk_s **list, uint16_t line, char *str)
     for(i = 0; i < sizeof(keywords) / sizeof(struct keyw_s); i++) {
         if(!strcmp(str, keywords[i].str)) {
             len = strlen(keywords[i].str);
-            mtok(list, line, keywords[i].str, len, keywords[i].type, TOKATT_DEFAULT);
+            *prev = mtok(list, line, keywords[i].str, len, keywords[i].type, TOKATT_DEFAULT);
             return true;
         }
     }
@@ -1051,6 +1068,11 @@ expressions_s p_factor_(tokiter_s *ti)
             break;
         default:
             //syntax error
+            
+            exp.tok = t;
+            exp.type.prim = TYPE_REAL;
+            exp.type.ndim = 0;
+            exp.type.param = NULL;
             adderr(ti, "Syntax Error", t->lex, t->line, "identifier", "number", "(", "string", "regex", "{", "@", NULL);
             synerr_rec(ti);
             break;

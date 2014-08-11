@@ -2,7 +2,13 @@ var x : int := 32;
 
 var y : real[3] := {1.1, 2.2, 3.3};
 
-var x : (var a : int)[50] -> int[32][32] := 32;
+var x : (var a : int) -> int := @(){
+ 1+1;
+};
+
+var x : (var a) -> real[20] := @(){
+    1+1;
+};
 
 x[3](33);
 
@@ -21,12 +27,16 @@ while x <= 4 {
 }
 
 switch(x) {
-    case #^[abc]*+?(a+)(b+)|32# -> @(var x, var x) {
+    case /^[abc]*+?(a+)(b+)|32/ -> @(var x, var x) {
             print(derp);
             print(ahah);
             print(10^"30");
+            
+            32/32//234//;
 
+            5 + /abc/;
         }
+        
 
 }
 
