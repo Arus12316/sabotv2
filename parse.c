@@ -106,6 +106,8 @@
 
 #define TOKCHUNK_SIZE 16
 #define MAX_ERRARGS 256
+#define PUSHSCOPE() pushscope(ti)
+#define POPSCOPE() popscope(ti)
 
 #define SYM_TABLE_SIZE 19
 
@@ -227,7 +229,7 @@ struct tokiter_s
     tokchunk_s *curr;
     errlist_s *err;
     errlist_s *ecurr;
-    node_s *scope;
+    scope_s *scope;
 };
 
 static struct keyw_s {
@@ -373,6 +375,8 @@ static void addchild(node_s *root, node_s *c);
 static unsigned pjwhash(char *key);
 static bool addident(scope_s *root, node_s *ident);
 static scope_s *idtinit(scope_s *parent);
+static scope_s *pushscope(tokiter_s *ti);
+static inline void popscope(tokiter_s *ti);
 
 static void emit(char *, ...);
 
@@ -773,6 +777,8 @@ tok_s *nexttok(tokiter_s *ti)
 void start(tokiter_s *ti)
 {
     tok_s *t;
+    
+    ti->scope = idtinit(NULL);
     
     p_statementlist(ti);
     t = tok(ti);
@@ -1821,7 +1827,6 @@ node_s *p_set(tokiter_s *ti)
         t = tok(ti);
         if(t->type == TOKTYPE_CLOSEBRACE) {
             nexttok(ti);
-            
         }
         else {
             //syntax error
@@ -1898,6 +1903,12 @@ void addchild(node_s *root, node_s *c)
     root->nchildren++;
 }
 
+/*
+ pjw hash function 
+ 
+ credit to:
+ -Alfred V. Aho, Ravi Sethi, and Jeffrey D. Ullman, Compilers: Principles, Techniques, and Tools, Addison-Wesley, 1986.
+ */
 unsigned pjwhash(char *key)
 {
     unsigned h = 0, g;
@@ -1915,7 +1926,7 @@ bool addident(scope_s *root, node_s *ident)
     char *key = ident->tok->lex;
     unsigned index = pjwhash(key);
     rec_s **ptr = &root->table[index], *i = *ptr, *n;
-
+    
     if(i) {
         while(i->next) {
             if(!strcmp(i->key, key))
@@ -1939,6 +1950,25 @@ scope_s *idtinit(scope_s *parent)
     
     s->parent = parent;
     return s;
+}
+
+scope_s *pushscope(tokiter_s *ti)
+{
+    scope_s *o = ti->scope, *n = idtinit(o);
+    
+    if(o->children)
+        o->children = ralloc(o->children, (o->nchildren + 1) * sizeof(*o->children));
+    else
+        o->children = alloc(sizeof *o->children);
+    o->children[o->nchildren] = n;
+    o->nchildren++;
+    ti->scope = n;
+    return n;
+}
+
+inline void popscope(tokiter_s *ti)
+{
+    ti->scope = ti->scope->parent;
 }
 
 void printerrs(errlist_s *err)
