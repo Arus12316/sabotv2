@@ -29,6 +29,10 @@ public:
     QMutex listLock;
     QWaitCondition listCond;
     QStringList gameList;
+
+    char *username;
+    char *password;
+    class User *user;
     
     /* General ACK 0 */
     static const char ackX0[];
@@ -59,6 +63,8 @@ public:
 
     void findUser(const char *name);
 
+
+
     /*
      * Account Creating methods. Methods with less parameters generate the values randomly. Use
      * only in 1 thread. These are not reentrant.
@@ -81,11 +87,14 @@ signals:
     void postGeneralMain(Server *server, QString str);
     void postGeneralMisc(Server *server, QString str);
 
+    void loginRecover(Connection *last);
+
 public slots:
 
     void sessionInit();
     void gameEvent();
     void keepAlive();
+   // void gameListReq();
 
     void userConnected();
     void userDisconnected();
@@ -104,12 +113,9 @@ private:
     QTcpSocket *sock;
     char uid[4];
     QThread thread;
-    char *username;
-    char *password;
     bool active;
     QByteArray gameBuf;
     QTimer timer;
-    class User *user;
     MainWindow *win;
     QString general;
     char findBuf[21];

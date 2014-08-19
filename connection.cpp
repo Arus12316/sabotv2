@@ -44,7 +44,7 @@ const char Connection::finishLogin[] = {
 };
 
 const char Connection::charset1[] =
-        "abcdefghijklmnopqrstuvwxyz1234567890.";
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890.";
 
 const char Connection::charset2[] =
         "abcdefghijklmnopqrstuvwxyz1234567890";
@@ -78,6 +78,7 @@ Connection::Connection(int server, MainWindow *win, QObject *parent) :
     connect(this, SIGNAL(postGameList(Connection *)), win, SLOT(postGameList(Connection *)));
     connect(this, SIGNAL(postGeneralMain(Server *, QString)), win, SLOT(postGeneralMain(Server *, QString)));
     connect(this, SIGNAL(postGeneralMisc(Server *, QString)), win, SLOT(postGeneralMisc(Server *, QString)));
+    connect(this, SIGNAL(loginRecover(Connection *)), win, SLOT(loginRecover(Connection *)));
 }
 
 
@@ -177,7 +178,6 @@ void Connection::createAccount(const char name[], const char pass[], const char 
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     request.setHeader(QNetworkRequest::UserAgentHeader, "I am Kim Jong Un. All Your Base are Belong To Us.");
     netAccess.post(request, url.toPercentEncoding(query.toString(),  excl, incl));
-
 }
 
 void Connection::createAccount(const char name[], const char pass[], const char email[])
@@ -209,7 +209,7 @@ void Connection::createAccount(const char pass[])
 
 void Connection::sessionInit()
 {
-    enum { SLEEP_TIME = 5000 };
+    enum { SLEEP_TIME = 1000 };
     qint64 n;
     char buf[SOCK_BUFSIZE];
     sock = new QTcpSocket;
@@ -271,6 +271,21 @@ void Connection::sessionInit()
             timer.start(SLEEP_TIME);
 
             active = true;
+        }
+        else {
+            user = new User(this, "A102###########semaphore0060572450060572451;33;0;2;26;0;-1190;1;95;0");
+            user->isSelf = true;
+            emit newUser(user);
+            emit newSelf(user);
+
+            sock->write(finishLogin, sizeof finishLogin);
+
+            connect(sock, SIGNAL(readyRead()), this, SLOT(gameEvent()));
+            connect(&timer, SIGNAL(timeout()), this, SLOT(keepAlive()));
+            timer.start(SLEEP_TIME);
+
+            active = true;
+
 
         }
     }
@@ -383,7 +398,7 @@ void Connection::gameEvent()
 
                         emit userDisconnected(u);
 
-                        findUser(findBuf);
+                      //  findUser(findBuf);
 
                         //force synchronization
                         win->lock.lock();
@@ -452,9 +467,10 @@ void Connection::userDisconnected()
     msg += username;
     msg += " disconnected ]";
     qDebug() << msg <<  endl;
-    emit postGeneralMain(server, msg);
+    emit postGeneralMain(this->server, msg);
 
-
+    emit loginRecover(this);
+    exit(0);
 }
 
 
@@ -510,8 +526,6 @@ void Connection::sendRaw(QString str)
 Connection::~Connection()
 {
     active = false;
-    delete[] username;
-    delete[] password;
     sock->close();
     delete sock;
 }

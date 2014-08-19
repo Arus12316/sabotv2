@@ -7,6 +7,13 @@
 User::User(QObject *parent) :
     QObject(parent)
 {
+    color.setRgb(0, 0, 0, 255);
+
+    id[0] = '0';
+    id[1] = '0';
+    id[2] = '0';
+
+    modLevel = '0';
 }
 
 User::User(Connection *conn, QObject *parent)
@@ -25,6 +32,7 @@ User::User(Connection *conn, const char *buf, QObject *parent)
     this->conn = conn;
     parseData(buf);
 }
+
 
 void User::parseData(const char *data)
 {

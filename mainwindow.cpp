@@ -379,6 +379,27 @@ void MainWindow::raid()
     }
 }
 
+void MainWindow::loginRecover(Connection *last)
+{
+    int serverIndex;
+    Connection *rec;
+
+    for(serverIndex = 0; serverIndex < N_GAMESERVERS; serverIndex++) {
+        if(Server::servers[serverIndex] == last->server)
+            break;
+    }
+
+    if(last == last->server->master)
+        last->server->master = NULL;
+
+    userDisconnected(last->user);
+
+    rec = new Connection(serverIndex, this, NULL);
+
+    rec->login(last->username, last->password);
+    last->deleteLater();
+}
+
 MainWindow::~MainWindow()
 {
     delete ui;

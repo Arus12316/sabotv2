@@ -75,6 +75,8 @@ public slots:
     void postGeneralMisc(Server *server, QString msg);
     void createAccount();
     void raid();
+    void loginRecover(class Connection *last);
+
 
 private:
     Ui::MainWindow *ui;
