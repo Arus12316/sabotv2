@@ -71,7 +71,7 @@ for x <- {1 => 100} {
 }
 
 switch(x) {
-    case /^[abc]*+?(a+)(b+)|32/ -> @(x, x) {
+    case /^[abc]*+?(a+)(b+)|32/ , hey -> @(x, x) {
             print(derp);
             print(ahah);
             print(10^"30");
