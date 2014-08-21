@@ -1,7 +1,5 @@
 /*
- <statementlist> -> <statement> <statementlist'>
- 
- <statementlist'> -> <statement> <statementlist'> | ε
+ <statementlist> -> <statement> <statementlist> | ε
  
  <statement> ->  <expression> ; | <control> | <dec> ; | return <expression>
  
@@ -303,7 +301,6 @@ static tok_s *nexttok(tokiter_s *ti);
 
 static void start(tokiter_s *ti);
 static void p_statementlist(tokiter_s *ti);
-static void p_statementlist_(tokiter_s *ti);
 static void p_statement(tokiter_s *ti);
 static node_s *p_expression(tokiter_s *ti);
 static void p_expression_(tokiter_s *ti, node_s *exp);
@@ -760,22 +757,16 @@ void start(tokiter_s *ti)
 
 void p_statementlist(tokiter_s *ti)
 {
-    p_statement(ti);
-    p_statementlist_(ti);
-}
-
-void p_statementlist_(tokiter_s *ti)
-{
     tok_s *t = tok(ti);
     
     switch(t->type) {
-        case TOKTYPE_VAR:
         case TOKTYPE_CLASS:
+        case TOKTYPE_VAR:
+        case TOKTYPE_LISENER:
         case TOKTYPE_SWITCH:
         case TOKTYPE_FOR:
         case TOKTYPE_WHILE:
         case TOKTYPE_IF:
-        case TOKTYPE_LISENER:
         case TOKTYPE_ADDOP:
         case TOKTYPE_OPENBRACE:
         case TOKTYPE_LAMBDA:
@@ -787,13 +778,20 @@ void p_statementlist_(tokiter_s *ti)
         case TOKTYPE_IDENT:
         case TOKTYPE_RETURN:
             p_statement(ti);
-            p_statementlist_(ti);
+            p_statementlist(ti);
+            break;
+        case TOKTYPE_CLOSEBRACE:
+        case TOKTYPE_EOF:
+            //epsilon production
             break;
         default:
-            //epsilon production
+            adderr(ti, "Syntax Error", t->lex, t->line, "class", "var", "listener", "switch", "for", "while", "if",
+                                                        "+", "-", "{", "@", "regex", "string", "!", "(", "number", "identifier", "return", NULL);
+            synerr_rec(ti);
             break;
     }
 }
+
 
 void p_statement(tokiter_s *ti)
 {
@@ -1786,7 +1784,6 @@ void p_declist(tokiter_s *ti)
         }
     }
 }
-
 
 node_s *p_array(tokiter_s *ti)
 {
