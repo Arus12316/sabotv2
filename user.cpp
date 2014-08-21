@@ -33,6 +33,20 @@ User::User(Connection *conn, const char *buf, QObject *parent)
     parseData(buf);
 }
 
+User::User(Connection *conn, const char *name, bool isdummy, QObject *parent)
+{
+
+    id[0] = '1';
+    id[1] = '0';
+    id[2] = '0';
+
+    modLevel = '0';
+
+    strcpy(this->name, name);
+    this->conn = conn;
+    color.setRgb(10, 10, 10, 20);
+}
+
 
 void User::parseData(const char *data)
 {

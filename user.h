@@ -34,6 +34,7 @@ public:
     User(Connection *conn, QObject *parent = 0);
     User(const char *buf, QObject *parent = 0);
     User(Connection *conn, const char *buf, QObject *parent = 0);
+    User(Connection *conn, const char *name, bool isdummy, QObject *parent = 0);
 
     explicit User(QObject *parent = 0);
 

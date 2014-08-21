@@ -21,7 +21,7 @@
  
  <factor> -> <factor'> <optexp>
  
- <optexp> -> ^ <expression> | ε
+ <optexp> -> ^ <factor> | ε
  
  <factor'> ->   id <factor''> <assign> { <factor''>.ident := id }
                 |
@@ -153,7 +153,8 @@ enum {
     TOKTYPE_STRINGTYPE,
     TOKTYPE_REGEXTYPE,
     TOKTYPE_SET,
-    TOKTYPE_RETURN
+    TOKTYPE_RETURN,
+    TOKTYPE_UNNEG
 };
 
 enum {
@@ -187,6 +188,8 @@ enum {
     TYPE_TYPEEXP,
     TYPE_EPSILON,
     TYPE_OP,
+    TYPE_PARAMLIST,
+    TYPE_NODE,
     TYPE_INCOMPLETE
 };
 
@@ -198,7 +201,6 @@ typedef struct node_s node_s;
 typedef struct set_s set_s;
 typedef struct att_s att_s;
 
-typedef struct tree_s tree_s;
 typedef struct rec_s rec_s;
 typedef struct scope_s scope_s;
 
@@ -278,6 +280,8 @@ struct node_s
         long integer;
         set_s *set;
         void *array;
+        scope_s *scope;
+        node_s *param;
         uint8_t type_exp;
     }
     val;
@@ -306,11 +310,6 @@ struct att_s
     
 };
 
-struct tree_s
-{
-    node_s exp;
-    tree_s **children;
-};
 
 struct rec_s
 {
@@ -339,13 +338,13 @@ static void p_statementlist(tokiter_s *ti);
 static void p_statementlist_(tokiter_s *ti);
 static void p_statement(tokiter_s *ti);
 static node_s *p_expression(tokiter_s *ti);
-static node_s *p_expression_(tokiter_s *ti);
+static void p_expression_(tokiter_s *ti, node_s *exp);
 static node_s *p_simple_expression(tokiter_s *ti);
-static node_s *p_simple_expression_(tokiter_s *ti);
+static void p_simple_expression_(tokiter_s *ti, node_s *sexp);
 static node_s *p_term(tokiter_s *ti);
-static node_s *p_term_(tokiter_s *ti, node_s *l);
+static void p_term_(tokiter_s *ti, node_s *term);
 static node_s *p_factor(tokiter_s *ti);
-static node_s *p_optexp(tokiter_s *ti);
+static void p_optexp(tokiter_s *ti, node_s *factor);
 static node_s *p_factor_(tokiter_s *ti);
 static void p_factor__(tokiter_s *ti);
 static node_s *p_assign(tokiter_s *ti);
@@ -893,158 +892,170 @@ void p_statement(tokiter_s *ti)
 
 node_s *p_expression(tokiter_s *ti)
 {
-    node_s *exp;
+    node_s *node, *exp;
     
-    exp = p_simple_expression(ti);
-    p_expression_(ti);
+    exp = node_s_();
     
-    return exp;
+    exp->type.prim = TYPE_NODE;
+    exp->type.ndim = 0;
+    exp->type.param = NULL;
+    
+    node = p_simple_expression(ti);
+    addchild(exp, node);
+    p_expression_(ti, exp);
+    
+    return node;
 }
 
-node_s *p_expression_(tokiter_s *ti)
+void p_expression_(tokiter_s *ti, node_s *exp)
 {
-    node_s *exp = NULL;
+    node_s *s = NULL, *op = NULL;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_RELOP) {
         nexttok(ti);
-        exp = p_simple_expression(ti);
+        s = p_simple_expression(ti);
+        
+        op = node_s_();
+        op->type.prim = TYPE_OP;
+        op->type.ndim = 0;
+        op->type.param = NULL;
+        
+        addchild(exp, op);
+        addchild(exp, s);
     }
-    return exp;
 }
 
 node_s *p_simple_expression(tokiter_s *ti)
 {
-    node_s *exp;
+    int sign = 0;
+    node_s *n, *u = NULL, *sexp;
     tok_s *t = tok(ti);
-
-    if(t->type == TOKTYPE_ADDOP)
-        p_sign(ti);
-    exp = p_term(ti);
-    p_simple_expression_(ti);
     
-    return exp;
+    if(t->type == TOKTYPE_ADDOP)
+        sign = p_sign(ti);
+    n = p_term(ti);
+    
+    if(sign == -1) {
+        u = node_s_();
+        u->type.prim = TYPE_OP;
+        u->type.ndim = 0;
+        u->tok = t;
+        t->type = TOKTYPE_UNNEG;
+        addchild(u, n);
+        n = u;
+    }
+    
+    sexp = node_s_();
+    sexp->type.prim = TYPE_OP;
+    sexp->type.ndim = 0;
+    sexp->type.param = NULL;
+    
+    addchild(sexp, n);
+    
+    p_simple_expression_(ti, sexp);
+    return n;
 }
 
-node_s *p_simple_expression_(tokiter_s *ti)
+void p_simple_expression_(tokiter_s *ti, node_s *sexp)
 {
-    node_s *exp = NULL;
+    node_s *term = NULL, *op;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_ADDOP) {
         nexttok(ti);
-        exp = p_term(ti);
-        p_simple_expression_(ti);
+        term = p_term(ti);
+        
+        op = node_s_();
+        op->type.prim = TYPE_OP;
+        op->type.ndim = 0;
+        op->type.param = NULL;
+        op->tok = t;
+        
+        addchild(sexp, op);
+        addchild(sexp, term);
+        
+        p_simple_expression_(ti, sexp);
     }
-    exp->type.prim = TYPE_EPSILON;
-    return exp;
 }
 
 node_s *p_term(tokiter_s *ti)
 {
-    node_s *exp;
+    node_s *f, *term;
     
-    exp = p_factor(ti);
-    p_term_(ti, exp);
+    term = node_s_();
+    term->type.prim = TYPE_NODE;
+    term->type.ndim = 0;
+    term->type.param = NULL;
     
-    return exp;
+    f = p_factor(ti);
+    addchild(term, f);
+    
+    p_term_(ti, term);
+    
+    return term;
 }
 
-node_s *p_term_(tokiter_s *ti, node_s *l)
+void p_term_(tokiter_s *ti, node_s *term)
 {
-    node_s *exp = NULL;
+    node_s *f = NULL, *op;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_MULOP) {
         nexttok(ti);
-        exp = p_factor(ti);
+        f = p_factor(ti);
         
-        if(exp->type.param || l->type.param) {
-            adderr(ti, "Type Error", "closure", exp->tok->line, "integer", "real", "set", "array", "string", NULL);
-        }
-        p_term_(ti, exp);
+        op = node_s_();
+        op->type.prim = TYPE_OP;
+        op->type.ndim = 0;
+        op->type.param = 0;
+        op->tok = t;
+        
+        addchild(term, op);
+        addchild(term, f);
+        p_term_(ti, term);
     }
     
-    return exp;
 }
 
 node_s *p_factor(tokiter_s *ti)
 {
-    node_s *exp1, *exp2;
+    node_s *f, *fact;
     
-    exp1 = p_factor_(ti);
-    exp2 = p_optexp(ti);
-    if(exp2->type.prim != TYPE_EPSILON) {
-        if(exp1->type.param) {
-            adderr(ti, "Type Error for exponentiation", "closure", exp1->tok->line, "scalar or string type", NULL);
-        }
-        else if(exp1->type.ndim) {
-            adderr(ti, "Type Error for exponentiation", "array", exp1->tok->line, "scalar or string type", NULL);
-        }
-        else if(exp1->type.prim == TYPE_INCOMPLETE) {
-            adderr(ti, "Type Error for exponentiation", "incomplete type", exp1->tok->line, "scalar or string type", NULL);
-        }
-        
-        if(exp2->type.param) {
-            adderr(ti, "Type Error for exponentiation", "closure", exp2->tok->line, "scalar type", NULL);
-        }
-        else if(exp2->type.ndim) {
-            adderr(ti, "Type Error for exponentiation", "array", exp2->tok->line, "scalar type", NULL);
-        }
-        else {
-            switch(exp2->type.prim) {
-                case TYPE_STRING:
-                    adderr(ti, "Type Error for exponentiation", "string", exp2->tok->line, "scalar type", NULL);
-                    break;
-                case TYPE_REGEX:
-                    adderr(ti, "Type Error for exponentiation", "regex", exp2->tok->line, "scalar type", NULL);
-                    break;
-                case TYPE_SET:
-                    adderr(ti, "Type Error for exponentiation", "set", exp2->tok->line, "scalar type", NULL);
-                    break;
-                case TYPE_REAL:
-                    if(exp1->type.prim == TYPE_STRING)
-                        adderr(ti, "Type Error for exponentiation on string", "set", exp2->tok->line, "integer type", NULL);
-                    else if(exp1->type.prim == TYPE_REGEX)
-                        adderr(ti, "Type Error for exponentiation on regex", "set", exp2->tok->line, "integer type", NULL);
-                    else
-                        exp1->type.prim = TYPE_REAL;
-                    break;
-                    
-                case TYPE_INCOMPLETE:
-                    adderr(ti, "Type Error for exponentiation", "incomplete type", exp1->tok->line, "scalar or string type", NULL);
-                    break;
-                case TYPE_INTEGER:
-                    
-                    break;
-                case TYPE_CLOSURE:
-                case TYPE_TYPEEXP:
-                    assert(false);
-                    break;
-            }
-        }
-    }
+    fact = node_s_();
+    fact->type.prim = TYPE_NODE;
+    fact->type.ndim = 0;
+    fact->type.param = NULL;
     
-    return exp1;
+    f = p_factor_(ti);
+    addchild(fact, f);
+    p_optexp(ti, fact);
+    
+    return fact;
 }
 
-node_s *p_optexp(tokiter_s *ti)
+void p_optexp(tokiter_s *ti, node_s *factor)
 {
     tok_s *t = tok(ti);
-    node_s *exp = NULL;
+    node_s *f = NULL, *op;
     
     if(t->type == TOKTYPE_EXPOP) {
         nexttok(ti);
-        exp = p_expression(ti);
-        return exp;
+        f = p_factor(ti);
+        
+        op = node_s_();
+        op->type.prim = TYPE_OP;
+        op->type.ndim = 0;
+        op->type.param = NULL;
+        
+        addchild(factor, op);
+        addchild(factor, f);
     }
-    exp->type.prim = TYPE_EPSILON;
-    return exp;
 }
 
 node_s *p_factor_(tokiter_s *ti)
 {
-    node_s *exp = NULL;
+    node_s *n = NULL;
     tok_s *t = tok(ti);
     
     switch(t->type) {
@@ -1055,13 +1066,13 @@ node_s *p_factor_(tokiter_s *ti)
             break;
         case TOKTYPE_NUM:
             if(t->att == TOKATT_NUMINT)
-                exp->type.prim = TYPE_INTEGER;
+                n->type.prim = TYPE_INTEGER;
             else
-                exp->type.prim = TYPE_REAL;
-            exp->type.ndim = 0;
-            exp->type.param = NULL;
-            exp->val.integer = atol(t->lex);
-            exp->tok = t;
+                n->type.prim = TYPE_REAL;
+            n->type.ndim = 0;
+            n->type.param = NULL;
+            n->val.integer = atol(t->lex);
+            n->tok = t;
             nexttok(ti);
             break;
         case TOKTYPE_OPENPAREN:
@@ -1080,46 +1091,46 @@ node_s *p_factor_(tokiter_s *ti)
             }
             break;
         case TOKTYPE_STRING:
-            exp->type.prim = TYPE_STRING;
-            exp->type.ndim = 0;
-            exp->type.param = NULL;
-            exp->tok = t;
+            n->type.prim = TYPE_STRING;
+            n->type.ndim = 0;
+            n->type.param = NULL;
+            n->tok = t;
             nexttok(ti);
             break;
         case TOKTYPE_REGEX:
-            exp->type.prim = TYPE_REGEX;
-            exp->type.ndim = 0;
-            exp->type.param = NULL;
-            exp->tok = t;
+            n->type.prim = TYPE_REGEX;
+            n->type.ndim = 0;
+            n->type.param = NULL;
+            n->tok = t;
             nexttok(ti);
             break;
         case TOKTYPE_OPENBRACE:
             p_set(ti);
-            exp->type.prim = TYPE_SET;
-            exp->type.ndim = 0;
-            exp->type.param = NULL;
-            exp->tok = t;
+            n->type.prim = TYPE_SET;
+            n->type.ndim = 0;
+            n->type.param = NULL;
+            n->tok = t;
             break;
         case TOKTYPE_LAMBDA:
             p_lambda(ti);
-            exp->type.prim = TYPE_CLOSURE;
-            exp->type.ndim = 0;
-            exp->type.param = NULL;
-            exp->val.str = "code";
-            exp->tok = t;
+            n->type.prim = TYPE_CLOSURE;
+            n->type.ndim = 0;
+            n->type.param = NULL;
+            n->val.str = "code";
+            n->tok = t;
             break;
         default:
             //syntax error
             
-            exp->tok = t;
-            exp->type.prim = TYPE_REAL;
-            exp->type.ndim = 0;
-            exp->type.param = NULL;
+            n->tok = t;
+            n->type.prim = TYPE_REAL;
+            n->type.ndim = 0;
+            n->type.param = NULL;
             adderr(ti, "Syntax Error", t->lex, t->line, "identifier", "number", "(", "string", "regex", "{", "@", NULL);
             synerr_rec(ti);
             break;
     }
-    return exp;
+    return n;
 }
 
 void p_factor__(tokiter_s *ti)
@@ -1588,6 +1599,7 @@ node_s *p_dec(tokiter_s *ti)
             nexttok(ti);
             dectype = p_opttype(ti);
             assign = p_assign(ti);
+            final = node_s_();
             
             if(dectype->type.prim == TYPE_EPSILON && assign->type.prim == TYPE_EPSILON) {
                 final->type.prim = TYPE_INCOMPLETE;
@@ -1612,6 +1624,10 @@ node_s *p_dec(tokiter_s *ti)
                 final->tok = t;
                 final->val = assign->val;
             }
+            
+            if(addident(ti->scope, final)) {
+                adderr(ti, "Redeclaration of", t->lex, t->line, "unique name", NULL);
+            }
         }
         else {
             //syntax error
@@ -1629,86 +1645,93 @@ node_s *p_dec(tokiter_s *ti)
 
 node_s *p_opttype(tokiter_s *ti)
 {
-    node_s *exp = NULL;
+    node_s *node = NULL;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_COLON) {
         nexttok(ti);
-        exp = p_type(ti);
+        node = p_type(ti);
     }
     else {
         //epsilon production
-        exp->type.prim = TYPE_EPSILON;
+        node = node_s_();
+        node->type.prim = TYPE_EPSILON;
     }
-    return exp;
+    return node;
 }
 
 
 node_s *p_type(tokiter_s *ti)
 {
-    node_s *exp = NULL;
+    node_s *node = NULL;
     node_s *array = NULL;
     tok_s *t = tok(ti);
     
     switch(t->type) {
         case TOKTYPE_VOID:
             nexttok(ti);
-            exp->type.prim = TYPE_TYPEEXP;
-            exp->type.ndim = 0;
-            exp->type.param = NULL;
-            exp->val.type_exp = TYPE_VOID;
-            exp->iseval = true;
-            exp->isvar = false;
+            node = node_s_();
+            node->type.prim = TYPE_TYPEEXP;
+            node->type.ndim = 0;
+            node->type.param = NULL;
+            node->val.type_exp = TYPE_VOID;
+            node->iseval = true;
+            node->isvar = false;
             break;
         case TOKTYPE_INTEGER:
             nexttok(ti);
-            exp->iseval = true;
-            exp->isvar = false;
-            exp->type.prim = TYPE_TYPEEXP;
-            exp->type.param = NULL;
-            exp->val.type_exp = TYPE_INTEGER;
+            node = node_s_();
+            node->iseval = true;
+            node->isvar = false;
+            node->type.prim = TYPE_TYPEEXP;
+            node->type.param = NULL;
+            node->val.type_exp = TYPE_INTEGER;
             array = p_array(ti);
-            exp->type.ndim = array->nchildren;
+            node->type.ndim = array->nchildren;
             break;
         case TOKTYPE_REAL:
             nexttok(ti);
-            exp->iseval = true;
-            exp->isvar = false;
-            exp->type.prim = TYPE_TYPEEXP;
-            exp->type.param = NULL;
-            exp->val.type_exp = TYPE_REAL;
+            node = node_s_();
+            node->iseval = true;
+            node->isvar = false;
+            node->type.prim = TYPE_TYPEEXP;
+            node->type.param = NULL;
+            node->val.type_exp = TYPE_REAL;
             array = p_array(ti);
-            exp->type.ndim = array->nchildren;
+            node->type.ndim = array->nchildren;
             break;
         case TOKTYPE_STRINGTYPE:
             nexttok(ti);
-            exp->iseval = true;
-            exp->isvar = false;
-            exp->type.prim = TYPE_TYPEEXP;
-            exp->type.param = NULL;
-            exp->val.type_exp = TYPE_STRING;
+            node = node_s_();
+            node->iseval = true;
+            node->isvar = false;
+            node->type.prim = TYPE_TYPEEXP;
+            node->type.param = NULL;
+            node->val.type_exp = TYPE_STRING;
             array = p_array(ti);
-            exp->type.ndim = array->nchildren;
+            node->type.ndim = array->nchildren;
             break;
         case TOKTYPE_REGEXTYPE:
             nexttok(ti);
-            exp->iseval = true;
-            exp->isvar = false;
-            exp->type.prim = TYPE_TYPEEXP;
-            exp->type.param = NULL;
-            exp->val.type_exp = TYPE_REGEX;
+            node = node_s_();
+            node->iseval = true;
+            node->isvar = false;
+            node->type.prim = TYPE_TYPEEXP;
+            node->type.param = NULL;
+            node->val.type_exp = TYPE_REGEX;
             array = p_array(ti);
-            exp->type.ndim = array->nchildren;
+            node->type.ndim = array->nchildren;
             break;
         case TOKTYPE_SET:
             nexttok(ti);
-            exp->iseval = true;
-            exp->isvar = false;
-            exp->type.prim = TYPE_TYPEEXP;
-            exp->type.param = NULL;
-            exp->val.type_exp = TYPE_SET;
+            node = node_s_();
+            node->iseval = true;
+            node->isvar = false;
+            node->type.prim = TYPE_TYPEEXP;
+            node->type.param = NULL;
+            node->val.type_exp = TYPE_SET;
             array = p_array(ti);
-            exp->type.ndim = array->nchildren;
+            node->type.ndim = array->nchildren;
             break;
         case TOKTYPE_OPENPAREN:
             nexttok(ti);
@@ -1740,7 +1763,7 @@ node_s *p_type(tokiter_s *ti)
             synerr_rec(ti);
             break;
     }
-    return exp;
+    return node;
 }
 
 node_s *p_array(tokiter_s *ti)
@@ -1786,11 +1809,16 @@ node_s *p_optparamlist(tokiter_s *ti)
 
 node_s *p_paramlist(tokiter_s *ti)
 {
-    node_s *root = node_s_(), *n;
+    node_s *root = node_s_(), *dec;
+
+    root->type.prim = TYPE_PARAMLIST;
+    root->val.scope = PUSHSCOPE();
+    dec = p_dec(ti);
     
-    n = p_dec(ti);
-    addchild(root, n);
+    addchild(root, dec);
     p_paramlist_(ti, root);
+    
+    POPSCOPE();
     
     return root;
 }
@@ -1804,6 +1832,10 @@ void p_paramlist_(tokiter_s *ti, node_s *root)
         nexttok(ti);
         
         dec = p_dec(ti);
+        
+        if(addident(ti->scope, dec)) {
+            //redeclaration error
+        }
         
         addchild(root, dec);
         p_paramlist_(ti, root);
@@ -1907,7 +1939,7 @@ void addchild(node_s *root, node_s *c)
  pjw hash function 
  
  credit to:
- -Alfred V. Aho, Ravi Sethi, and Jeffrey D. Ullman, Compilers: Principles, Techniques, and Tools, Addison-Wesley, 1986.
+ -Alfred V. Aho, Ravi Sethi, and Jeffrey D. Ullman, 1986.
  */
 unsigned pjwhash(char *key)
 {

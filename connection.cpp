@@ -205,8 +205,6 @@ void Connection::createAccount(const char pass[])
 
 
 /* Slots */
-
-
 void Connection::sessionInit()
 {
     enum { SLEEP_TIME = 1000 };
@@ -273,7 +271,8 @@ void Connection::sessionInit()
             active = true;
         }
         else {
-            user = new User(this, "A102###########semaphore0060572450060572451;33;0;2;26;0;-1190;1;95;0");
+
+            user = new User(this, username, true, this);
             user->isSelf = true;
             emit newUser(user);
             emit newSelf(user);
@@ -285,8 +284,6 @@ void Connection::sessionInit()
             timer.start(SLEEP_TIME);
 
             active = true;
-
-
         }
     }
 
