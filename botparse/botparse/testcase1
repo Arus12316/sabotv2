@@ -24,6 +24,7 @@ var x := @(){
     1+1;
 };
 
+
 x[3](33);
 
 x().hello()()().ha()().ho := 32;
@@ -63,6 +64,16 @@ switch(x) {
         ahaha;
     }
 }
+
+class bob : tom {
+    var xyz := "hey";
+    
+    class bob : tom {
+        var bob := "derp";
+    
+    };
+
+};
 
 2.2 * 4 * @(){ 1+1; };
 

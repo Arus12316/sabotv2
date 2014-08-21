@@ -72,11 +72,15 @@
  
  <elseif> -> elif <expression> openbrace <statementlist> closebrace <elseif> | else openbrace <statementlist> closebrace
  
- <dec> -> var id <opttype> <assign>
+ <dec> -> var id <opttype> <assign> | class id <inh> { <declist> }
  
  <opttype> -> : <type> | ε
  
- <type> -> void | integer <array> | real <array> | String <array> | Regex <array> | set <array> |( <optparamlist> ) <array> map <type>
+ <type> -> void | integer <array> | real <array> | String <array> | Regex <array> | set <array> | id <array> |( <optparamlist> ) <array> map <type>
+ 
+ <inh> -> : id | ε
+ <declist> -> <dec> ; <declist> | ε
+
  
  <array> -> [ <expression> ] <array> | ε
  
@@ -155,6 +159,7 @@ enum {
     TOKTYPE_REGEXTYPE,
     TOKTYPE_LIST,
     TOKTYPE_RETURN,
+    TOKTYPE_CLASS,
     TOKTYPE_UNNEG
 };
 
@@ -258,7 +263,8 @@ keywords[] = {
     {"string", TOKTYPE_STRINGTYPE},
     {"regex", TOKTYPE_REGEXTYPE},
     {"list", TOKTYPE_LIST},
-    {"return", TOKTYPE_RETURN}
+    {"return", TOKTYPE_RETURN},
+    {"class", TOKTYPE_CLASS}
 };
 
 struct node_s
@@ -321,6 +327,8 @@ static void p_elseif(tokiter_s *ti);
 static node_s *p_dec(tokiter_s *ti);
 static node_s *p_opttype(tokiter_s *ti);
 static node_s *p_type(tokiter_s *ti);
+static void p_inh(tokiter_s *ti);
+static void p_declist(tokiter_s *ti);
 static node_s *p_array(tokiter_s *ti);
 static node_s *p_optparamlist(tokiter_s *ti);
 static node_s *p_paramlist(tokiter_s *ti);
@@ -762,6 +770,7 @@ void p_statementlist_(tokiter_s *ti)
     
     switch(t->type) {
         case TOKTYPE_VAR:
+        case TOKTYPE_CLASS:
         case TOKTYPE_SWITCH:
         case TOKTYPE_FOR:
         case TOKTYPE_WHILE:
@@ -819,6 +828,7 @@ void p_statement(tokiter_s *ti)
             p_control(ti);
             break;
         case TOKTYPE_VAR:
+        case TOKTYPE_CLASS:
             p_dec(ti);
             t = tok(ti);
             if(t->type == TOKTYPE_SEMICOLON) {
@@ -1583,6 +1593,37 @@ node_s *p_dec(tokiter_s *ti)
             synerr_rec(ti);
         }
     }
+    else if(t->type == TOKTYPE_CLASS) {
+        t = nexttok(ti);
+        if(t->type == TOKTYPE_IDENT) {
+            t = nexttok(ti);
+            p_inh(ti);
+            t = tok(ti);
+            if(t->type == TOKTYPE_OPENBRACE) {
+                nexttok(ti);
+                p_declist(ti);
+                t = tok(ti);
+                if(t->type == TOKTYPE_CLOSEBRACE) {
+                    nexttok(ti);
+                }
+                else {
+                    //syntax error
+                    adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
+                    synerr_rec(ti);
+                }
+            }
+            else {
+                //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
+                synerr_rec(ti);
+            }
+        }
+        else {
+            //syntax error
+            adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
+            synerr_rec(ti);
+        }
+    }
     else {
         //syntax error
         adderr(ti, "Syntax Error", t->lex, t->line, "var", NULL);
@@ -1610,8 +1651,7 @@ node_s *p_opttype(tokiter_s *ti)
 
 node_s *p_type(tokiter_s *ti)
 {
-    node_s *node, *type;
-    node_s *array;
+    node_s *type, *array, *opt;
     tok_s *t = tok(ti);
     
     type = node_s_();
@@ -1620,52 +1660,74 @@ node_s *p_type(tokiter_s *ti)
     switch(t->type) {
         case TOKTYPE_VOID:
             nexttok(ti);
-            node = node_s_();
-            node->type = TYPE_VOID;
-            node->tok= t;
+            type = node_s_();
+            type->type = TYPE_TYPEEXP;
+            type->tok= t;
             break;
         case TOKTYPE_INTEGER:
             nexttok(ti);
-            node = node_s_();
-            node->type = TYPE_INTEGER;
+            type = node_s_();
+            type->type = TYPE_TYPEEXP;
+            type->tok = t;
             array = p_array(ti);
-            addchild(node, array);
+            addchild(type, array);
             break;
         case TOKTYPE_REAL:
             nexttok(ti);
-            node = node_s_();
-            node->type = TYPE_REAL;
+            type = node_s_();
+            type->type = TYPE_TYPEEXP;
+            type->tok = t;
             array = p_array(ti);
-            addchild(node, array);
+            addchild(type, array);
             break;
         case TOKTYPE_STRINGTYPE:
             nexttok(ti);
-            node = node_s_();
-            node->type = TYPE_STRING;
+            type = node_s_();
+            type->type = TYPE_TYPEEXP;
+            type->tok = t;
             array = p_array(ti);
-            addchild(node, array);
+            addchild(type, array);
             break;
         case TOKTYPE_REGEXTYPE:
             nexttok(ti);
-            node = node_s_();
-            node->type = TYPE_TYPEEXP;
+            type = node_s_();
+            type->type = TYPE_TYPEEXP;
+            type->tok = t;
             array = p_array(ti);
-            addchild(node, array);
+            addchild(type, array);
             break;
         case TOKTYPE_LIST:
             nexttok(ti);
-            node = node_s_();
-            node->type = TYPE_LIST;
+            type = node_s_();
+            type->type = TYPE_TYPEEXP;
+            type->tok = t;
             array = p_array(ti);
-            addchild(node, array);
+            addchild(type, array);
+            break;
+        case TOKTYPE_IDENT:
+            nexttok(ti);
+            type = node_s_();
+            type->type = TYPE_TYPEEXP;
+            type->tok = t;
+            array = p_array(ti);
+            addchild(type, array);
             break;
         case TOKTYPE_OPENPAREN:
             nexttok(ti);
-            p_optparamlist(ti);
+            
+            type = node_s_();
+            type->type = TYPE_TYPEEXP;
+            type->tok = t;
+            
+            opt = p_optparamlist(ti);
+            
+            addchild(type, opt);
+            
             t = tok(ti);
             if(t->type == TOKTYPE_CLOSEPAREN) {
                 nexttok(ti);
                 array = p_array(ti);
+                addchild(type, array);
                 t = tok(ti);
                 if(t->type == TOKTYPE_MAP) {
                     nexttok(ti);
@@ -1694,6 +1756,37 @@ node_s *p_type(tokiter_s *ti)
     }
     return type;
 }
+
+void p_inh(tokiter_s *ti)
+{
+    tok_s *t = tok(ti);
+    
+    if(t->type == TOKTYPE_COLON) {
+        t = nexttok(ti);
+        if(t->type == TOKTYPE_IDENT) {
+            nexttok(ti);
+        }
+        else {
+            adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
+            synerr_rec(ti);
+        }
+    }
+}
+
+void p_declist(tokiter_s *ti)
+{
+    tok_s *t;
+    
+    for(t = tok(ti); t->type == TOKTYPE_VAR || t->type == TOKTYPE_CLASS; t = nexttok(ti)) {
+        p_dec(ti);
+        t = tok(ti);
+        if(t->type != TOKTYPE_SEMICOLON) {
+            adderr(ti, "Syntax Error", t->lex, t->line, ";", NULL);
+            synerr_rec(ti);
+        }
+    }
+}
+
 
 node_s *p_array(tokiter_s *ti)
 {
