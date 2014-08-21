@@ -90,11 +90,11 @@ switch(x) {
 1+1 2+2
 
 class bob : tom {
-    var xyz := "hey";
+    var xyz := "hey"
     
     class bob : tom {
         var bob := "derp";
-    };
+    }
     
     var x : bob;
 
