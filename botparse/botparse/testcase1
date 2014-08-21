@@ -18,11 +18,17 @@ var woah :  (a : int) ->
     1 + 1;
 };
 
+var bob := if x = 3 { 3 } else {4}
+
 woah()()();
 
 var x := @(){
     1+1;
 };
+
+while(true) {
+    print("hey")
+}
 
 
 x[3](33);
@@ -64,6 +70,8 @@ switch(x) {
         ahaha;
     }
 }
+
+1+1 2+2
 
 class bob : tom {
     var xyz := "hey";

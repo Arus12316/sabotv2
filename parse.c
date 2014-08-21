@@ -1,7 +1,9 @@
 /*
- <statementlist> -> <statement> <statementlist> | ε
+ <statementlist> -> <statement> <optsemicolon> <statementlist> | ε
  
- <statement> ->  <expression> ; | <control> | <dec> ; | return <expression>
+ <optsemicolon> -> ; | ε
+ 
+ <statement> ->  <expression> | <control> | <dec> | return <expression>
  
  <expression> -> <simple_expression> <expression'>
  
@@ -36,6 +38,10 @@
                 <set>
                 |
                 <lambda> { <factor'>.type := closure; <factor'>.val := <lambda>.val }
+                |
+                <if>
+                |
+                <switch>
  
  
  <factor''> -> [ <expression> ] <factor''> | . id <factor''> | ( <optarglist> ) <factor''> | ε
@@ -50,13 +56,9 @@
  <arglist> -> <expression> <arglist'>
  <arglist'> -> , <expression> <arglist'> | ε
  
- <control> ->   <if>
-                |
-                while <expression> openbrace <statementlist> closebrace
+ <control> ->   while <expression> openbrace <statementlist> closebrace
                 |
                 for id <- <expression> openbrace <statementlist> closebrace
-                |
-                <switch>
                 |
                 listener(<arglist>) openbrace <statementlist> closebrace
  
@@ -149,6 +151,7 @@ enum {
     TOKTYPE_SWITCH,
     TOKTYPE_CASE,
     TOKTYPE_DEFAULT,
+    TOKTYPE_DO,
     TOKTYPE_WHILE,
     TOKTYPE_FOR,
     TOKTYPE_LISENER,
@@ -265,7 +268,8 @@ keywords[] = {
     {"regex", TOKTYPE_REGEXTYPE},
     {"list", TOKTYPE_LIST},
     {"return", TOKTYPE_RETURN},
-    {"class", TOKTYPE_CLASS}
+    {"class", TOKTYPE_CLASS},
+    {"do", TOKTYPE_DO}
 };
 
 struct node_s
@@ -643,7 +647,14 @@ tokiter_s *lex(char *src)
                         src++;
                     c = *src;
                     *src = '\0';
-                    if(!trykeyword(&curr, &prev, line, bptr))
+                    
+                    if(!strcmp(bptr, "true")) {
+                        prev = mtok(&curr, line, "1", 1, TOKTYPE_NUM, TOKATT_NUMINT);
+                    }
+                    else if(!strcmp(bptr, "false")) {
+                        prev = mtok(&curr, line, "0", 1, TOKTYPE_NUM, TOKATT_NUMINT);
+                    }
+                    else if(!trykeyword(&curr, &prev, line, bptr))
                         prev = mtok(&curr, line, bptr, src - bptr, TOKTYPE_IDENT, TOKATT_DEFAULT);
                     *src = c;
                 }
@@ -783,6 +794,10 @@ void p_statementlist(tokiter_s *ti)
         case TOKTYPE_IDENT:
         case TOKTYPE_RETURN:
             p_statement(ti);
+            t = tok(ti);
+            if(t->type == TOKTYPE_SEMICOLON) {
+                nexttok(ti);
+            }
             p_statementlist(ti);
             break;
         case TOKTYPE_CLOSEBRACE:
@@ -807,54 +822,27 @@ void p_statement(tokiter_s *ti)
         case TOKTYPE_NUM:
         case TOKTYPE_OPENPAREN:
         case TOKTYPE_NOT:
+        case TOKTYPE_IF:
+        case TOKTYPE_SWITCH:
         case TOKTYPE_STRING:
         case TOKTYPE_REGEX:
         case TOKTYPE_LAMBDA:
         case TOKTYPE_OPENBRACE:
         case TOKTYPE_ADDOP:
             p_expression(ti);
-            t = tok(ti);
-            if(t->type == TOKTYPE_SEMICOLON) {
-                nexttok(ti);
-            }
-            else {
-                //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, ";", NULL);
-                synerr_rec(ti);
-            }
             break;
-        case TOKTYPE_IF:
         case TOKTYPE_WHILE:
         case TOKTYPE_FOR:
-        case TOKTYPE_SWITCH:
         case TOKTYPE_LISENER:
             p_control(ti);
             break;
         case TOKTYPE_VAR:
         case TOKTYPE_CLASS:
             p_dec(ti);
-            t = tok(ti);
-            if(t->type == TOKTYPE_SEMICOLON) {
-                nexttok(ti);
-            }
-            else {
-                //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, ";", NULL);
-                synerr_rec(ti);
-            }
             break;
         case TOKTYPE_RETURN:
             nexttok(ti);
             p_expression(ti);
-            t = tok(ti);
-            if(t->type == TOKTYPE_SEMICOLON) {
-                nexttok(ti);
-            }
-            else {
-                //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, ";", NULL);
-                synerr_rec(ti);
-            }
             break;
         default:
             //syntax error
@@ -1070,6 +1058,14 @@ node_s *p_factor_(tokiter_s *ti)
             n = p_lambda(ti);
             n->tok = t;
             break;
+        case TOKTYPE_IF:
+            n = NULL;
+            p_if(ti);
+            break;
+        case TOKTYPE_SWITCH:
+            n = NULL;
+            p_switch(ti);
+            break;
         default:
             //syntax error
             n = NULL;
@@ -1257,6 +1253,8 @@ node_s *p_optarglist(tokiter_s *ti)
         case TOKTYPE_OPENPAREN:
         case TOKTYPE_NUM:
         case TOKTYPE_IDENT:
+        case TOKTYPE_IF:
+        case TOKTYPE_SWITCH:
             return p_arglist(ti);
             break;
         default:
@@ -1298,9 +1296,6 @@ void p_control(tokiter_s *ti)
     tok_s *t = tok(ti);
     
     switch(t->type) {
-        case TOKTYPE_IF:
-            p_if(ti);
-            break;
         case TOKTYPE_WHILE:
             nexttok(ti);
             p_expression(ti);
@@ -1362,9 +1357,6 @@ void p_control(tokiter_s *ti)
                 adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
                 synerr_rec(ti);
             }
-            break;
-        case TOKTYPE_SWITCH:
-            p_switch(ti);
             break;
         case TOKTYPE_LISENER:
             t = nexttok(ti);
