@@ -1,7 +1,6 @@
 /*
  <statementlist> -> <statement> <statementlist> | ε
  
- 
  <statement> ->  <expression> | <control> | <dec> | return <expression> | ;
  
  <expression> -> <simple_expression> <expression'>
@@ -75,7 +74,7 @@
                 |
                 ε
  
- <elseif> -> elif <expression> openbrace <statementlist> closebrace <elseif> | else openbrace <statementlist> closebrace
+ <elseif> -> elif <expression> openbrace <statementlist> closebrace <elseif> | else openbrace <statementlist> closebrace | ε
  
  <controlsuffix> -> openbrace <statementlist> closebrace | <statement>
  
@@ -310,9 +309,9 @@ static void printtoks(tokchunk_s *list);
 static tok_s *tok(tokiter_s *ti);
 static tok_s *nexttok(tokiter_s *ti);
 
-static void start(tokiter_s *ti);
-static void p_statementlist(tokiter_s *ti);
-static void p_statement(tokiter_s *ti);
+static node_s *start(tokiter_s *ti);
+static void p_statementlist(tokiter_s *ti, node_s *root);
+static node_s *p_statement(tokiter_s *ti);
 static node_s *p_expression(tokiter_s *ti);
 static void p_expression_(tokiter_s *ti, node_s *exp);
 static node_s *p_simple_expression(tokiter_s *ti);
@@ -329,12 +328,12 @@ static int p_sign(tokiter_s *ti);
 static node_s *p_optarglist(tokiter_s *ti);
 static node_s *p_arglist(tokiter_s *ti);
 static void p_arglist_(tokiter_s *ti, node_s *root);
-static void p_control(tokiter_s *ti);
-static void p_if(tokiter_s *ti);
-static void p_switch(tokiter_s *ti);
+static node_s *p_control(tokiter_s *ti);
+static node_s *p_if(tokiter_s *ti);
+static node_s *p_switch(tokiter_s *ti);
 static void p_caselist(tokiter_s *ti);
 static void p_elseif(tokiter_s *ti);
-static void p_controlsuffix(tokiter_s *ti);
+static node_s *p_controlsuffix(tokiter_s *ti);
 static node_s *p_dec(tokiter_s *ti);
 static node_s *p_opttype(tokiter_s *ti);
 static node_s *p_type(tokiter_s *ti);
@@ -761,23 +760,28 @@ tok_s *nexttok(tokiter_s *ti)
     return &eoftok;
 }
 
-void start(tokiter_s *ti)
+node_s *start(tokiter_s *ti)
 {
     tok_s *t;
+    node_s *root = node_s_();
+    
+    root->type = TYPE_NODE;
     
     ti->scope = idtinit(NULL);
     
-    p_statementlist(ti);
+    p_statementlist(ti, root);
     t = tok(ti);
     
     if(t->type != TOKTYPE_EOF) {
         //syntax error
         adderr(ti, "Syntax Error", t->lex, t->line, "EOF", NULL);
     }
+    return root;
 }
 
-void p_statementlist(tokiter_s *ti)
+void p_statementlist(tokiter_s *ti, node_s *root)
 {
+    node_s *statement;
     tok_s *t = tok(ti);
     
     switch(t->type) {
@@ -800,9 +804,9 @@ void p_statementlist(tokiter_s *ti)
         case TOKTYPE_IDENT:
         case TOKTYPE_RETURN:
         case TOKTYPE_SEMICOLON:
-            p_statement(ti);
-            t = tok(ti);
-            p_statementlist(ti);
+            statement = p_statement(ti);
+            addchild(root, statement);
+            p_statementlist(ti, root);
             break;
         case TOKTYPE_CLOSEBRACE:
         case TOKTYPE_EOF:
@@ -817,8 +821,9 @@ void p_statementlist(tokiter_s *ti)
 }
 
 
-void p_statement(tokiter_s *ti)
+node_s *p_statement(tokiter_s *ti)
 {
+    node_s *statement, *exp, *ret;
     tok_s *t = tok(ti);
     
     switch(t->type) {
@@ -833,31 +838,37 @@ void p_statement(tokiter_s *ti)
         case TOKTYPE_LAMBDA:
         case TOKTYPE_OPENBRACE:
         case TOKTYPE_ADDOP:
-            p_expression(ti);
-            break;
+            return p_expression(ti);
         case TOKTYPE_WHILE:
         case TOKTYPE_DO:
         case TOKTYPE_FOR:
         case TOKTYPE_LISENER:
-            p_control(ti);
-            break;
+            return p_control(ti);
         case TOKTYPE_VAR:
         case TOKTYPE_CLASS:
-            p_dec(ti);
-            break;
+            return p_dec(ti);
         case TOKTYPE_RETURN:
             nexttok(ti);
-            p_expression(ti);
-            break;
+            statement = node_s_();
+            statement->type = TYPE_NODE;
+            
+            ret = node_s_();
+            ret->type = TYPE_OP;
+            ret->tok = t;
+            exp = p_expression(ti);
+            
+            addchild(statement, ret);
+            addchild(statement, exp);
+            return statement;
         case TOKTYPE_SEMICOLON:
             nexttok(ti);
-            break;
+            return NULL;
         default:
             //syntax error
             adderr(ti, "Syntax Error", t->lex, t->line, "identifier", "number", "(", "not", "string",
                    "regex", "@", "{", "+", "-", "|", "if", "while", "for", "switch", "var", "return", NULL);
             synerr_rec(ti);
-            break;
+            return NULL;
     }
 }
 
@@ -872,7 +883,7 @@ node_s *p_expression(tokiter_s *ti)
     addchild(exp, node);
     p_expression_(ti, exp);
     
-    return node;
+    return exp;
 }
 
 void p_expression_(tokiter_s *ti, node_s *exp)
@@ -895,29 +906,26 @@ void p_expression_(tokiter_s *ti, node_s *exp)
 node_s *p_simple_expression(tokiter_s *ti)
 {
     int sign = 0;
-    node_s *n, *u = NULL, *sexp;
+    node_s *term, *un = NULL, *sexp;
     tok_s *t = tok(ti);
-    
-    if(t->type == TOKTYPE_ADDOP)
-        sign = p_sign(ti);
-    n = p_term(ti);
-    
-    if(sign == -1) {
-        u = node_s_();
-        u->type = TYPE_OP;
-        u->tok = t;
-        t->type = TOKTYPE_UNNEG;
-        addchild(u, n);
-        n = u;
-    }
     
     sexp = node_s_();
     sexp->type = TYPE_OP;
     
-    addchild(sexp, n);
+    if(t->type == TOKTYPE_ADDOP)
+        sign = p_sign(ti);
+    term = p_term(ti);
     
+    if(sign == -1) {
+        un = node_s_();
+        un->type = TYPE_OP;
+        un->tok = t;
+        t->type = TOKTYPE_UNNEG;
+        addchild(sexp, un);
+    }
+    addchild(sexp, term);
     p_simple_expression_(ti, sexp);
-    return n;
+    return sexp;
 }
 
 void p_simple_expression_(tokiter_s *ti, node_s *sexp)
@@ -1009,7 +1017,7 @@ void p_optexp(tokiter_s *ti, node_s *factor)
 
 node_s *p_factor_(tokiter_s *ti)
 {
-    node_s *n, *ident;
+    node_s *n, *ident, *f, *op;
     tok_s *t = tok(ti);
     
     switch(t->type) {
@@ -1047,32 +1055,42 @@ node_s *p_factor_(tokiter_s *ti)
                 synerr_rec(ti);
             }
             break;
+        case TOKTYPE_NOT:
+            nexttok(ti);
+            n = node_s_();
+            n->type = TYPE_NODE;
+            
+            op = node_s_();
+            op->type = TYPE_OP;
+            op->tok = t;
+            
+            f = p_factor(ti);
+            addchild(n, op);
+            addchild(n, f);
+            break;
         case TOKTYPE_STRING:
+            nexttok(ti);
             n = node_s_();
             n->type = TYPE_STRING;
             n->tok = t;
-            nexttok(ti);
             break;
         case TOKTYPE_REGEX:
+            nexttok(ti);
             n = node_s_();
             n->type = TYPE_REGEX;
             n->tok = t;
-            nexttok(ti);
             break;
         case TOKTYPE_OPENBRACE:
             n = p_set(ti);
             break;
         case TOKTYPE_LAMBDA:
             n = p_lambda(ti);
-            n->tok = t;
             break;
         case TOKTYPE_IF:
-            n = NULL;
-            p_if(ti);
+            n = p_if(ti);
             break;
         case TOKTYPE_SWITCH:
-            n = NULL;
-            p_switch(ti);
+            n = p_switch(ti);
             break;
         default:
             //syntax error
@@ -1173,30 +1191,33 @@ void p_assign(tokiter_s *ti, node_s *root)
         op->type = TYPE_OP;
         op->tok = t;
         
+        addchild(root, op);
         addchild(root, exp);
     }
 }
 
 node_s *p_lambda(tokiter_s *ti)
 {
-    node_s *lambda;
-    //so far, a check that token is '@' is redundant
-    tok_s *t = nexttok(ti);
+    tok_s *t = tok(ti);
+    node_s *lambda = node_s_(), *op = node_s_(), *param;
     
-    lambda = node_s_();
-    lambda->type = TYPE_CLOSURE;
+    lambda->type = TYPE_NODE;
+    op->type = TYPE_OP;
+    op->tok = t;
+
+    t = nexttok(ti);
     
     if(t->type == TOKTYPE_OPENPAREN) {
         nexttok(ti);
-    
-        p_optparamlist(ti);
-        
+        param = p_optparamlist(ti);
         t = tok(ti);
         if(t->type == TOKTYPE_CLOSEPAREN) {
             t = nexttok(ti);
             if(t->type == TOKTYPE_OPENBRACE) {
                 nexttok(ti);
-                p_statementlist(ti);
+                addchild(lambda, op);
+                addchild(lambda, param);
+                p_statementlist(ti, lambda);
                 t = tok(ti);
                 if(t->type == TOKTYPE_CLOSEBRACE) {
                     nexttok(ti);
@@ -1208,18 +1229,27 @@ node_s *p_lambda(tokiter_s *ti)
                 }
             }
             else {
+                free(lambda);
+                free(op);
+                lambda = NULL;
                 //syntax error
                 adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
                 synerr_rec(ti);
             }
         }
         else {
+            free(lambda);
+            free(op);
+            lambda = NULL;
             //syntax error
             adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
             synerr_rec(ti);
         }
     }
     else {
+        free(lambda);
+        free(op);
+        lambda = NULL;
         //syntax error
         adderr(ti, "Syntax Error", t->lex, t->line, "(", NULL);
         synerr_rec(ti);
@@ -1299,14 +1329,20 @@ void p_arglist_(tokiter_s *ti, node_s *root)
     }
 }
 
-void p_control(tokiter_s *ti)
+node_s *p_control(tokiter_s *ti)
 {
     tok_s *t = tok(ti);
+    node_s *control = node_s_(), *op, *exp, *suffix;
     
     switch(t->type) {
         case TOKTYPE_WHILE:
             nexttok(ti);
-            p_expression(ti);
+            
+            op = node_s_();
+            op->type = TYPE_OP;
+            op->tok = t;
+            
+            exp = p_expression(ti);
             p_controlsuffix(ti);
             break;
         case TOKTYPE_FOR:
@@ -1340,7 +1376,7 @@ void p_control(tokiter_s *ti)
                     t = nexttok(ti);
                     if(t->type == TOKTYPE_OPENBRACE) {
                         nexttok(ti);
-                        p_statementlist(ti);
+                        p_statementlist(ti, control);
                         t =tok(ti);
                         if(t->type == TOKTYPE_CLOSEBRACE) {
                             nexttok(ti);
@@ -1389,17 +1425,19 @@ void p_control(tokiter_s *ti)
             synerr_rec(ti);
             break;
     }
+    return NULL;
 }
 
-void p_if(tokiter_s *ti)
+node_s *p_if(tokiter_s *ti)
 {
     nexttok(ti);
     p_expression(ti);
     p_controlsuffix(ti);
     p_elseif(ti);
+    return NULL;
 }
 
-void p_switch(tokiter_s *ti)
+node_s *p_switch(tokiter_s *ti)
 {
     tok_s *t = nexttok(ti);
     
@@ -1439,7 +1477,7 @@ void p_switch(tokiter_s *ti)
         adderr(ti, "Syntax Error", t->lex, t->line, "(", NULL);
         synerr_rec(ti);
     }
-
+    return NULL;
 }
 
 
@@ -1475,9 +1513,6 @@ void p_caselist(tokiter_s *ti)
             synerr_rec(ti);
         }
     }
-    else {
-        //epsilon production
-    }
 }
 
 void p_elseif(tokiter_s *ti)
@@ -1495,19 +1530,19 @@ void p_elseif(tokiter_s *ti)
         nexttok(ti);
         p_controlsuffix(ti);
     }
-    else {
-        //syntax error
-        adderr(ti, "Syntax Error", t->lex, t->line, "else", "elif", NULL);
-        synerr_rec(ti);
-    }
 }
 
-void p_controlsuffix(tokiter_s *ti)
+node_s *p_controlsuffix(tokiter_s *ti)
 {
     tok_s *t = tok(ti);
+    node_s *suffix, *statement;
+    
+    suffix = node_s_();
+    suffix->type = TYPE_NODE;
+    
     if(t->type == TOKTYPE_OPENBRACE) {
         nexttok(ti);
-        p_statementlist(ti);
+        p_statementlist(ti, suffix);
         t = tok(ti);
         if(t->type == TOKTYPE_CLOSEBRACE) {
             nexttok(ti);
@@ -1519,8 +1554,10 @@ void p_controlsuffix(tokiter_s *ti)
         }
     }
     else {
-        p_statement(ti);
+        statement = p_statement(ti);
+        addchild(suffix, statement);
     }
+    return suffix;
 }
 
 node_s *p_dec(tokiter_s *ti)
