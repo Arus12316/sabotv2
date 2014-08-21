@@ -85,8 +85,9 @@
  <type> -> void | integer <array> | real <array> | String <array> | Regex <array> | set <array> | id <array> |( <optparamlist> ) <array> map <type>
  
  <inh> -> : id | ε
- <declist> -> <dec> ; <declist> | ε
+ <declist> -> <dec> <optsemicolon> <declist> | ε
 
+ <optsemicolon> -> ; | ε
  
  <array> -> [ <expression> ] <array> | ε
  
@@ -337,8 +338,8 @@ static node_s *p_controlsuffix(tokiter_s *ti);
 static node_s *p_dec(tokiter_s *ti);
 static node_s *p_opttype(tokiter_s *ti);
 static node_s *p_type(tokiter_s *ti);
-static void p_inh(tokiter_s *ti);
-static void p_declist(tokiter_s *ti);
+static void p_inh(tokiter_s *ti, node_s *root);
+static void p_declist(tokiter_s *ti, node_s *root);
 static node_s *p_array(tokiter_s *ti);
 static node_s *p_optparamlist(tokiter_s *ti);
 static node_s *p_paramlist(tokiter_s *ti);
@@ -1643,20 +1644,26 @@ node_s *p_controlsuffix(tokiter_s *ti)
 
 node_s *p_dec(tokiter_s *ti)
 {
-    node_s *ident, *dectype = NULL, *dec = NULL;
+    node_s *ident, *dectype, *dec, *op;
     tok_s *t = tok(ti);
+    
+    dec = node_s_();
+    dec->type = TYPE_DEC;
+    
+    op = node_s_();
+    op->type = TYPE_OP;
+    op->tok = t;
     
     if(t->type == TOKTYPE_VAR) {
         t = nexttok(ti);
         if(t->type == TOKTYPE_IDENT) {
             nexttok(ti);
             
-            dec = node_s_();
-            dec->type = TYPE_DEC;
-            
             ident = node_s_();
             ident->type = TYPE_IDENT;
             ident->tok = t;
+            
+            addchild(dec, op);
             addchild(dec, ident);
             
             dectype = p_opttype(ti);
@@ -1668,6 +1675,7 @@ node_s *p_dec(tokiter_s *ti)
             }
         }
         else {
+            dec = NULL;
             //syntax error
             adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
             synerr_rec(ti);
@@ -1676,12 +1684,20 @@ node_s *p_dec(tokiter_s *ti)
     else if(t->type == TOKTYPE_CLASS) {
         t = nexttok(ti);
         if(t->type == TOKTYPE_IDENT) {
+            
+            ident = node_s_();
+            ident->type = TYPE_IDENT;
+            ident->tok = t;
+            
+            addchild(dec, op);
+            addchild(dec, ident);
+
             t = nexttok(ti);
-            p_inh(ti);
+            p_inh(ti, dec);
             t = tok(ti);
             if(t->type == TOKTYPE_OPENBRACE) {
                 nexttok(ti);
-                p_declist(ti);
+                p_declist(ti, dec);
                 t = tok(ti);
                 if(t->type == TOKTYPE_CLOSEBRACE) {
                     nexttok(ti);
@@ -1836,14 +1852,24 @@ node_s *p_type(tokiter_s *ti)
     return type;
 }
 
-void p_inh(tokiter_s *ti)
+void p_inh(tokiter_s *ti, node_s *root)
 {
+    node_s *op, *ident;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_COLON) {
+        op = node_s_();
+        op->type = TYPE_OP;
+        op->tok = t;
+        
         t = nexttok(ti);
         if(t->type == TOKTYPE_IDENT) {
             nexttok(ti);
+            ident = node_s_();
+            ident->type = TYPE_IDENT;
+            ident->tok = t;
+            addchild(root, op);
+            addchild(root, ident);
         }
         else {
             adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
@@ -1852,16 +1878,17 @@ void p_inh(tokiter_s *ti)
     }
 }
 
-void p_declist(tokiter_s *ti)
+void p_declist(tokiter_s *ti, node_s *root)
 {
-    tok_s *t;
+    tok_s *t = tok(ti);
+    node_s *dec;
     
-    for(t = tok(ti); t->type == TOKTYPE_VAR || t->type == TOKTYPE_CLASS; t = nexttok(ti)) {
-        p_dec(ti);
+    while(t->type == TOKTYPE_VAR || t->type == TOKTYPE_CLASS) {
+        dec = p_dec(ti);
+        addchild(root, dec);
         t = tok(ti);
-        if(t->type != TOKTYPE_SEMICOLON) {
-            adderr(ti, "Syntax Error", t->lex, t->line, ";", NULL);
-            synerr_rec(ti);
+        if(t->type == TOKTYPE_SEMICOLON) {
+            t = nexttok(ti);
         }
     }
 }
