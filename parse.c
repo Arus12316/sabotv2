@@ -50,16 +50,19 @@
  <arglist> -> <expression> <arglist'>
  <arglist'> -> , <expression> <arglist'> | ε
  
- <control> ->   if <expression> openbrace <statementlist> closebrace <elseif>
+ <control> ->   <if>
                 |
                 while <expression> openbrace <statementlist> closebrace
                 |
                 for id <- <expression> openbrace <statementlist> closebrace
                 |
-                switch(<expression>) openbrace <caselist> closebrace
+                <switch>
                 |
                 listener(<arglist>) openbrace <statementlist> closebrace
  
+ <if> -> if <expression> openbrace <statementlist> closebrace <elseif>
+ 
+ <switch> -> switch(<expression>) openbrace <caselist> closebrace
  
  <caselist> ->
                 case <arglist> map <expression> <caselist>
@@ -319,6 +322,8 @@ static node_s *p_optarglist(tokiter_s *ti);
 static node_s *p_arglist(tokiter_s *ti);
 static void p_arglist_(tokiter_s *ti, node_s *root);
 static void p_control(tokiter_s *ti);
+static void p_if(tokiter_s *ti);
+static void p_switch(tokiter_s *ti);
 static void p_caselist(tokiter_s *ti);
 static void p_elseif(tokiter_s *ti);
 static node_s *p_dec(tokiter_s *ti);
@@ -1294,28 +1299,7 @@ void p_control(tokiter_s *ti)
     
     switch(t->type) {
         case TOKTYPE_IF:
-            nexttok(ti);
-            p_expression(ti);
-            t = tok(ti);
-            if(t->type == TOKTYPE_OPENBRACE) {
-                nexttok(ti);
-                p_statementlist(ti);
-                t = tok(ti);
-                if(t->type == TOKTYPE_CLOSEBRACE) {
-                    nexttok(ti);
-                    p_elseif(ti);
-                }
-                else {
-                    //syntax error
-                    adderr(ti, "Syntax Error", t->lex, t->line, "}", NULL);
-                    synerr_rec(ti);
-                }
-            }
-            else {
-                //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
-                synerr_rec(ti);
-            }
+            p_if(ti);
             break;
         case TOKTYPE_WHILE:
             nexttok(ti);
@@ -1380,43 +1364,7 @@ void p_control(tokiter_s *ti)
             }
             break;
         case TOKTYPE_SWITCH:
-            t = nexttok(ti);
-            if(t->type == TOKTYPE_OPENPAREN) {
-                nexttok(ti);
-                p_expression(ti);
-                t = tok(ti);
-                if(t->type == TOKTYPE_CLOSEPAREN) {
-                    t = nexttok(ti);
-                    if(t->type == TOKTYPE_OPENBRACE) {
-                        nexttok(ti);
-                        p_caselist(ti);
-                        t = tok(ti);
-                        if(t->type == TOKTYPE_CLOSEBRACE) {
-                            nexttok(ti);
-                        }
-                        else {
-                            //syntax error
-                            adderr(ti, "Syntax Error", t->lex, t->line, "}", NULL);
-                            synerr_rec(ti);
-                        }
-                    }
-                    else {
-                        //syntax error
-                        adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
-                        synerr_rec(ti);
-                    }
-                }
-                else {
-                    //syntax error
-                    adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
-                    synerr_rec(ti);
-                }
-            }
-            else {
-                //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, "(", NULL);
-                synerr_rec(ti);
-            }
+            p_switch(ti);
             break;
         case TOKTYPE_LISENER:
             t = nexttok(ti);
@@ -1464,6 +1412,76 @@ void p_control(tokiter_s *ti)
             break;
     }
 }
+
+void p_if(tokiter_s *ti)
+{
+    tok_s *t = nexttok(ti);
+    p_expression(ti);
+    t = tok(ti);
+    if(t->type == TOKTYPE_OPENBRACE) {
+        nexttok(ti);
+        p_statementlist(ti);
+        t = tok(ti);
+        if(t->type == TOKTYPE_CLOSEBRACE) {
+            nexttok(ti);
+            p_elseif(ti);
+        }
+        else {
+            //syntax error
+            adderr(ti, "Syntax Error", t->lex, t->line, "}", NULL);
+            synerr_rec(ti);
+        }
+    }
+    else {
+        //syntax error
+        adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
+        synerr_rec(ti);
+    }
+}
+
+void p_switch(tokiter_s *ti)
+{
+    tok_s *t = nexttok(ti);
+    
+    if(t->type == TOKTYPE_OPENPAREN) {
+        nexttok(ti);
+        p_expression(ti);
+        t = tok(ti);
+        if(t->type == TOKTYPE_CLOSEPAREN) {
+            t = nexttok(ti);
+            if(t->type == TOKTYPE_OPENBRACE) {
+                nexttok(ti);
+                p_caselist(ti);
+                t = tok(ti);
+                if(t->type == TOKTYPE_CLOSEBRACE) {
+                    nexttok(ti);
+                }
+                else {
+                    //syntax error
+                    adderr(ti, "Syntax Error", t->lex, t->line, "}", NULL);
+                    synerr_rec(ti);
+                }
+            }
+            else {
+                //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
+                synerr_rec(ti);
+            }
+        }
+        else {
+            //syntax error
+            adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
+            synerr_rec(ti);
+        }
+    }
+    else {
+        //syntax error
+        adderr(ti, "Syntax Error", t->lex, t->line, "(", NULL);
+        synerr_rec(ti);
+    }
+
+}
+
 
 void p_caselist(tokiter_s *ti)
 {
