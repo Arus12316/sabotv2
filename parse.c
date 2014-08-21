@@ -1,9 +1,8 @@
 /*
- <statementlist> -> <statement> <optsemicolon> <statementlist> | ε
+ <statementlist> -> <statement> <statementlist> | ε
  
- <optsemicolon> -> ; | ε
  
- <statement> ->  <expression> | <control> | <dec> | return <expression>
+ <statement> ->  <expression> | <control> | <dec> | return <expression> | ;
  
  <expression> -> <simple_expression> <expression'>
  
@@ -800,11 +799,9 @@ void p_statementlist(tokiter_s *ti)
         case TOKTYPE_NUM:
         case TOKTYPE_IDENT:
         case TOKTYPE_RETURN:
+        case TOKTYPE_SEMICOLON:
             p_statement(ti);
             t = tok(ti);
-            if(t->type == TOKTYPE_SEMICOLON) {
-                nexttok(ti);
-            }
             p_statementlist(ti);
             break;
         case TOKTYPE_CLOSEBRACE:
@@ -851,6 +848,9 @@ void p_statement(tokiter_s *ti)
         case TOKTYPE_RETURN:
             nexttok(ti);
             p_expression(ti);
+            break;
+        case TOKTYPE_SEMICOLON:
+            nexttok(ti);
             break;
         default:
             //syntax error
@@ -1370,7 +1370,18 @@ void p_control(tokiter_s *ti)
             }
             break;
         case TOKTYPE_DO:
-            
+            nexttok(ti);
+            p_controlsuffix(ti);
+            t = tok(ti);
+            if(t->type == TOKTYPE_WHILE) {
+                nexttok(ti);
+                p_expression(ti);
+            }
+            else {
+                //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, "while", NULL);
+                synerr_rec(ti);
+            }
             break;
         default:
             //syntax error

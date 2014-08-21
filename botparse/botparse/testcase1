@@ -32,9 +32,10 @@ var x := @(){
 };
 
 while(true) {
-    print("hey")
+    print("hey");
 }
 
+;
 
 x[3](33);
 
@@ -48,6 +49,11 @@ users.foreach(
         print(derp);
     }
 );
+
+do 
+    while 1
+        ;
+while 4 < 3
 
 while x <= 4 {
     1+1;
