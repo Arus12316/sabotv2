@@ -344,7 +344,7 @@ static node_s *p_if(tokiter_s *ti);
 static node_s *p_switch(tokiter_s *ti);
 static void p_caselist(tokiter_s *ti, node_s *root);
 static void p_elseif(tokiter_s *ti, node_s *root);
-static node_s *p_controlsuffix(tokiter_s *ti);
+static void p_controlsuffix(tokiter_s *ti, node_s *root);
 static node_s *p_dec(tokiter_s *ti);
 static node_s *p_opttype(tokiter_s *ti);
 static node_s *p_type(tokiter_s *ti);
@@ -371,6 +371,7 @@ static void pushscope(tokiter_s *ti);
 static inline void popscope(tokiter_s *ti);
 
 static node_s *getparentfunc(node_s *start);
+static node_s *getparentloop(node_s *start);
 static void walk_tree(node_s *root);
 static bool typeeq(node_s *typeexp, node_s *literal);
 
@@ -826,17 +827,30 @@ void p_statementlist(tokiter_s *ti, node_s *root)
         case TOKTYPE_NUM:
         case TOKTYPE_IDENT:
         case TOKTYPE_RETURN:
+        case TOKTYPE_BREAK:
+        case TOKTYPE_CONTINUE:
         case TOKTYPE_SEMICOLON:
             statement = p_statement(ti);
-            
             addchild(root, statement);
-
             if(statement) {
                 if(statement->nchildren) {
                     tcmp = statement->children[0]->tok;
-                    if(tcmp && tcmp->type == TOKTYPE_RETURN) {
-                        if(!getparentfunc(statement)) {
-                            adderr(ti, "Return Error", "return from invalid scope", tcmp->line, "return from lambda expression", NULL);
+                    if(tcmp) {
+                        if(tcmp->type == TOKTYPE_RETURN) {
+                            if(!getparentfunc(root)) {
+                                adderr(ti, "Return Error", "return from invalid scope", tcmp->line, "return from lambda expression", NULL);
+                            }
+                        }
+                        else if(tcmp->type == TOKTYPE_BREAK) {
+                            if(!getparentloop(root)) {
+                                adderr(ti, "Break Error", "break from invalid scope", tcmp->line, "break from loop", NULL);
+
+                            }
+                        }
+                        else if(tcmp->type == TOKTYPE_CONTINUE) {
+                            if(!getparentloop(root)) {
+                                adderr(ti, "Continue Error", "continue from invalid scope", tcmp->line, "continue from loop", NULL);
+                            }
                         }
                     }
                 }
@@ -858,7 +872,7 @@ void p_statementlist(tokiter_s *ti, node_s *root)
 
 node_s *p_statement(tokiter_s *ti)
 {
-    node_s *statement, *exp, *ret;
+    node_s *statement, *exp, *jmp;
     tok_s *t = tok(ti);
     
     switch(t->type) {
@@ -886,14 +900,11 @@ node_s *p_statement(tokiter_s *ti)
             nexttok(ti);
             statement = MAKENODE();
             statement->type = TYPE_NODE;
-            
-            ret = MAKENODE();
-            ret->type = TYPE_OP;
-            ret->tok = t;
+            jmp = MAKENODE();
+            jmp->type = TYPE_OP;
+            jmp->tok = t;
             exp = p_expression(ti);
-            
-            
-            addchild(statement, ret);
+            addchild(statement, jmp);
             addchild(statement, exp);
             return statement;
         case TOKTYPE_SEMICOLON:
@@ -901,12 +912,22 @@ node_s *p_statement(tokiter_s *ti)
             return NULL;
         case TOKTYPE_BREAK:
             nexttok(ti);
-            return NULL;
-            break;
+            statement = MAKENODE();
+            statement->type = TYPE_NODE;
+            jmp = MAKENODE();
+            jmp->type = TYPE_OP;
+            jmp->tok = t;
+            addchild(statement, jmp);
+            return statement;
         case TOKTYPE_CONTINUE:
             nexttok(ti);
-            return NULL;
-            break;
+            statement = MAKENODE();
+            statement->type = TYPE_NODE;
+            jmp = MAKENODE();
+            jmp->type = TYPE_OP;
+            jmp->tok = t;
+            addchild(statement, jmp);
+            return statement;
         default:
             //syntax error
             adderr(ti, "Syntax Error", t->lex, t->line, "identifier", "number", "(", "not", "string",
@@ -1061,7 +1082,7 @@ void p_optexp(tokiter_s *ti, node_s *factor)
 
 node_s *p_factor_(tokiter_s *ti)
 {
-    node_s *n, *ident, *f, *op, *typeexp;
+    node_s *n, *ident, *f, *op;
     tok_s *t = tok(ti);
     
     switch(t->type) {
@@ -1382,7 +1403,10 @@ void p_arglist_(tokiter_s *ti, node_s *root)
 node_s *p_control(tokiter_s *ti)
 {
     tok_s *t = tok(ti);
-    node_s *control = MAKENODE(), *op = MAKENODE(), *exp, *suffix, *arg, *ident;
+    node_s *control = MAKENODE(), *op = MAKENODE(),
+                    *exp, *arg, *ident, *suffix = MAKENODE();
+    
+    suffix->type = TYPE_NODE;
     
     op->type = TYPE_OP;
     op->tok = t;
@@ -1391,10 +1415,10 @@ node_s *p_control(tokiter_s *ti)
         case TOKTYPE_WHILE:
             nexttok(ti);
             exp = p_expression(ti);
-            suffix = p_controlsuffix(ti);
             addchild(control, op);
             addchild(control, exp);
             addchild(control, suffix);
+            p_controlsuffix(ti, suffix);
             break;
         case TOKTYPE_FOR:
             t = nexttok(ti);
@@ -1406,11 +1430,11 @@ node_s *p_control(tokiter_s *ti)
                 if(t->type == TOKTYPE_FORVAR) {
                     nexttok(ti);
                     exp = p_expression(ti);
-                    suffix = p_controlsuffix(ti);
                     addchild(control, op);
                     addchild(control, ident);
                     addchild(control, exp);
                     addchild(control, suffix);
+                    p_controlsuffix(ti, suffix);
                 }
                 else {
                     free(control);
@@ -1443,8 +1467,9 @@ node_s *p_control(tokiter_s *ti)
                         nexttok(ti);
                         addchild(control, op);
                         addchild(control, arg);
+                        addchild(control, suffix);
                         PUSHSCOPE();
-                        p_statementlist(ti, control);
+                        p_statementlist(ti, suffix);
                         POPSCOPE();
                         t =tok(ti);
                         if(t->type == TOKTYPE_CLOSEBRACE) {
@@ -1487,19 +1512,18 @@ node_s *p_control(tokiter_s *ti)
             break;
         case TOKTYPE_DO:
             nexttok(ti);
-            suffix = p_controlsuffix(ti);
+            addchild(control, op);
+            addchild(control, suffix);
+            p_controlsuffix(ti, suffix);
             t = tok(ti);
             if(t->type == TOKTYPE_WHILE) {
                 nexttok(ti);
                 exp = p_expression(ti);
-                addchild(control, op);
-                addchild(control, suffix);
                 addchild(control, exp);
             }
             else {
                 free(control);
                 free(op);
-                freetree(suffix);
                 control = NULL;
                 //syntax error
                 adderr(ti, "Syntax Error", t->lex, t->line, "while", NULL);
@@ -1520,19 +1544,20 @@ node_s *p_control(tokiter_s *ti)
 
 node_s *p_if(tokiter_s *ti)
 {
-    node_s *root = MAKENODE(), *op = MAKENODE(), *exp, *suffix;
+    node_s *root = MAKENODE(), *op = MAKENODE(), *exp, *suffix = MAKENODE();
     
     root->type = TYPE_NODE;
+    suffix->type = TYPE_NODE;
     
     op->type = TYPE_OP;
     op->tok = tok(ti);
     
     nexttok(ti);
     exp = p_expression(ti);
-    suffix = p_controlsuffix(ti);
     addchild(root, op);
     addchild(root, exp);
     addchild(root, suffix);
+    p_controlsuffix(ti, suffix);
     p_elseif(ti, root);
     return root;
 }
@@ -1650,7 +1675,9 @@ void p_caselist(tokiter_s *ti, node_s *root)
 void p_elseif(tokiter_s *ti, node_s *root)
 {
     tok_s *t = tok(ti);
-    node_s *op, *exp, *suffix;
+    node_s *op, *exp, *suffix = MAKENODE();
+
+    suffix->type = TYPE_NODE;
     
     if(t->type == TOKTYPE_ELIF) {
         nexttok(ti);
@@ -1660,11 +1687,11 @@ void p_elseif(tokiter_s *ti, node_s *root)
         
         exp = p_expression(ti);
         t = tok(ti);
-        suffix = p_controlsuffix(ti);
         
         addchild(root, op);
         addchild(root, exp);
         addchild(root, suffix);
+        p_controlsuffix(ti, suffix);
         p_elseif(ti, root);
     }
     else if(t->type == TOKTYPE_ELSE) {
@@ -1672,24 +1699,22 @@ void p_elseif(tokiter_s *ti, node_s *root)
         op = MAKENODE();
         op->type = TYPE_OP;
         op->tok = t;
-        suffix = p_controlsuffix(ti);
         addchild(root, op);
         addchild(root, suffix);
+        p_controlsuffix(ti, suffix);
     }
 }
 
-node_s *p_controlsuffix(tokiter_s *ti)
+void p_controlsuffix(tokiter_s *ti, node_s *root)
 {
     tok_s *t = tok(ti);
-    node_s *suffix, *statement;
+    node_s *statement;
     
-    suffix = MAKENODE();
-    suffix->type = TYPE_NODE;
     
     if(t->type == TOKTYPE_OPENBRACE) {
         nexttok(ti);
         PUSHSCOPE();
-        p_statementlist(ti, suffix);
+        p_statementlist(ti, root);
         POPSCOPE();
         t = tok(ti);
         if(t->type == TOKTYPE_CLOSEBRACE) {
@@ -1703,9 +1728,8 @@ node_s *p_controlsuffix(tokiter_s *ti)
     }
     else {
         statement = p_statement(ti);
-        addchild(suffix, statement);
+        addchild(root, statement);
     }
-    return suffix;
 }
 
 node_s *p_dec(tokiter_s *ti)
@@ -2278,10 +2302,36 @@ void checkvar(node_s *var)
 
 node_s *getparentfunc(node_s *start)
 {
+    tok_s *t;
+    
     while(start) {
         if(start->nchildren) {
-            if(start->children[0]->tok && start->children[0]->tok->type == TOKTYPE_LAMBDA)
+            t = start->children[0]->tok;
+            if(t && t->type == TOKTYPE_LAMBDA)
                 return start;
+        }
+        start = start->parent;
+    }
+    return NULL;
+}
+
+node_s *getparentloop(node_s *start)
+{
+    tok_s *t;
+    
+    while(start) {
+        if(start->nchildren) {
+            t = start->children[0]->tok;
+            if(t) {
+                switch(t->type) {
+                    case TOKTYPE_FOR:
+                    case TOKTYPE_WHILE:
+                    case TOKTYPE_DO:
+                        return start;
+                    default:
+                        break;
+                }
+            }
         }
         start = start->parent;
     }
