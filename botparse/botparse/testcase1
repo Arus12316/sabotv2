@@ -35,6 +35,7 @@ var x := @(){
     1+1;
 };
 
+
 while(true) {
     print("hey");
     continue;
@@ -99,6 +100,7 @@ switch(x) {
 
 1+1 2+2
 
+
 class bob : tom {
     var xyz := "hey"
     
@@ -112,15 +114,7 @@ class bob : tom {
 
 2.2 * 4 * @(){ 1+1; };
 
-if x = 4 {
-    3 + 3;
-}
-elif x = 5 {
-    2 + 2;
-}
-else {
-    1 + 1;
-}
+
 
 if x = 4 {
     print(x)

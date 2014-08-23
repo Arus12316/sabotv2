@@ -64,7 +64,10 @@
                 do <controlsuffix> while <expression>
  
  
- <if> -> if <expression> <controlsuffix> <elseif>
+ <if> -> if <expression> <controlsuffix> <else>
+ 
+    {
+    }
  
  <switch> -> switch(<expression>) openbrace <caselist> closebrace
  
@@ -74,7 +77,7 @@
                 |
                 ε
  
- <elseif> -> elif <expression> openbrace <statementlist> closebrace <elseif> | else openbrace <statementlist> closebrace | ε
+ <else> -> else openbrace <statementlist> closebrace | ε
  
  <controlsuffix> -> openbrace <statementlist> closebrace | <statement>
  
@@ -151,7 +154,6 @@ enum {
     TOKTYPE_SEMICOLON,
     TOKTYPE_NOT,
     TOKTYPE_IF,
-    TOKTYPE_ELIF,
     TOKTYPE_ELSE,
     TOKTYPE_SWITCH,
     TOKTYPE_CASE,
@@ -218,6 +220,8 @@ typedef struct tok_s tok_s;
 typedef struct tokchunk_s tokchunk_s;
 typedef struct tokiter_s tokiter_s;
 typedef struct node_s node_s;
+typedef struct flow_s flow_s;
+typedef struct flnode_s flnode_s;
 
 typedef struct rec_s rec_s;
 typedef struct scope_s scope_s;
@@ -260,7 +264,6 @@ static struct keyw_s {
 keywords[] = {
     {"not", TOKTYPE_NOT},
     {"if", TOKTYPE_IF},
-    {"elif", TOKTYPE_ELIF},
     {"else", TOKTYPE_ELSE},
     {"while", TOKTYPE_WHILE},
     {"for", TOKTYPE_FOR},
@@ -312,6 +315,21 @@ struct scope_s
     scope_s **children;
 };
 
+struct flow_s
+{
+    flnode_s *start;
+    flnode_s *curr;
+    flnode_s *final;
+};
+
+struct flnode_s
+{
+    unsigned nin;
+    unsigned nout;
+    flnode_s **in;
+    flnode_s **out;
+};
+
 static tokiter_s *lex(char *src);
 static tok_s *mtok(tokchunk_s **list, uint16_t line, char *lexeme, size_t len, uint8_t type, uint8_t att);
 static bool trykeyword(tokchunk_s **list, tok_s **prev, uint16_t line, char *str);
@@ -321,8 +339,8 @@ static tok_s *tok(tokiter_s *ti);
 static tok_s *nexttok(tokiter_s *ti);
 
 static node_s *start(tokiter_s *ti);
-static void p_statementlist(tokiter_s *ti, node_s *root);
-static node_s *p_statement(tokiter_s *ti);
+static void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow);
+static node_s *p_statement(tokiter_s *ti, flow_s *flow);
 static node_s *p_expression(tokiter_s *ti);
 static void p_expression_(tokiter_s *ti, node_s *exp);
 static node_s *p_simple_expression(tokiter_s *ti);
@@ -339,11 +357,11 @@ static int p_sign(tokiter_s *ti);
 static node_s *p_optarglist(tokiter_s *ti);
 static node_s *p_arglist(tokiter_s *ti);
 static void p_arglist_(tokiter_s *ti, node_s *root);
-static node_s *p_control(tokiter_s *ti);
+static node_s *p_control(tokiter_s *ti, flow_s *flow);
 static node_s *p_if(tokiter_s *ti);
 static node_s *p_switch(tokiter_s *ti);
 static void p_caselist(tokiter_s *ti, node_s *root);
-static void p_elseif(tokiter_s *ti, node_s *root);
+static void p_else(tokiter_s *ti, node_s *root);
 static void p_controlsuffix(tokiter_s *ti, node_s *root);
 static node_s *p_dec(tokiter_s *ti);
 static node_s *p_opttype(tokiter_s *ti);
@@ -369,7 +387,8 @@ static bool addident(scope_s *root, node_s *ident);
 static scope_s *idtinit(scope_s *parent);
 static void pushscope(tokiter_s *ti);
 static inline void popscope(tokiter_s *ti);
-
+static flow_s *flow_s_(void);
+static void addflow(flnode_s *out, flnode_s *in);
 static node_s *getparentfunc(node_s *start);
 static node_s *getparentloop(node_s *start);
 static void walk_tree(node_s *root);
@@ -782,6 +801,7 @@ tok_s *nexttok(tokiter_s *ti)
 node_s *start(tokiter_s *ti)
 {
     tok_s *t;
+    flow_s *flow = flow_s_();
     node_s *root = MAKENODE();
     
     root->type = TYPE_NODE;
@@ -790,7 +810,7 @@ node_s *start(tokiter_s *ti)
     ti->graph = MAKENODE();
     ti->graph->type = TYPE_NODE;
 
-    p_statementlist(ti, root);
+    p_statementlist(ti, root, flow);
     t = tok(ti);
     
     if(t->type != TOKTYPE_EOF) {
@@ -803,9 +823,9 @@ node_s *start(tokiter_s *ti)
     return root;
 }
 
-void p_statementlist(tokiter_s *ti, node_s *root)
+void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
 {
-    node_s *statement;
+    node_s *statement, *last;
     tok_s *t = tok(ti), *tcmp;
     
     switch(t->type) {
@@ -830,7 +850,7 @@ void p_statementlist(tokiter_s *ti, node_s *root)
         case TOKTYPE_BREAK:
         case TOKTYPE_CONTINUE:
         case TOKTYPE_SEMICOLON:
-            statement = p_statement(ti);
+            statement = p_statement(ti, flow);
             addchild(root, statement);
             if(statement) {
                 if(statement->nchildren) {
@@ -855,8 +875,8 @@ void p_statementlist(tokiter_s *ti, node_s *root)
                     }
                 }
             }
-            
-            p_statementlist(ti, root);
+            last = statement;
+            p_statementlist(ti, root, flow);
             break;
         case TOKTYPE_CLOSEBRACE:
         case TOKTYPE_EOF:
@@ -870,7 +890,7 @@ void p_statementlist(tokiter_s *ti, node_s *root)
     }
 }
 
-node_s *p_statement(tokiter_s *ti)
+node_s *p_statement(tokiter_s *ti, flow_s *flow)
 {
     node_s *statement, *exp, *jmp;
     tok_s *t = tok(ti);
@@ -892,7 +912,7 @@ node_s *p_statement(tokiter_s *ti)
         case TOKTYPE_DO:
         case TOKTYPE_FOR:
         case TOKTYPE_LISENER:
-            return p_control(ti);
+            return p_control(ti, &flow);
         case TOKTYPE_VAR:
         case TOKTYPE_CLASS:
             return p_dec(ti);
@@ -1264,10 +1284,12 @@ void p_assign(tokiter_s *ti, node_s *root)
 
 node_s *p_lambda(tokiter_s *ti)
 {
+    flow_s *flow = flow_s_();
     tok_s *t = tok(ti);
-    node_s *lambda = MAKENODE(), *op = MAKENODE(), *param;
+    node_s *lambda = MAKENODE(), *op = MAKENODE(), *param, *body = MAKENODE();
     
     lambda->type = TYPE_NODE;
+    body->type = TYPE_NODE;
     op->type = TYPE_OP;
     op->tok = t;
     
@@ -1284,7 +1306,10 @@ node_s *p_lambda(tokiter_s *ti)
                 nexttok(ti);
                 addchild(lambda, op);
                 addchild(lambda, param);
-                p_statementlist(ti, lambda);
+                addchild(lambda, body);
+                p_statementlist(ti, body, flow);
+                flow = flow_s_();
+                
                 t = tok(ti);
                 if(t->type == TOKTYPE_CLOSEBRACE) {
                     nexttok(ti);
@@ -1400,7 +1425,7 @@ void p_arglist_(tokiter_s *ti, node_s *root)
     }
 }
 
-node_s *p_control(tokiter_s *ti)
+node_s *p_control(tokiter_s *ti, flow_s *flow)
 {
     tok_s *t = tok(ti);
     node_s *control = MAKENODE(), *op = MAKENODE(),
@@ -1469,7 +1494,7 @@ node_s *p_control(tokiter_s *ti)
                         addchild(control, arg);
                         addchild(control, suffix);
                         PUSHSCOPE();
-                        p_statementlist(ti, suffix);
+                        p_statementlist(ti, suffix, flow);
                         POPSCOPE();
                         t =tok(ti);
                         if(t->type == TOKTYPE_CLOSEBRACE) {
@@ -1545,6 +1570,8 @@ node_s *p_control(tokiter_s *ti)
 node_s *p_if(tokiter_s *ti)
 {
     node_s *root = MAKENODE(), *op = MAKENODE(), *exp, *suffix = MAKENODE();
+    flow_s  *ftrue = flow_s_(),
+            *ffalse = flow_s_();
     
     root->type = TYPE_NODE;
     suffix->type = TYPE_NODE;
@@ -1558,7 +1585,7 @@ node_s *p_if(tokiter_s *ti)
     addchild(root, exp);
     addchild(root, suffix);
     p_controlsuffix(ti, suffix);
-    p_elseif(ti, root);
+    p_else(ti, root);
     return root;
 }
 
@@ -1672,29 +1699,14 @@ void p_caselist(tokiter_s *ti, node_s *root)
     }
 }
 
-void p_elseif(tokiter_s *ti, node_s *root)
+void p_else(tokiter_s *ti, node_s *root)
 {
     tok_s *t = tok(ti);
-    node_s *op, *exp, *suffix = MAKENODE();
+    node_s *op, *suffix = MAKENODE();
 
     suffix->type = TYPE_NODE;
     
-    if(t->type == TOKTYPE_ELIF) {
-        nexttok(ti);
-        op = MAKENODE();
-        op->type = TYPE_OP;
-        op->tok = t;
-        
-        exp = p_expression(ti);
-        t = tok(ti);
-        
-        addchild(root, op);
-        addchild(root, exp);
-        addchild(root, suffix);
-        p_controlsuffix(ti, suffix);
-        p_elseif(ti, root);
-    }
-    else if(t->type == TOKTYPE_ELSE) {
+    if(t->type == TOKTYPE_ELSE) {
         nexttok(ti);
         op = MAKENODE();
         op->type = TYPE_OP;
@@ -1709,12 +1721,13 @@ void p_controlsuffix(tokiter_s *ti, node_s *root)
 {
     tok_s *t = tok(ti);
     node_s *statement;
+    flow_s *flow = flow_s_();
     
     
     if(t->type == TOKTYPE_OPENBRACE) {
         nexttok(ti);
         PUSHSCOPE();
-        p_statementlist(ti, root);
+        p_statementlist(ti, root, flow);
         POPSCOPE();
         t = tok(ti);
         if(t->type == TOKTYPE_CLOSEBRACE) {
@@ -1727,7 +1740,7 @@ void p_controlsuffix(tokiter_s *ti, node_s *root)
         }
     }
     else {
-        statement = p_statement(ti);
+        statement = p_statement(ti, flow);
         addchild(root, statement);
     }
 }
@@ -1761,7 +1774,7 @@ node_s *p_dec(tokiter_s *ti)
             p_assign(ti, dec);
             
             if(addident(ti->scope, ident)) {
-                adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
+               // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
             }
         }
         else {
@@ -1783,7 +1796,7 @@ node_s *p_dec(tokiter_s *ti)
             addchild(dec, ident);
 
             if(addident(ti->scope, ident)) {
-                adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
+               // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
             }
             t = nexttok(ti);
             p_inh(ti, dec);
@@ -2015,7 +2028,7 @@ node_s *p_param(tokiter_s *ti)
         ident->tok = t;
         
         if(addident(ti->scope, ident)) {
-            adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
+           // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
         }
         opt = p_opttype(ti);
         addchild(n, ident);
@@ -2298,6 +2311,33 @@ void checkvar(node_s *var)
             }
         }
     }
+}
+
+flow_s *flow_s_(void)
+{
+    flow_s *f = alloc(sizeof *f);
+    
+    f->start = allocz(sizeof *f);
+    f->curr = f->start;
+    f->final = NULL;
+    return f;
+}
+
+void addflow(flnode_s *out, flnode_s *in)
+{
+    if(out->nout)
+        out->out = ralloc(out->out, (out->nout + 1) * sizeof(*out->out));
+    else
+        out->out = alloc(sizeof *out->out);
+    out->out[out->nout] = in;
+    out->nout++;
+    
+    if(in->nin)
+        in->in = ralloc(in->in, (in->nin + 1) * sizeof(*in->in));
+    else
+        in->in = alloc(sizeof *in->in);
+    in->in[in->nin] = out;
+    in->nin++;
 }
 
 node_s *getparentfunc(node_s *start)
