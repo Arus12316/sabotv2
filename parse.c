@@ -105,8 +105,6 @@
  
  <set'> -> , <expression> <optnext> <set'> | ε
  
- 
- 
  */
 
 #include "parse.h"
@@ -341,40 +339,40 @@ static tok_s *nexttok(tokiter_s *ti);
 static node_s *start(tokiter_s *ti);
 static void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow);
 static node_s *p_statement(tokiter_s *ti, flow_s *flow);
-static node_s *p_expression(tokiter_s *ti);
-static void p_expression_(tokiter_s *ti, node_s *exp);
-static node_s *p_simple_expression(tokiter_s *ti);
-static void p_simple_expression_(tokiter_s *ti, node_s *sexp);
-static node_s *p_term(tokiter_s *ti);
-static void p_term_(tokiter_s *ti, node_s *term);
-static node_s *p_factor(tokiter_s *ti);
-static void p_optexp(tokiter_s *ti, node_s *factor);
-static node_s *p_factor_(tokiter_s *ti);
-static void p_factor__(tokiter_s *ti, node_s *root);
-static void p_assign(tokiter_s *ti, node_s *root);
+static node_s *p_expression(tokiter_s *ti, flow_s *flow);
+static void p_expression_(tokiter_s *ti, node_s *exp, flow_s *flow);
+static node_s *p_simple_expression(tokiter_s *ti, flow_s *flow);
+static void p_simple_expression_(tokiter_s *ti, node_s *sexp, flow_s *flow);
+static node_s *p_term(tokiter_s *ti, flow_s *flow);
+static void p_term_(tokiter_s *ti, node_s *term, flow_s *flow);
+static node_s *p_factor(tokiter_s *ti, flow_s *flow);
+static void p_optexp(tokiter_s *ti, node_s *factor, flow_s *flow);
+static node_s *p_factor_(tokiter_s *ti, flow_s *flow);
+static void p_factor__(tokiter_s *ti, node_s *root, flow_s *flow);
+static void p_assign(tokiter_s *ti, node_s *root, flow_s *flow);
 static node_s *p_lambda(tokiter_s *ti);
 static int p_sign(tokiter_s *ti);
-static node_s *p_optarglist(tokiter_s *ti);
-static node_s *p_arglist(tokiter_s *ti);
-static void p_arglist_(tokiter_s *ti, node_s *root);
+static node_s *p_optarglist(tokiter_s *ti, flow_s *flow);
+static node_s *p_arglist(tokiter_s *ti, flow_s *flow);
+static void p_arglist_(tokiter_s *ti, node_s *root, flow_s *flow);
 static node_s *p_control(tokiter_s *ti, flow_s *flow);
-static node_s *p_if(tokiter_s *ti);
-static node_s *p_switch(tokiter_s *ti);
-static void p_caselist(tokiter_s *ti, node_s *root);
-static void p_else(tokiter_s *ti, node_s *root);
-static void p_controlsuffix(tokiter_s *ti, node_s *root);
-static node_s *p_dec(tokiter_s *ti);
-static node_s *p_opttype(tokiter_s *ti);
-static node_s *p_type(tokiter_s *ti);
+static node_s *p_if(tokiter_s *ti, flow_s *flow);
+static node_s *p_switch(tokiter_s *ti, flow_s *flow);
+static void p_caselist(tokiter_s *ti, node_s *root, flow_s *flow);
+static void p_else(tokiter_s *ti, node_s *root, flow_s *flow);
+static void p_controlsuffix(tokiter_s *ti, node_s *root, flow_s *flow);
+static node_s *p_dec(tokiter_s *ti, flow_s *flow);
+static node_s *p_opttype(tokiter_s *ti, flow_s *flow);
+static node_s *p_type(tokiter_s *ti,flow_s *flow);
 static void p_inh(tokiter_s *ti, node_s *root);
 static void p_declist(tokiter_s *ti, node_s *root);
-static void p_array(tokiter_s *ti, node_s *root);
-static node_s *p_optparamlist(tokiter_s *ti);
-static node_s *p_paramlist(tokiter_s *ti);
-static void p_paramlist_(tokiter_s *ti, node_s *root);
-static node_s *p_set(tokiter_s *ti);
-static void p_optnext(tokiter_s *ti, node_s *root);
-static void p_set_(tokiter_s *ti, node_s *set);
+static void p_array(tokiter_s *ti, node_s *root, flow_s *flow);
+static node_s *p_optparamlist(tokiter_s *ti, flow_s *flow);
+static node_s *p_paramlist(tokiter_s *ti, flow_s *flow);
+static void p_paramlist_(tokiter_s *ti, node_s *root, flow_s *flow);
+static node_s *p_set(tokiter_s *ti, flow_s *flow);
+static void p_optnext(tokiter_s *ti, node_s *root, flow_s *flow);
+static void p_set_(tokiter_s *ti, node_s *set, flow_s *flow);
 static void synerr_rec(tokiter_s *ti);
 
 static node_s *node_s_(scope_s *scope);
@@ -389,6 +387,7 @@ static void pushscope(tokiter_s *ti);
 static inline void popscope(tokiter_s *ti);
 static flow_s *flow_s_(void);
 static void addflow(flnode_s *out, flnode_s *in);
+static void fflow_stmt(flow_s *flow);
 static node_s *getparentfunc(node_s *start);
 static node_s *getparentloop(node_s *start);
 static void walk_tree(node_s *root);
@@ -907,15 +906,16 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_LAMBDA:
         case TOKTYPE_OPENBRACE:
         case TOKTYPE_ADDOP:
-            return p_expression(ti);
+            fflow_stmt(flow);
+            return p_expression(ti, flow);
         case TOKTYPE_WHILE:
         case TOKTYPE_DO:
         case TOKTYPE_FOR:
         case TOKTYPE_LISENER:
-            return p_control(ti, &flow);
+            return p_control(ti, flow);
         case TOKTYPE_VAR:
         case TOKTYPE_CLASS:
-            return p_dec(ti);
+            return p_dec(ti, flow);
         case TOKTYPE_RETURN:
             nexttok(ti);
             statement = MAKENODE();
@@ -923,9 +923,10 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
             jmp = MAKENODE();
             jmp->type = TYPE_OP;
             jmp->tok = t;
-            exp = p_expression(ti);
+            exp = p_expression(ti, flow);
             addchild(statement, jmp);
             addchild(statement, exp);
+            fflow_stmt(flow);
             return statement;
         case TOKTYPE_SEMICOLON:
             nexttok(ti);
@@ -938,6 +939,7 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
             jmp->type = TYPE_OP;
             jmp->tok = t;
             addchild(statement, jmp);
+            fflow_stmt(flow);
             return statement;
         case TOKTYPE_CONTINUE:
             nexttok(ti);
@@ -947,6 +949,7 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
             jmp->type = TYPE_OP;
             jmp->tok = t;
             addchild(statement, jmp);
+            fflow_stmt(flow);
             return statement;
         default:
             //syntax error
@@ -957,28 +960,28 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
     }
 }
 
-node_s *p_expression(tokiter_s *ti)
+node_s *p_expression(tokiter_s *ti, flow_s *flow)
 {
     node_s *node, *exp;
     
     exp = MAKENODE();
     exp->type = TYPE_NODE;
 
-    node = p_simple_expression(ti);
+    node = p_simple_expression(ti, flow);
     addchild(exp, node);
-    p_expression_(ti, exp);
+    p_expression_(ti, exp, flow);
     
     return exp;
 }
 
-void p_expression_(tokiter_s *ti, node_s *exp)
+void p_expression_(tokiter_s *ti, node_s *exp, flow_s *flow)
 {
     node_s *s = NULL, *op = NULL;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_RELOP) {
         nexttok(ti);
-        s = p_simple_expression(ti);
+        s = p_simple_expression(ti, flow);
         
         op = MAKENODE();
         op->type = TYPE_OP;
@@ -988,7 +991,7 @@ void p_expression_(tokiter_s *ti, node_s *exp)
     }
 }
 
-node_s *p_simple_expression(tokiter_s *ti)
+node_s *p_simple_expression(tokiter_s *ti, flow_s *flow)
 {
     int sign = 0;
     node_s *term, *un = NULL, *sexp;
@@ -999,7 +1002,7 @@ node_s *p_simple_expression(tokiter_s *ti)
     
     if(t->type == TOKTYPE_ADDOP)
         sign = p_sign(ti);
-    term = p_term(ti);
+    term = p_term(ti, flow);
     
     if(sign == -1) {
         un = MAKENODE();
@@ -1009,18 +1012,18 @@ node_s *p_simple_expression(tokiter_s *ti)
         addchild(sexp, un);
     }
     addchild(sexp, term);
-    p_simple_expression_(ti, sexp);
+    p_simple_expression_(ti, sexp, flow);
     return sexp;
 }
 
-void p_simple_expression_(tokiter_s *ti, node_s *sexp)
+void p_simple_expression_(tokiter_s *ti, node_s *sexp, flow_s *flow)
 {
     node_s *term = NULL, *op;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_ADDOP) {
         nexttok(ti);
-        term = p_term(ti);
+        term = p_term(ti, flow);
         
         op = MAKENODE();
         op->type = TYPE_OP;
@@ -1029,33 +1032,33 @@ void p_simple_expression_(tokiter_s *ti, node_s *sexp)
         addchild(sexp, op);
         addchild(sexp, term);
         
-        p_simple_expression_(ti, sexp);
+        p_simple_expression_(ti, sexp, flow);
     }
 }
 
-node_s *p_term(tokiter_s *ti)
+node_s *p_term(tokiter_s *ti, flow_s *flow)
 {
     node_s *f, *term;
     
     term = MAKENODE();
     term->type = TYPE_NODE;
     
-    f = p_factor(ti);
+    f = p_factor(ti, flow);
     addchild(term, f);
     
-    p_term_(ti, term);
+    p_term_(ti, term, flow);
     
     return term;
 }
 
-void p_term_(tokiter_s *ti, node_s *term)
+void p_term_(tokiter_s *ti, node_s *term, flow_s *flow)
 {
     node_s *f = NULL, *op;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_MULOP) {
         nexttok(ti);
-        f = p_factor(ti);
+        f = p_factor(ti, flow);
         
         op = MAKENODE();
         op->type = TYPE_OP;
@@ -1063,33 +1066,33 @@ void p_term_(tokiter_s *ti, node_s *term)
         
         addchild(term, op);
         addchild(term, f);
-        p_term_(ti, term);
+        p_term_(ti, term, flow);
     }
     
 }
 
-node_s *p_factor(tokiter_s *ti)
+node_s *p_factor(tokiter_s *ti, flow_s *flow)
 {
     node_s *f, *fact;
     
     fact = MAKENODE();
     fact->type = TYPE_NODE;
     
-    f = p_factor_(ti);
+    f = p_factor_(ti, flow);
     addchild(fact, f);
-    p_optexp(ti, fact);
+    p_optexp(ti, fact, flow);
     
     return fact;
 }
 
-void p_optexp(tokiter_s *ti, node_s *factor)
+void p_optexp(tokiter_s *ti, node_s *factor, flow_s *flow)
 {
     tok_s *t = tok(ti);
     node_s *f = NULL, *op;
     
     if(t->type == TOKTYPE_EXPOP) {
         nexttok(ti);
-        f = p_factor(ti);
+        f = p_factor(ti, flow);
         
         op = MAKENODE();
         op->type = TYPE_OP;
@@ -1100,7 +1103,7 @@ void p_optexp(tokiter_s *ti, node_s *factor)
     }
 }
 
-node_s *p_factor_(tokiter_s *ti)
+node_s *p_factor_(tokiter_s *ti, flow_s *flow)
 {
     node_s *n, *ident, *f, *op;
     tok_s *t = tok(ti);
@@ -1118,8 +1121,8 @@ node_s *p_factor_(tokiter_s *ti)
             
             addchild(n, ident);
 
-            p_factor__(ti, n);
-            p_assign(ti, n);
+            p_factor__(ti, n, flow);
+            p_assign(ti, n, flow);
             break;
         case TOKTYPE_NUM:
             nexttok(ti);
@@ -1129,7 +1132,7 @@ node_s *p_factor_(tokiter_s *ti)
             break;
         case TOKTYPE_OPENPAREN:
             nexttok(ti);
-            n = p_expression(ti);
+            n = p_expression(ti, flow);
             t = tok(ti);
             if(t->type == TOKTYPE_CLOSEPAREN) {
                 nexttok(ti);
@@ -1149,7 +1152,7 @@ node_s *p_factor_(tokiter_s *ti)
             op->type = TYPE_OP;
             op->tok = t;
             
-            f = p_factor(ti);
+            f = p_factor(ti, flow);
             addchild(n, op);
             addchild(n, f);
             break;
@@ -1166,16 +1169,16 @@ node_s *p_factor_(tokiter_s *ti)
             n->tok = t;
             break;
         case TOKTYPE_OPENBRACE:
-            n = p_set(ti);
+            n = p_set(ti, flow);
             break;
         case TOKTYPE_LAMBDA:
             n = p_lambda(ti);
             break;
         case TOKTYPE_IF:
-            n = p_if(ti);
+            n = p_if(ti, flow);
             break;
         case TOKTYPE_SWITCH:
-            n = p_switch(ti);
+            n = p_switch(ti, flow);
             break;
         default:
             //syntax error
@@ -1187,7 +1190,7 @@ node_s *p_factor_(tokiter_s *ti)
     return n;
 }
 
-void p_factor__(tokiter_s *ti, node_s *root)
+void p_factor__(tokiter_s *ti, node_s *root, flow_s *flow)
 {
     node_s *op, *exp, *ident, *opt;
     tok_s *t = tok(ti);
@@ -1195,7 +1198,7 @@ void p_factor__(tokiter_s *ti, node_s *root)
     switch(t->type) {
         case TOKTYPE_OPENBRACKET:
             nexttok(ti);
-            exp = p_expression(ti);
+            exp = p_expression(ti, flow);
             
             op = MAKENODE();
             op->type = TYPE_OP;
@@ -1207,7 +1210,7 @@ void p_factor__(tokiter_s *ti, node_s *root)
             t = tok(ti);
             if(t->type == TOKTYPE_CLOSEBRACKET) {
                 nexttok(ti);
-                p_factor__(ti, root);
+                p_factor__(ti, root, flow);
             }
             else {
                 //syntax error
@@ -1228,7 +1231,7 @@ void p_factor__(tokiter_s *ti, node_s *root)
                 ident->tok = t;
                 addchild(root, op);
                 addchild(root, ident);
-                p_factor__(ti, root);
+                p_factor__(ti, root, flow);
             }
             else {
                 //syntax error
@@ -1243,14 +1246,14 @@ void p_factor__(tokiter_s *ti, node_s *root)
             op->type = TYPE_OP;
             op->tok = t;
             
-            opt = p_optarglist(ti);
+            opt = p_optarglist(ti, flow);
             addchild(root, op);
             addchild(root, opt);
             
             t = tok(ti);
             if(t->type == TOKTYPE_CLOSEPAREN) {
                 nexttok(ti);
-                p_factor__(ti, root);
+                p_factor__(ti, root, flow);
             }
             else {
                 //syntax error
@@ -1264,14 +1267,14 @@ void p_factor__(tokiter_s *ti, node_s *root)
     }
 }
 
-void p_assign(tokiter_s *ti, node_s *root)
+void p_assign(tokiter_s *ti, node_s *root, flow_s *flow)
 {
     node_s *exp, *op;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_ASSIGN) {
         nexttok(ti);
-        exp = p_expression(ti);
+        exp = p_expression(ti, flow);
         
         op = MAKENODE();
         op->type = TYPE_OP;
@@ -1298,7 +1301,7 @@ node_s *p_lambda(tokiter_s *ti)
     if(t->type == TOKTYPE_OPENPAREN) {
         nexttok(ti);
         PUSHSCOPE();
-        param = p_optparamlist(ti);
+        param = p_optparamlist(ti, flow);
         t = tok(ti);
         if(t->type == TOKTYPE_CLOSEPAREN) {
             t = nexttok(ti);
@@ -1321,8 +1324,6 @@ node_s *p_lambda(tokiter_s *ti)
                 }
             }
             else {
-                free(lambda);
-                free(op);
                 lambda = NULL;
                 //syntax error
                 adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
@@ -1330,8 +1331,6 @@ node_s *p_lambda(tokiter_s *ti)
             }
         }
         else {
-            free(lambda);
-            free(op);
             lambda = NULL;
             //syntax error
             adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
@@ -1340,8 +1339,6 @@ node_s *p_lambda(tokiter_s *ti)
         POPSCOPE();
     }
     else {
-        free(lambda);
-        free(op);
         lambda = NULL;
         //syntax error
         adderr(ti, "Syntax Error", t->lex, t->line, "(", NULL);
@@ -1370,7 +1367,7 @@ int p_sign(tokiter_s *ti)
     }
 }
 
-node_s *p_optarglist(tokiter_s *ti)
+node_s *p_optarglist(tokiter_s *ti, flow_s *flow)
 {
     node_s *empty;
     tok_s *t = tok(ti);
@@ -1387,7 +1384,7 @@ node_s *p_optarglist(tokiter_s *ti)
         case TOKTYPE_IDENT:
         case TOKTYPE_IF:
         case TOKTYPE_SWITCH:
-            return p_arglist(ti);
+            return p_arglist(ti, flow);
             break;
         default:
             empty = MAKENODE();
@@ -1397,28 +1394,28 @@ node_s *p_optarglist(tokiter_s *ti)
     }
 }
 
-node_s *p_arglist(tokiter_s *ti)
+node_s *p_arglist(tokiter_s *ti, flow_s *flow)
 {
     node_s *root = MAKENODE(), *n;
     
-    n = p_expression(ti);
+    n = p_expression(ti, flow);
     addchild(root, n);
-    p_arglist_(ti, root);
+    p_arglist_(ti, root, flow);
 
     return root;
 }
 
-void p_arglist_(tokiter_s *ti, node_s *root)
+void p_arglist_(tokiter_s *ti, node_s *root, flow_s *flow)
 {
     node_s *n;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_COMMA) {
         nexttok(ti);
-        n = p_expression(ti);
+        n = p_expression(ti, flow);
         addchild(root, n);
         
-        p_arglist_(ti, root);
+        p_arglist_(ti, root, flow);
     }
     else {
         //epsilon production
@@ -1439,11 +1436,11 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
     switch(t->type) {
         case TOKTYPE_WHILE:
             nexttok(ti);
-            exp = p_expression(ti);
+            exp = p_expression(ti, flow);
             addchild(control, op);
             addchild(control, exp);
             addchild(control, suffix);
-            p_controlsuffix(ti, suffix);
+            p_controlsuffix(ti, suffix, flow);
             break;
         case TOKTYPE_FOR:
             t = nexttok(ti);
@@ -1454,12 +1451,12 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
                 t = nexttok(ti);
                 if(t->type == TOKTYPE_FORVAR) {
                     nexttok(ti);
-                    exp = p_expression(ti);
+                    exp = p_expression(ti, flow);
                     addchild(control, op);
                     addchild(control, ident);
                     addchild(control, exp);
                     addchild(control, suffix);
-                    p_controlsuffix(ti, suffix);
+                    p_controlsuffix(ti, suffix, flow);
                 }
                 else {
                     free(control);
@@ -1484,7 +1481,7 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
             t = nexttok(ti);
             if(t->type == TOKTYPE_OPENPAREN) {
                 nexttok(ti);
-                arg = p_arglist(ti);
+                arg = p_arglist(ti, flow);
                 t = tok(ti);
                 if(t->type == TOKTYPE_CLOSEPAREN) {
                     t = nexttok(ti);
@@ -1507,9 +1504,6 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
                         }
                     }
                     else {
-                        free(control);
-                        free(op);
-                        free(arg);
                         control = NULL;
                         //syntax error
                         adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
@@ -1517,9 +1511,6 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
                     }
                 }
                 else {
-                    free(control);
-                    free(op);
-                    free(arg);
                     control = NULL;
                     //syntax error
                     adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
@@ -1527,8 +1518,6 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
                 }
             }
             else {
-                free(control);
-                free(op);
                 control = NULL;
                 //syntax error
                 adderr(ti, "Syntax Error", t->lex, t->line, "(", NULL);
@@ -1539,16 +1528,14 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
             nexttok(ti);
             addchild(control, op);
             addchild(control, suffix);
-            p_controlsuffix(ti, suffix);
+            p_controlsuffix(ti, suffix, flow);
             t = tok(ti);
             if(t->type == TOKTYPE_WHILE) {
                 nexttok(ti);
-                exp = p_expression(ti);
+                exp = p_expression(ti, flow);
                 addchild(control, exp);
             }
             else {
-                free(control);
-                free(op);
                 control = NULL;
                 //syntax error
                 adderr(ti, "Syntax Error", t->lex, t->line, "while", NULL);
@@ -1556,8 +1543,6 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
             }
             break;
         default:
-            free(op);
-            free(control);
             control = NULL;
             //syntax error
             adderr(ti, "Syntax Error", t->lex, t->line, "if", "while", "for", "switch", NULL);
@@ -1567,7 +1552,7 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
     return control;
 }
 
-node_s *p_if(tokiter_s *ti)
+node_s *p_if(tokiter_s *ti, flow_s *flow)
 {
     node_s *root = MAKENODE(), *op = MAKENODE(), *exp, *suffix = MAKENODE();
     flow_s  *ftrue = flow_s_(),
@@ -1580,16 +1565,16 @@ node_s *p_if(tokiter_s *ti)
     op->tok = tok(ti);
     
     nexttok(ti);
-    exp = p_expression(ti);
+    exp = p_expression(ti, flow);
     addchild(root, op);
     addchild(root, exp);
     addchild(root, suffix);
-    p_controlsuffix(ti, suffix);
-    p_else(ti, root);
+    p_controlsuffix(ti, suffix, flow);
+    p_else(ti, root, flow);
     return root;
 }
 
-node_s *p_switch(tokiter_s *ti)
+node_s *p_switch(tokiter_s *ti, flow_s *flow)
 {
     tok_s *t = tok(ti);
     node_s *root = MAKENODE(), *op = MAKENODE(), *exp;
@@ -1601,7 +1586,7 @@ node_s *p_switch(tokiter_s *ti)
     t = nexttok(ti);
     if(t->type == TOKTYPE_OPENPAREN) {
         nexttok(ti);
-        exp = p_expression(ti);
+        exp = p_expression(ti, flow);
         t = tok(ti);
         if(t->type == TOKTYPE_CLOSEPAREN) {
             t = nexttok(ti);
@@ -1611,7 +1596,7 @@ node_s *p_switch(tokiter_s *ti)
                 addchild(root, op);
                 addchild(root, exp);
                 
-                p_caselist(ti, root);
+                p_caselist(ti, root, flow);
                 t = tok(ti);
                 if(t->type == TOKTYPE_CLOSEBRACE) {
                     nexttok(ti);
@@ -1643,7 +1628,7 @@ node_s *p_switch(tokiter_s *ti)
 }
 
 
-void p_caselist(tokiter_s *ti, node_s *root)
+void p_caselist(tokiter_s *ti, node_s *root, flow_s *flow)
 {
     node_s *exp, *arg, *op, *cadef;
     tok_s *t = tok(ti);
@@ -1655,7 +1640,7 @@ void p_caselist(tokiter_s *ti, node_s *root)
         cadef->type = TYPE_OP;
         cadef->tok = t;
         
-        arg = p_arglist(ti);
+        arg = p_arglist(ti, flow);
         t = tok(ti);
         if(t->type == TOKTYPE_MAP) {
             nexttok(ti);
@@ -1664,12 +1649,12 @@ void p_caselist(tokiter_s *ti, node_s *root)
             op->type = TYPE_OP;
             op->tok = t;
             
-            exp = p_expression(ti);
+            exp = p_expression(ti, flow);
             addchild(root, cadef);
             addchild(root, arg);
             addchild(root, op);
             addchild(root, exp);
-            p_caselist(ti, root);
+            p_caselist(ti, root, flow);
         }
         else {
             //syntax error
@@ -1686,10 +1671,10 @@ void p_caselist(tokiter_s *ti, node_s *root)
         if(t->type == TOKTYPE_MAP) {
             nexttok(ti);
             
-            exp = p_expression(ti);
+            exp = p_expression(ti, flow);
             addchild(root, cadef);
             addchild(root, exp);
-            p_caselist(ti, root);
+            p_caselist(ti, root, flow);
         }
         else {
             //syntax error
@@ -1699,7 +1684,7 @@ void p_caselist(tokiter_s *ti, node_s *root)
     }
 }
 
-void p_else(tokiter_s *ti, node_s *root)
+void p_else(tokiter_s *ti, node_s *root, flow_s *flow)
 {
     tok_s *t = tok(ti);
     node_s *op, *suffix = MAKENODE();
@@ -1713,16 +1698,14 @@ void p_else(tokiter_s *ti, node_s *root)
         op->tok = t;
         addchild(root, op);
         addchild(root, suffix);
-        p_controlsuffix(ti, suffix);
+        p_controlsuffix(ti, suffix, flow);
     }
 }
 
-void p_controlsuffix(tokiter_s *ti, node_s *root)
+void p_controlsuffix(tokiter_s *ti, node_s *root, flow_s *flow)
 {
     tok_s *t = tok(ti);
     node_s *statement;
-    flow_s *flow = flow_s_();
-    
     
     if(t->type == TOKTYPE_OPENBRACE) {
         nexttok(ti);
@@ -1745,7 +1728,7 @@ void p_controlsuffix(tokiter_s *ti, node_s *root)
     }
 }
 
-node_s *p_dec(tokiter_s *ti)
+node_s *p_dec(tokiter_s *ti, flow_s *flow)
 {
     node_s *ident, *dectype, *dec, *op;
     tok_s *t = tok(ti);
@@ -1769,9 +1752,9 @@ node_s *p_dec(tokiter_s *ti)
             addchild(dec, op);
             addchild(dec, ident);
             
-            dectype = p_opttype(ti);
+            dectype = p_opttype(ti, flow);
             addchild(dec, dectype);
-            p_assign(ti, dec);
+            p_assign(ti, dec, flow);
             
             if(addident(ti->scope, ident)) {
                // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
@@ -1836,14 +1819,14 @@ node_s *p_dec(tokiter_s *ti)
     return dec;
 }
 
-node_s *p_opttype(tokiter_s *ti)
+node_s *p_opttype(tokiter_s *ti, flow_s *flow)
 {
     node_s *type = NULL;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_COLON) {
         nexttok(ti);
-        type = p_type(ti);
+        type = p_type(ti, flow);
     }
     else {
         //epsilon production
@@ -1852,7 +1835,7 @@ node_s *p_opttype(tokiter_s *ti)
     return type;
 }
 
-node_s *p_type(tokiter_s *ti)
+node_s *p_type(tokiter_s *ti, flow_s *flow)
 {
     node_s *type, *opt, *ret;
     tok_s *t = tok(ti);
@@ -1869,42 +1852,42 @@ node_s *p_type(tokiter_s *ti)
             type = MAKENODE();
             type->type = TYPE_TYPEEXP;
             type->tok = t;
-            p_array(ti, type);
+            p_array(ti, type, flow);
             break;
         case TOKTYPE_REAL:
             nexttok(ti);
             type = MAKENODE();
             type->type = TYPE_TYPEEXP;
             type->tok = t;
-            p_array(ti, type);
+            p_array(ti, type, flow);
             break;
         case TOKTYPE_STRINGTYPE:
             nexttok(ti);
             type = MAKENODE();
             type->type = TYPE_TYPEEXP;
             type->tok = t;
-            p_array(ti, type);
+            p_array(ti, type, flow);
             break;
         case TOKTYPE_REGEXTYPE:
             nexttok(ti);
             type = MAKENODE();
             type->type = TYPE_TYPEEXP;
             type->tok = t;
-            p_array(ti, type);
+            p_array(ti, type, flow);
             break;
         case TOKTYPE_LIST:
             nexttok(ti);
             type = MAKENODE();
             type->type = TYPE_TYPEEXP;
             type->tok = t;
-            p_array(ti, type);
+            p_array(ti, type, flow);
             break;
         case TOKTYPE_IDENT:
             nexttok(ti);
             type = MAKENODE();
             type->type = TYPE_TYPEEXP;
             type->tok = t;
-            p_array(ti, type);
+            p_array(ti, type, flow);
             break;
         case TOKTYPE_OPENPAREN:
             nexttok(ti);
@@ -1912,17 +1895,17 @@ node_s *p_type(tokiter_s *ti)
             type = MAKENODE();
             type->type = TYPE_TYPEEXP;
             type->tok = t;
-            opt = p_optparamlist(ti);
+            opt = p_optparamlist(ti, flow);
             addchild(type, opt);
             
             t = tok(ti);
             if(t->type == TOKTYPE_CLOSEPAREN) {
                 nexttok(ti);
-                p_array(ti, type);
+                p_array(ti, type, flow);
                 t = tok(ti);
                 if(t->type == TOKTYPE_MAP) {
                     nexttok(ti);
-                    ret = p_type(ti);
+                    ret = p_type(ti, flow);
                     addchild(type, ret);
                 }
                 else {
@@ -1981,7 +1964,7 @@ void p_declist(tokiter_s *ti, node_s *root)
     node_s *dec;
     
     while(t->type == TOKTYPE_VAR || t->type == TOKTYPE_CLASS) {
-        dec = p_dec(ti);
+        dec = p_dec(ti, NULL);
         addchild(root, dec);
         t = tok(ti);
         if(t->type == TOKTYPE_SEMICOLON)
@@ -1989,7 +1972,7 @@ void p_declist(tokiter_s *ti, node_s *root)
     }
 }
 
-void p_array(tokiter_s *ti, node_s *root)
+void p_array(tokiter_s *ti, node_s *root, flow_s *flow)
 {
     node_s *exp;
     tok_s *t = tok(ti);
@@ -1997,13 +1980,13 @@ void p_array(tokiter_s *ti, node_s *root)
     if(t->type == TOKTYPE_OPENBRACKET) {
         nexttok(ti);
         
-        exp = p_expression(ti);
+        exp = p_expression(ti, flow);
         addchild(root, exp);
         
         t = tok(ti);
         if(t->type == TOKTYPE_CLOSEBRACKET) {
             nexttok(ti);
-            p_array(ti, root);
+            p_array(ti, root, flow);
         }
         else {
             //syntax error
@@ -2013,7 +1996,7 @@ void p_array(tokiter_s *ti, node_s *root)
     }
 }
 
-node_s *p_param(tokiter_s *ti)
+node_s *p_param(tokiter_s *ti, flow_s *flow)
 {
     node_s *n, *ident, *opt;
     tok_s *t = tok(ti);
@@ -2030,10 +2013,10 @@ node_s *p_param(tokiter_s *ti)
         if(addident(ti->scope, ident)) {
            // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
         }
-        opt = p_opttype(ti);
+        opt = p_opttype(ti, flow);
         addchild(n, ident);
         addchild(n, opt);
-        p_assign(ti, n);
+        p_assign(ti, n, flow);
         return n;
     }
     else {
@@ -2044,13 +2027,13 @@ node_s *p_param(tokiter_s *ti)
     }
 }
 
-node_s *p_optparamlist(tokiter_s *ti)
+node_s *p_optparamlist(tokiter_s *ti, flow_s *flow)
 {
     node_s *empty;
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_IDENT) {
-        return p_paramlist(ti);
+        return p_paramlist(ti, flow);
     }
     else {
         //epsilon production
@@ -2060,20 +2043,20 @@ node_s *p_optparamlist(tokiter_s *ti)
     }
 }
 
-node_s *p_paramlist(tokiter_s *ti)
+node_s *p_paramlist(tokiter_s *ti, flow_s *flow)
 {
     node_s *root = MAKENODE(), *dec;
 
     root->type = TYPE_PARAMLIST;
-    dec = p_param(ti);
+    dec = p_param(ti, flow);
     
     addchild(root, dec);
-    p_paramlist_(ti, root);
+    p_paramlist_(ti, root, flow);
     
     return root;
 }
 
-void p_paramlist_(tokiter_s *ti, node_s *root)
+void p_paramlist_(tokiter_s *ti, node_s *root, flow_s *flow)
 {
     node_s *dec;
     tok_s *t = tok(ti);
@@ -2081,17 +2064,17 @@ void p_paramlist_(tokiter_s *ti, node_s *root)
     if(t->type == TOKTYPE_COMMA) {
         nexttok(ti);
         
-        dec = p_param(ti);
+        dec = p_param(ti, flow);
         
         addchild(root, dec);
-        p_paramlist_(ti, root);
+        p_paramlist_(ti, root, flow);
     }
     else {
         //epsilon production
     }
 }
 
-node_s *p_set(tokiter_s *ti)
+node_s *p_set(tokiter_s *ti, flow_s *flow)
 {
     tok_s *t = tok(ti);
     node_s *set = MAKENODE(), *exp;
@@ -2100,10 +2083,10 @@ node_s *p_set(tokiter_s *ti)
     
     if(t->type == TOKTYPE_OPENBRACE) {
         nexttok(ti);
-        exp = p_expression(ti);
+        exp = p_expression(ti, flow);
         addchild(set, exp);
-        p_optnext(ti, exp);
-        p_set_(ti, set);
+        p_optnext(ti, exp, flow);
+        p_set_(ti, set, flow);
         t = tok(ti);
         if(t->type == TOKTYPE_CLOSEBRACE) {
             nexttok(ti);
@@ -2122,7 +2105,7 @@ node_s *p_set(tokiter_s *ti)
     return set;
 }
 
-void p_optnext(tokiter_s *ti, node_s *root)
+void p_optnext(tokiter_s *ti, node_s *root, flow_s *flow)
 {
     node_s *exp;
     tok_s *t = tok(ti);
@@ -2133,7 +2116,7 @@ void p_optnext(tokiter_s *ti, node_s *root)
         op = MAKENODE();
         op->type = TYPE_OP;
         op->tok = t;
-        exp = p_expression(ti);
+        exp = p_expression(ti, flow);
         addchild(root, op);
         addchild(root, exp);
     }
@@ -2142,24 +2125,24 @@ void p_optnext(tokiter_s *ti, node_s *root)
         op = MAKENODE();
         op->type = TYPE_OP;
         op->tok = t;
-        exp = p_expression(ti);
+        exp = p_expression(ti, flow);
         addchild(root, op);
         addchild(root, exp);
     }
 }
 
 
-void p_set_(tokiter_s *ti, node_s *set)
+void p_set_(tokiter_s *ti, node_s *set, flow_s *flow)
 {
     tok_s *t = tok(ti);
     node_s *exp;
     
     if(t->type == TOKTYPE_COMMA) {
         nexttok(ti);
-        exp = p_expression(ti);
-        p_optnext(ti, exp);
+        exp = p_expression(ti, flow);
+        p_optnext(ti, exp, flow);
         addchild(set, exp);
-        p_set_(ti, set);
+        p_set_(ti, set, flow);
     }
     else {
         //epsilon production
@@ -2338,6 +2321,15 @@ void addflow(flnode_s *out, flnode_s *in)
         in->in = alloc(sizeof *in->in);
     in->in[in->nin] = out;
     in->nin++;
+}
+
+void fflow_stmt(flow_s *flow)
+{
+    flnode_s *old = flow->curr;
+    flnode_s *nn = allocz(sizeof *nn);
+    
+    addflow(old, nn);
+    flow->curr = nn;
 }
 
 node_s *getparentfunc(node_s *start)
