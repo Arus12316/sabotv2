@@ -207,7 +207,7 @@ void Connection::createAccount(const char pass[])
 /* Slots */
 void Connection::sessionInit()
 {
-    enum { SLEEP_TIME = 1000 };
+    enum { SLEEP_TIME = 10000 };
     qint64 n;
     char buf[SOCK_BUFSIZE];
     sock = new QTcpSocket;

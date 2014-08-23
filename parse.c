@@ -1,7 +1,7 @@
 /*
  <statementlist> -> <statement> <statementlist> | ε
  
- <statement> ->  <expression> | <control> | <dec> | return <expression> | ;
+ <statement> ->  <expression> | <control> | <dec> | return <expression> | ; | continue | break
  
  <expression> -> <simple_expression> <expression'>
  
@@ -168,6 +168,8 @@ enum {
     TOKTYPE_REGEXTYPE,
     TOKTYPE_LIST,
     TOKTYPE_RETURN,
+    TOKTYPE_BREAK,
+    TOKTYPE_CONTINUE,
     TOKTYPE_CLASS,
     TOKTYPE_UNNEG
 };
@@ -248,6 +250,7 @@ struct tokiter_s
     errlist_s *err;
     errlist_s *ecurr;
     scope_s *scope;
+    node_s *graph;
 };
 
 static struct keyw_s {
@@ -274,7 +277,9 @@ keywords[] = {
     {"list", TOKTYPE_LIST},
     {"return", TOKTYPE_RETURN},
     {"class", TOKTYPE_CLASS},
-    {"do", TOKTYPE_DO}
+    {"do", TOKTYPE_DO},
+    {"break", TOKTYPE_BREAK},
+    {"continue", TOKTYPE_CONTINUE}
 };
 
 struct node_s
@@ -284,9 +289,13 @@ struct node_s
     tok_s *tok;
     scope_s *scope;
     
+    unsigned index;
     unsigned nchildren;
     node_s **children;
     node_s *parent;
+    
+    node_s *currtype;
+    node_s *statement;
 };
 
 struct rec_s
@@ -352,6 +361,8 @@ static void synerr_rec(tokiter_s *ti);
 
 static node_s *node_s_(scope_s *scope);
 static void addchild(node_s *root, node_s *c);
+static node_s *right(node_s *node);
+static node_s *left(node_s *node);
 
 static unsigned pjwhash(char *key);
 static bool addident(scope_s *root, node_s *ident);
@@ -359,7 +370,9 @@ static scope_s *idtinit(scope_s *parent);
 static void pushscope(tokiter_s *ti);
 static inline void popscope(tokiter_s *ti);
 
+static node_s *getparentfunc(node_s *start);
 static void walk_tree(node_s *root);
+static bool typeeq(node_s *typeexp, node_s *literal);
 
 static void freetree(node_s *root);
 
@@ -723,7 +736,6 @@ bool trykeyword(tokchunk_s **list, tok_s **prev, uint16_t line, char *str)
     return false;
 }
 
-
 void printtoks(tokchunk_s *list)
 {
     int i;
@@ -738,7 +750,6 @@ void printtoks(tokchunk_s *list)
 
 tok_s *tok(tokiter_s *ti)
 {
-    
     if(ti->i == ti->curr->size) {
         if(ti->curr->next)
             return &ti->curr->next->tok[0];
@@ -775,7 +786,9 @@ node_s *start(tokiter_s *ti)
     root->type = TYPE_NODE;
     
     ti->scope = idtinit(NULL);
-    
+    ti->graph = MAKENODE();
+    ti->graph->type = TYPE_NODE;
+
     p_statementlist(ti, root);
     t = tok(ti);
     
@@ -792,7 +805,7 @@ node_s *start(tokiter_s *ti)
 void p_statementlist(tokiter_s *ti, node_s *root)
 {
     node_s *statement;
-    tok_s *t = tok(ti);
+    tok_s *t = tok(ti), *tcmp;
     
     switch(t->type) {
         case TOKTYPE_CLASS:
@@ -815,7 +828,20 @@ void p_statementlist(tokiter_s *ti, node_s *root)
         case TOKTYPE_RETURN:
         case TOKTYPE_SEMICOLON:
             statement = p_statement(ti);
+            
             addchild(root, statement);
+
+            if(statement) {
+                if(statement->nchildren) {
+                    tcmp = statement->children[0]->tok;
+                    if(tcmp && tcmp->type == TOKTYPE_RETURN) {
+                        if(!getparentfunc(statement)) {
+                            adderr(ti, "Return Error", "return from invalid scope", tcmp->line, "return from lambda expression", NULL);
+                        }
+                    }
+                }
+            }
+            
             p_statementlist(ti, root);
             break;
         case TOKTYPE_CLOSEBRACE:
@@ -866,12 +892,21 @@ node_s *p_statement(tokiter_s *ti)
             ret->tok = t;
             exp = p_expression(ti);
             
+            
             addchild(statement, ret);
             addchild(statement, exp);
             return statement;
         case TOKTYPE_SEMICOLON:
             nexttok(ti);
             return NULL;
+        case TOKTYPE_BREAK:
+            nexttok(ti);
+            return NULL;
+            break;
+        case TOKTYPE_CONTINUE:
+            nexttok(ti);
+            return NULL;
+            break;
         default:
             //syntax error
             adderr(ti, "Syntax Error", t->lex, t->line, "identifier", "number", "(", "not", "string",
@@ -1026,7 +1061,7 @@ void p_optexp(tokiter_s *ti, node_s *factor)
 
 node_s *p_factor_(tokiter_s *ti)
 {
-    node_s *n, *ident, *f, *op;
+    node_s *n, *ident, *f, *op, *typeexp;
     tok_s *t = tok(ti);
     
     switch(t->type) {
@@ -1214,7 +1249,7 @@ node_s *p_lambda(tokiter_s *ti)
     lambda->type = TYPE_NODE;
     op->type = TYPE_OP;
     op->tok = t;
-
+    
     t = nexttok(ti);
     
     if(t->type == TOKTYPE_OPENPAREN) {
@@ -1512,7 +1547,6 @@ node_s *p_switch(tokiter_s *ti)
     op->tok = t;
     
     t = nexttok(ti);
-    
     if(t->type == TOKTYPE_OPENPAREN) {
         nexttok(ti);
         exp = p_expression(ti);
@@ -1680,7 +1714,7 @@ node_s *p_dec(tokiter_s *ti)
     tok_s *t = tok(ti);
     
     dec = MAKENODE();
-    dec->type = TYPE_DEC;
+    dec->type = TYPE_NODE;
     
     op = MAKENODE();
     op->type = TYPE_OP;
@@ -1785,9 +1819,6 @@ node_s *p_type(tokiter_s *ti)
 {
     node_s *type, *opt, *ret;
     tok_s *t = tok(ti);
-    
-    type = MAKENODE();
-    type->type = TYPE_TYPEEXP;
     
     switch(t->type) {
         case TOKTYPE_VOID:
@@ -2111,6 +2142,7 @@ node_s *node_s_(scope_s *scope)
     node_s *e = alloc(sizeof *e);
     
     e->tok = NULL;
+    e->index = 0;
     e->scope = scope;
     e->nchildren = 0;
     return e;
@@ -2123,10 +2155,39 @@ void addchild(node_s *root, node_s *c)
             root->children = ralloc(root->children, (root->nchildren + 1) * sizeof(*root->children));
         else
             root->children = alloc(sizeof *root->children);
+        c->parent = root;
         root->children[root->nchildren] = c;
+        c->index = root->nchildren;
         root->nchildren++;
     }
 }
+
+node_s *right(node_s *node)
+{
+    unsigned i;
+    node_s *p = node->parent;
+    
+    if(p) {
+        i = node->index;
+        if(i < node->nchildren - 1)
+            return p->children[i + 1];
+    }
+    return NULL;
+}
+
+node_s *left(node_s *node)
+{
+    unsigned i;
+    node_s *p = node->parent;
+
+    if(p) {
+        i = node->index;
+        if(i)
+            return p->children[i - 1];
+    }
+    return NULL;
+}
+
 
 /*
  pjw hash function 
@@ -2195,17 +2256,60 @@ inline void popscope(tokiter_s *ti)
     ti->scope = ti->scope->parent;
 }
 
+void checkvar(node_s *var)
+{
+    node_s  *id = right(var),
+            *opttype,
+            *assign = right(id);
+    
+    if(assign) {
+        if(assign->type == TYPE_OP) {
+            
+        }
+        else {
+            opttype = assign;
+            assign = right(opttype);
+            if(assign) {
+                
+            }
+        }
+    }
+}
+
+node_s *getparentfunc(node_s *start)
+{
+    while(start) {
+        if(start->nchildren) {
+            if(start->children[0]->tok && start->children[0]->tok->type == TOKTYPE_LAMBDA)
+                return start;
+        }
+        start = start->parent;
+    }
+    return NULL;
+}
+
 void walk_tree(node_s *root)
 {
     unsigned i;
     
-    for(i = 0; i < root->nchildren; i++) {
+    //printf("%u\n", root->nchildren);
+    for(i = 0; i < root->nchildren; i++)
         walk_tree(root->children[i]);
+    
+    if(root->type == TYPE_OP) {
+       /* switch(root->tok->type) {
+            case TOKTYPE_VAR:
+                break;
+        }*/
     }
-    if(root->tok) {
-        printf("tok: %s\n", root->tok->lex);
-    }
+    
 }
+
+bool typeeq(node_s *typeexp, node_s *literal)
+{
+    return false;
+}
+
 
 void freetree(node_s *root)
 {
