@@ -47,12 +47,16 @@ while(true) {
 
 continue;
 
+let x := 32
+let y := 33
+
 if x > 3 4
 
 ;
 
 x[3](33);
 
+var x := @(a:int, b:int){ a + b }
 
 x().hello()()().ha()().ho := 32;
 
@@ -64,7 +68,6 @@ users.foreach(
         print(derp);
     }
 );
-
 
 do 
     while 1
@@ -78,6 +81,9 @@ while x <= 4 {
     x += 1;
     x := 1;
 }
+
+let x := 32 
+let y := 34
 
 break
 
@@ -115,8 +121,6 @@ class bob : tom {
     }
     
     var x : bob;
-    
-
 
 };
 

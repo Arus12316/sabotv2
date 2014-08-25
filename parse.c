@@ -81,7 +81,9 @@
  
  <controlsuffix> -> openbrace <statementlist> closebrace | <statement>
  
- <dec> -> var id <opttype> <assign> | class id <inh> { <declist> } | enum <optid> { <enumlist> }
+ <dec> -> <varlet> id <opttype> <assign> | class id <inh> { <declist> } | enum <optid> { <enumlist> }
+ 
+ <varlet> -> var | let
  
  <enumlist> -> id <assign> <enumlist'> | ε
  <enumlist'> -> , id <assign> <enumlist'> | ε
@@ -171,6 +173,7 @@ enum {
     TOKTYPE_FOR,
     TOKTYPE_LISENER,
     TOKTYPE_VAR,
+    TOKTYPE_LET,
     TOKTYPE_VOID,
     TOKTYPE_INTEGER,
     TOKTYPE_REAL,
@@ -280,6 +283,7 @@ keywords[] = {
     {"default", TOKTYPE_DEFAULT},
     {"listener", TOKTYPE_LISENER},
     {"var", TOKTYPE_VAR},
+    {"let", TOKTYPE_LET},
     {"void", TOKTYPE_VOID},
     {"int", TOKTYPE_INTEGER},
     {"real", TOKTYPE_REAL},
@@ -863,6 +867,7 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
     switch(t->type) {
         case TOKTYPE_CLASS:
         case TOKTYPE_VAR:
+        case TOKTYPE_LET:
         case TOKTYPE_ENUM:
         case TOKTYPE_LISENER:
         case TOKTYPE_SWITCH:
@@ -940,7 +945,6 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_LAMBDA:
         case TOKTYPE_OPENBRACE:
         case TOKTYPE_ADDOP:
-            
             fflow_stmt(flow);
             return p_expression(ti, flow);
         case TOKTYPE_WHILE:
@@ -949,6 +953,7 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_LISENER:
             return p_control(ti, flow);
         case TOKTYPE_VAR:
+        case TOKTYPE_LET:
         case TOKTYPE_CLASS:
         case TOKTYPE_ENUM:
             return p_dec(ti, flow);
@@ -1776,7 +1781,7 @@ node_s *p_dec(tokiter_s *ti, flow_s *flow)
     op->type = TYPE_OP;
     op->tok = t;
     
-    if(t->type == TOKTYPE_VAR) {
+    if(t->type == TOKTYPE_VAR || t->type == TOKTYPE_LET) {
         t = nexttok(ti);
         if(t->type == TOKTYPE_IDENT) {
             nexttok(ti);
@@ -2066,7 +2071,7 @@ void p_declist(tokiter_s *ti, node_s *root)
     tok_s *t = tok(ti);
     node_s *dec;
     
-    while(t->type == TOKTYPE_VAR || t->type == TOKTYPE_CLASS) {
+    while(t->type == TOKTYPE_VAR || t->type == TOKTYPE_CLASS || t->type == TOKTYPE_ENUM || t->type == TOKTYPE_LET) {
         dec = p_dec(ti, NULL);
         addchild(root, dec);
         t = tok(ti);
