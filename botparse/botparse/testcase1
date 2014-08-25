@@ -21,6 +21,10 @@ var woah :  (a : int) ->
     break
 };
 
+var tom : (x : int, y : int, z : int) -> real[30]
+
+var derp : (bob : d, int, real, (int, real) -> int, () -> int) -> real[20]
+
 var bob := if x = 3 { 3 } else {4}
 
 return x;
@@ -61,6 +65,7 @@ users.foreach(
     }
 );
 
+
 do 
     while 1
         ;
@@ -71,6 +76,7 @@ while x <= 4 {
     1+1;
     a := "32";
     x += 1;
+    x := 1;
 }
 
 break
@@ -109,6 +115,8 @@ class bob : tom {
     }
     
     var x : bob;
+    
+
 
 };
 
@@ -136,6 +144,11 @@ listener(1) {
     var y := @( x,  y,  z) {
         3+3;
     };
+}
+
+enum bob {
+    derp := 30, omg, haha
+
 }
 
 1+1;

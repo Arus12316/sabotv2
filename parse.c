@@ -2,7 +2,7 @@
  <statementlist> -> <statement> <statementlist> | ε
  
  <statement> ->  <expression> | <control> | <dec> | return <expression> | ; | continue | break
- 
+
  <expression> -> <simple_expression> <expression'>
  
  <expression'> -> relop <simple_expression> | ε
@@ -81,11 +81,16 @@
  
  <controlsuffix> -> openbrace <statementlist> closebrace | <statement>
  
- <dec> -> var id <opttype> <assign> | class id <inh> { <declist> }
+ <dec> -> var id <opttype> <assign> | class id <inh> { <declist> } | enum <optid> { <enumlist> }
+ 
+ <enumlist> -> id <assign> <enumlist'> | ε
+ <enumlist'> -> , id <assign> <enumlist'> | ε
+ 
+ <optid> -> id | ε
  
  <opttype> -> : <type> | ε
  
- <type> -> void | integer <array> | real <array> | String <array> | Regex <array> | set <array> | id <array> |( <optparamlist> ) <array> map <type>
+ <type> -> void | integer <array> | real <array> | String <array> | Regex <array> | set <array> | id <array> |( <typelist> ) <array> map <type>
  
  <inh> -> : id | ε
  <declist> -> <dec> <optsemicolon> <declist> | ε
@@ -93,6 +98,10 @@
  <optsemicolon> -> ; | ε
  
  <array> -> [ <expression> ] <array> | ε
+ 
+ <typelist> -> <optname> <type> <typelist'> | ε
+ <typelist'> -> , <optname> <type> <typelist'> | ε
+ <optname> -> id : | ε
  
  <optparamlist> -> <paramlist> | ε
  <param> -> id <opttype> <assign>
@@ -150,6 +159,7 @@ enum {
     TOKTYPE_ASSIGN,
     TOKTYPE_COLON,
     TOKTYPE_SEMICOLON,
+    TOKTYPE_ENUM,
     TOKTYPE_NOT,
     TOKTYPE_IF,
     TOKTYPE_ELSE,
@@ -191,7 +201,7 @@ enum {
     TOKATT_OR,
     TOKATT_ADD,
     TOKATT_SUB,
-    TOKATT_EXP
+    TOKATT_EXP,
 };
 
 enum {
@@ -280,7 +290,8 @@ keywords[] = {
     {"class", TOKTYPE_CLASS},
     {"do", TOKTYPE_DO},
     {"break", TOKTYPE_BREAK},
-    {"continue", TOKTYPE_CONTINUE}
+    {"continue", TOKTYPE_CONTINUE},
+    {"enum", TOKTYPE_ENUM}
 };
 
 struct node_s
@@ -335,6 +346,7 @@ static void printtoks(tokchunk_s *list);
 
 static tok_s *tok(tokiter_s *ti);
 static tok_s *nexttok(tokiter_s *ti);
+static tok_s *peeknexttok(tokiter_s *ti);
 
 static node_s *start(tokiter_s *ti);
 static void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow);
@@ -362,11 +374,18 @@ static void p_caselist(tokiter_s *ti, node_s *root, flow_s *flow);
 static void p_else(tokiter_s *ti, node_s *root, flow_s *flow);
 static void p_controlsuffix(tokiter_s *ti, node_s *root, flow_s *flow);
 static node_s *p_dec(tokiter_s *ti, flow_s *flow);
+static void p_enumlist(tokiter_s *ti, node_s *root, flow_s *flow);
+static void p_enumlist_(tokiter_s *ti, node_s *root, flow_s *flow);
+static void p_optid(tokiter_s *ti, node_s *root);
 static node_s *p_opttype(tokiter_s *ti, flow_s *flow);
 static node_s *p_type(tokiter_s *ti,flow_s *flow);
 static void p_inh(tokiter_s *ti, node_s *root);
 static void p_declist(tokiter_s *ti, node_s *root);
 static void p_array(tokiter_s *ti, node_s *root, flow_s *flow);
+
+static node_s *p_typelist(tokiter_s *ti, flow_s *flow);
+static void p_typelist_(tokiter_s *ti, node_s *root, flow_s *flow);
+
 static node_s *p_optparamlist(tokiter_s *ti, flow_s *flow);
 static node_s *p_paramlist(tokiter_s *ti, flow_s *flow);
 static void p_paramlist_(tokiter_s *ti, node_s *root, flow_s *flow);
@@ -697,8 +716,9 @@ tokiter_s *lex(char *src)
                     else if(!strcmp(bptr, "false")) {
                         prev = mtok(&curr, line, "0", 1, TOKTYPE_NUM, TOKATT_NUMINT);
                     }
-                    else if(!trykeyword(&curr, &prev, line, bptr))
+                    else if(!trykeyword(&curr, &prev, line, bptr)) {
                         prev = mtok(&curr, line, bptr, src - bptr, TOKTYPE_IDENT, TOKATT_DEFAULT);
+                    }
                     *src = c;
                 }
                 else {
@@ -788,12 +808,25 @@ tok_s *nexttok(tokiter_s *ti)
         ti->i++;
         return &ti->curr->tok[i + 1];
     }
-    else if(ti->i == ti->curr->size - 1) {
+    else if(i == ti->curr->size - 1) {
         ti->curr = ti->curr->next;
         ti->i = 0;
         return &ti->curr->tok[0];
     }
     perror("nexttok error");
+    return &eoftok;
+}
+
+tok_s *peeknexttok(tokiter_s *ti)
+{
+    uint8_t i = ti->i;
+    
+    if(i < ti->curr->size-1) {
+        return &ti->curr->tok[i + 1];
+    }
+    else if(i == ti->curr->size - 1) {
+        return &ti->curr->next->tok[0];
+    }
     return &eoftok;
 }
 
@@ -830,6 +863,7 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
     switch(t->type) {
         case TOKTYPE_CLASS:
         case TOKTYPE_VAR:
+        case TOKTYPE_ENUM:
         case TOKTYPE_LISENER:
         case TOKTYPE_SWITCH:
         case TOKTYPE_FOR:
@@ -906,6 +940,7 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_LAMBDA:
         case TOKTYPE_OPENBRACE:
         case TOKTYPE_ADDOP:
+            
             fflow_stmt(flow);
             return p_expression(ti, flow);
         case TOKTYPE_WHILE:
@@ -915,6 +950,7 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
             return p_control(ti, flow);
         case TOKTYPE_VAR:
         case TOKTYPE_CLASS:
+        case TOKTYPE_ENUM:
             return p_dec(ti, flow);
         case TOKTYPE_RETURN:
             nexttok(ti);
@@ -1811,12 +1847,79 @@ node_s *p_dec(tokiter_s *ti, flow_s *flow)
             synerr_rec(ti);
         }
     }
+    else if(t->type == TOKTYPE_ENUM) {
+        nexttok(ti);
+        
+        ident = MAKENODE();
+        ident->type = TYPE_IDENT;
+        ident->tok = t;
+
+        
+        p_optid(ti, ident);
+        t = tok(ti);
+        
+        if(t->type == TOKTYPE_OPENBRACE) {
+            nexttok(ti);
+            p_enumlist(ti, ident, flow);
+            t = tok(ti);
+            if(t->type == TOKTYPE_CLOSEBRACE) {
+                nexttok(ti);
+            }
+            else {
+                adderr(ti, "Syntax Error", t->lex, t->line, "}", NULL);
+                synerr_rec(ti);
+            }
+        }
+        else {
+            adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
+            synerr_rec(ti);
+        }
+    }
     else {
         //syntax error
         adderr(ti, "Syntax Error", t->lex, t->line, "var", NULL);
         synerr_rec(ti);
     }
     return dec;
+}
+
+void p_enumlist(tokiter_s *ti, node_s *root, flow_s *flow)
+{
+    tok_s *t = tok(ti);
+    
+    if(t->type == TOKTYPE_IDENT) {
+        nexttok(ti);
+        p_assign(ti, root, flow);
+        p_enumlist_(ti, root, flow);
+    }
+}
+
+void p_enumlist_(tokiter_s *ti, node_s *root, flow_s *flow)
+{
+    tok_s *t = tok(ti);
+    
+    if(t->type == TOKTYPE_COMMA) {
+        t = nexttok(ti);
+        if(t->type == TOKTYPE_IDENT) {
+            nexttok(ti);
+            p_assign(ti, root, flow);
+            p_enumlist_(ti, root, flow);
+        }
+        else {
+            adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
+            synerr_rec(ti);
+        }
+    }
+}
+
+void p_optid(tokiter_s *ti, node_s *root)
+{
+    tok_s *t = tok(ti);
+    
+    if(t->type == TOKTYPE_IDENT) {
+        nexttok(ti);
+        
+    }
 }
 
 node_s *p_opttype(tokiter_s *ti, flow_s *flow)
@@ -1895,7 +1998,7 @@ node_s *p_type(tokiter_s *ti, flow_s *flow)
             type = MAKENODE();
             type->type = TYPE_TYPEEXP;
             type->tok = t;
-            opt = p_optparamlist(ti, flow);
+            opt = p_typelist(ti, flow);
             addchild(type, opt);
             
             t = tok(ti);
@@ -1993,6 +2096,63 @@ void p_array(tokiter_s *ti, node_s *root, flow_s *flow)
             adderr(ti, "Syntax Error", t->lex, t->line, "]", NULL);
             synerr_rec(ti);
         }
+    }
+}
+
+node_s *p_typelist(tokiter_s *ti, flow_s *flow)
+{
+    node_s *type;
+    tok_s *t = tok(ti);
+    node_s *root = MAKENODE();
+    root->type = TYPE_NODE;
+    
+    switch(t->type) {
+        case TOKTYPE_VOID:
+        case TOKTYPE_INTEGER:
+        case TOKTYPE_REAL:
+        case TOKTYPE_STRINGTYPE:
+        case TOKTYPE_REGEXTYPE:
+        case TOKTYPE_LIST:
+        case TOKTYPE_OPENPAREN:
+            type = p_type(ti, flow);
+            addchild(root, type);
+            p_typelist_(ti, root, flow);
+            break;
+        case TOKTYPE_IDENT:
+            t = peeknexttok(ti);
+            if(t->type == TOKTYPE_COLON) {
+                nexttok(ti);
+                nexttok(ti);
+            }
+            type = p_type(ti, flow);
+            addchild(root, type);
+            p_typelist_(ti, root, flow);
+            break;
+        default:
+            //epsilon production
+            break;
+    }
+    
+    return root;
+}
+
+void p_typelist_(tokiter_s *ti, node_s *root, flow_s *flow)
+{
+    tok_s *t = tok(ti);
+    node_s *type;
+    
+    if(t->type == TOKTYPE_COMMA) {
+        t = nexttok(ti);
+        if(t->type == TOKTYPE_IDENT) {
+            t = peeknexttok(ti);
+            if(t->type == TOKTYPE_COLON) {
+                nexttok(ti);
+                nexttok(ti);
+            }
+        }
+        type = p_type(ti, flow);
+        addchild(root, type);
+        p_typelist_(ti, root, flow);
     }
 }
 
