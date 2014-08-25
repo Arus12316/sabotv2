@@ -24,6 +24,8 @@
  
  <factor'> ->   id <factor''> <assign> { <factor''>.ident := id }
                 |
+                . id <factor''>
+                |
                 num
                 |
                 ( <expression> )
@@ -59,7 +61,7 @@
                 |
                 for id <- <expression> <controlsuffix>
                 |
-                listener(<arglist>) <controlsuffix>
+                listener(<optarglist>) <controlsuffix>
                 |
                 do <controlsuffix> while <expression>
  
@@ -171,7 +173,7 @@ enum {
     TOKTYPE_DO,
     TOKTYPE_WHILE,
     TOKTYPE_FOR,
-    TOKTYPE_LISENER,
+    TOKTYPE_LISTENER,
     TOKTYPE_VAR,
     TOKTYPE_LET,
     TOKTYPE_VOID,
@@ -281,7 +283,7 @@ keywords[] = {
     {"switch", TOKTYPE_SWITCH},
     {"case", TOKTYPE_CASE},
     {"default", TOKTYPE_DEFAULT},
-    {"listener", TOKTYPE_LISENER},
+    {"listener", TOKTYPE_LISTENER},
     {"var", TOKTYPE_VAR},
     {"let", TOKTYPE_LET},
     {"void", TOKTYPE_VOID},
@@ -869,7 +871,7 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
         case TOKTYPE_VAR:
         case TOKTYPE_LET:
         case TOKTYPE_ENUM:
-        case TOKTYPE_LISENER:
+        case TOKTYPE_LISTENER:
         case TOKTYPE_SWITCH:
         case TOKTYPE_FOR:
         case TOKTYPE_WHILE:
@@ -883,6 +885,7 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
         case TOKTYPE_NOT:
         case TOKTYPE_OPENPAREN:
         case TOKTYPE_NUM:
+        case TOKTYPE_DOT:
         case TOKTYPE_IDENT:
         case TOKTYPE_RETURN:
         case TOKTYPE_BREAK:
@@ -936,6 +939,7 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
     switch(t->type) {
         case TOKTYPE_IDENT:
         case TOKTYPE_NUM:
+        case TOKTYPE_DOT:
         case TOKTYPE_OPENPAREN:
         case TOKTYPE_NOT:
         case TOKTYPE_IF:
@@ -950,7 +954,7 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_WHILE:
         case TOKTYPE_DO:
         case TOKTYPE_FOR:
-        case TOKTYPE_LISENER:
+        case TOKTYPE_LISTENER:
             return p_control(ti, flow);
         case TOKTYPE_VAR:
         case TOKTYPE_LET:
@@ -1164,6 +1168,31 @@ node_s *p_factor_(tokiter_s *ti, flow_s *flow)
 
             p_factor__(ti, n, flow);
             p_assign(ti, n, flow);
+            break;
+        case TOKTYPE_DOT:
+            op = MAKENODE();
+            op->type = TYPE_OP;
+            op->tok = t;
+            t = nexttok(ti);
+
+            n = MAKENODE();
+            n->type = TYPE_NODE;
+
+            if(t->type == TOKTYPE_IDENT) {
+                nexttok(ti);
+                ident = MAKENODE();
+                ident->type = TYPE_IDENT;
+                ident->tok = t;
+                addchild(n, op);
+                addchild(n, ident);
+                p_factor__(ti, n, flow);
+            }
+            else {
+                n = NULL;
+                //syntax error
+                adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
+                synerr_rec(ti);
+            }
             break;
         case TOKTYPE_NUM:
             nexttok(ti);
@@ -1422,6 +1451,7 @@ node_s *p_optarglist(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_NOT:
         case TOKTYPE_OPENPAREN:
         case TOKTYPE_NUM:
+        case TOKTYPE_DOT:
         case TOKTYPE_IDENT:
         case TOKTYPE_IF:
         case TOKTYPE_SWITCH:
@@ -1518,11 +1548,11 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
                 synerr_rec(ti);
             }
             break;
-        case TOKTYPE_LISENER:
+        case TOKTYPE_LISTENER:
             t = nexttok(ti);
             if(t->type == TOKTYPE_OPENPAREN) {
                 nexttok(ti);
-                arg = p_arglist(ti, flow);
+                arg = p_optarglist(ti, flow);
                 t = tok(ti);
                 if(t->type == TOKTYPE_CLOSEPAREN) {
                     t = nexttok(ti);
