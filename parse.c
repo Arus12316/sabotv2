@@ -94,7 +94,7 @@
  
  <opttype> -> : <type> | ε
  
- <type> -> void | integer <array> | real <array> | String <array> | Regex <array> | set <array> | id <array> |( <typelist> ) <array> map <type>
+ <type> -> void | integer <array> | char <array> | real <array> | String <array> | Regex <array> | set <array> | id <array> |( <typelist> ) <array> map <type>
  
  <inh> -> : id | ε
  <declist> -> <dec> <optsemicolon> <declist> | ε
@@ -186,6 +186,7 @@ enum {
     TOKTYPE_BREAK,
     TOKTYPE_CONTINUE,
     TOKTYPE_CLASS,
+    TOKTYPE_CHAR,
     TOKTYPE_UNNEG
 };
 
@@ -288,6 +289,7 @@ keywords[] = {
     {"let", TOKTYPE_LET},
     {"void", TOKTYPE_VOID},
     {"int", TOKTYPE_INTEGER},
+    {"char", TOKTYPE_CHAR},
     {"real", TOKTYPE_REAL},
     {"string", TOKTYPE_STRINGTYPE},
     {"regex", TOKTYPE_REGEXTYPE},
@@ -1986,6 +1988,13 @@ node_s *p_type(tokiter_s *ti, flow_s *flow)
             type->tok= t;
             break;
         case TOKTYPE_INTEGER:
+            nexttok(ti);
+            type = MAKENODE();
+            type->type = TYPE_TYPEEXP;
+            type->tok = t;
+            p_array(ti, type, flow);
+            break;
+        case TOKTYPE_CHAR:
             nexttok(ti);
             type = MAKENODE();
             type->type = TYPE_TYPEEXP;
