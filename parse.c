@@ -38,7 +38,7 @@
                 |
                 <set>
                 |
-                <lambda> { <factor'>.type := closure; <factor'>.val := <lambda>.val }
+                <lambda> <factor''> { <factor'>.type := closure; <factor'>.val := <lambda>.val }
                 |
                 <if>
                 |
@@ -343,6 +343,7 @@ struct flnode_s
 {
     unsigned nin;
     unsigned nout;
+    node_s *value;
     flnode_s **in;
     flnode_s **out;
 };
@@ -413,6 +414,7 @@ static scope_s *idtinit(scope_s *parent);
 static void pushscope(tokiter_s *ti);
 static inline void popscope(tokiter_s *ti);
 static flow_s *flow_s_(void);
+static flnode_s *flnode_s_(void);
 static void addflow(flnode_s *out, flnode_s *in);
 static void fflow_stmt(flow_s *flow);
 static node_s *getparentfunc(node_s *start);
@@ -858,8 +860,6 @@ node_s *start(tokiter_s *ti)
         adderr(ti, "Syntax Error", t->lex, t->line, "EOF", NULL);
     }
     
-    walk_tree(root);
-    
     return root;
 }
 
@@ -923,6 +923,7 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
             break;
         case TOKTYPE_CLOSEBRACE:
         case TOKTYPE_EOF:
+            flow->final = flow->curr;
             //epsilon production
             break;
         default:
@@ -935,6 +936,8 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
 
 node_s *p_statement(tokiter_s *ti, flow_s *flow)
 {
+    flow_s *nf;
+    flnode_s *fn = flnode_s_();
     node_s *statement, *exp, *jmp;
     tok_s *t = tok(ti);
     
@@ -951,17 +954,27 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_LAMBDA:
         case TOKTYPE_OPENBRACE:
         case TOKTYPE_ADDOP:
-            fflow_stmt(flow);
-            return p_expression(ti, flow);
+            nf = flow_s_();
+            nf->final = flnode_s_();
+            flow->curr = nf->final;
+            statement = p_expression(ti, nf);
+            return statement;
         case TOKTYPE_WHILE:
         case TOKTYPE_DO:
         case TOKTYPE_FOR:
         case TOKTYPE_LISTENER:
-            return p_control(ti, flow);
+            statement =  p_control(ti, flow);
+            fn->value = NULL;
+            addflow(flow->curr, fn);
+            flow->curr = fn;
+            return statement;
         case TOKTYPE_VAR:
         case TOKTYPE_LET:
         case TOKTYPE_CLASS:
         case TOKTYPE_ENUM:
+            fn->value = NULL;
+            addflow(flow->curr, fn);
+            flow->curr = fn;
             return p_dec(ti, flow);
         case TOKTYPE_RETURN:
             nexttok(ti);
@@ -973,10 +986,14 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
             exp = p_expression(ti, flow);
             addchild(statement, jmp);
             addchild(statement, exp);
-            fflow_stmt(flow);
+            fn->value = exp;
+            addflow(flow->curr, fn);
+            addflow(fn, flow->final);
             return statement;
         case TOKTYPE_SEMICOLON:
             nexttok(ti);
+            addflow(flow->curr, fn);
+            flow->curr = fn;
             return NULL;
         case TOKTYPE_BREAK:
             nexttok(ti);
@@ -986,7 +1003,8 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
             jmp->type = TYPE_OP;
             jmp->tok = t;
             addchild(statement, jmp);
-            fflow_stmt(flow);
+            addflow(flow->curr, fn);
+            flow->curr = fn;
             return statement;
         case TOKTYPE_CONTINUE:
             nexttok(ti);
@@ -996,7 +1014,8 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
             jmp->type = TYPE_OP;
             jmp->tok = t;
             addchild(statement, jmp);
-            fflow_stmt(flow);
+            addflow(flow->curr, fn);
+            flow->curr = fn;
             return statement;
         default:
             //syntax error
@@ -1013,7 +1032,7 @@ node_s *p_expression(tokiter_s *ti, flow_s *flow)
     
     exp = MAKENODE();
     exp->type = TYPE_NODE;
-
+    
     node = p_simple_expression(ti, flow);
     addchild(exp, node);
     p_expression_(ti, exp, flow);
@@ -1152,6 +1171,7 @@ void p_optexp(tokiter_s *ti, node_s *factor, flow_s *flow)
 
 node_s *p_factor_(tokiter_s *ti, flow_s *flow)
 {
+    flnode_s *fl = flnode_s_();
     node_s *n, *ident, *f, *op;
     tok_s *t = tok(ti);
     
@@ -1168,8 +1188,12 @@ node_s *p_factor_(tokiter_s *ti, flow_s *flow)
             
             addchild(n, ident);
 
-            p_factor__(ti, n, flow);
-            p_assign(ti, n, flow);
+            p_factor__(ti, n, flow_s_());
+            p_assign(ti, n, flow_s_());
+            
+            fl->value = ident;
+            addflow(flow->curr, fl);
+            flow->curr = fl;
             break;
         case TOKTYPE_DOT:
             op = MAKENODE();
@@ -1187,7 +1211,11 @@ node_s *p_factor_(tokiter_s *ti, flow_s *flow)
                 ident->tok = t;
                 addchild(n, op);
                 addchild(n, ident);
-                p_factor__(ti, n, flow);
+                p_factor__(ti, n, flow_s_());
+                
+                fl->value = ident;
+                addflow(flow->curr, fl);
+                flow->curr = fl;
             }
             else {
                 n = NULL;
@@ -1201,6 +1229,9 @@ node_s *p_factor_(tokiter_s *ti, flow_s *flow)
             n = MAKENODE();
             n->type = TYPE_NUM;
             n->tok = t;
+            fl->value = n;
+            addflow(flow->curr, fl);
+            flow->curr = fl;
             break;
         case TOKTYPE_OPENPAREN:
             nexttok(ti);
@@ -1245,6 +1276,7 @@ node_s *p_factor_(tokiter_s *ti, flow_s *flow)
             break;
         case TOKTYPE_LAMBDA:
             n = p_lambda(ti);
+            p_factor__(ti, n, flow_s_());
             break;
         case TOKTYPE_IF:
             n = p_if(ti, flow);
@@ -1532,9 +1564,6 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
                     p_controlsuffix(ti, suffix, flow);
                 }
                 else {
-                    free(control);
-                    free(op);
-                    free(ident);
                     control = NULL;
                     //syntax error
                     adderr(ti, "Syntax Error", t->lex, t->line, "<-", NULL);
@@ -1542,8 +1571,6 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
                 }
             }
             else {
-                free(control);
-                free(op);
                 control = NULL;
                 //syntax error
                 adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
@@ -1627,9 +1654,8 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
 
 node_s *p_if(tokiter_s *ti, flow_s *flow)
 {
+    flnode_s *cond = flnode_s_();
     node_s *root = MAKENODE(), *op = MAKENODE(), *exp, *suffix = MAKENODE();
-    flow_s  *ftrue = flow_s_(),
-            *ffalse = flow_s_();
     
     root->type = TYPE_NODE;
     suffix->type = TYPE_NODE;
@@ -1642,8 +1668,13 @@ node_s *p_if(tokiter_s *ti, flow_s *flow)
     addchild(root, op);
     addchild(root, exp);
     addchild(root, suffix);
+    addflow(flow->curr, cond);
+    flow->curr = cond;
     p_controlsuffix(ti, suffix, flow);
+    addflow(flow->curr, flow->final);
+    flow->curr = cond;
     p_else(ti, root, flow);
+    
     return root;
 }
 
@@ -1772,6 +1803,7 @@ void p_else(tokiter_s *ti, node_s *root, flow_s *flow)
         addchild(root, op);
         addchild(root, suffix);
         p_controlsuffix(ti, suffix, flow);
+        addflow(flow->curr, flow->final);
     }
 }
 
@@ -1890,7 +1922,6 @@ node_s *p_dec(tokiter_s *ti, flow_s *flow)
         ident = MAKENODE();
         ident->type = TYPE_IDENT;
         ident->tok = t;
-
         
         p_optid(ti, ident);
         t = tok(ti);
@@ -2510,21 +2541,29 @@ flow_s *flow_s_(void)
     return f;
 }
 
+flnode_s *flnode_s_(void)
+{
+    return allocz(sizeof(flnode_s));
+}
+
+
 void addflow(flnode_s *out, flnode_s *in)
 {
-    if(out->nout)
-        out->out = ralloc(out->out, (out->nout + 1) * sizeof(*out->out));
-    else
-        out->out = alloc(sizeof *out->out);
-    out->out[out->nout] = in;
-    out->nout++;
-    
-    if(in->nin)
-        in->in = ralloc(in->in, (in->nin + 1) * sizeof(*in->in));
-    else
-        in->in = alloc(sizeof *in->in);
-    in->in[in->nin] = out;
-    in->nin++;
+    if(out && in) {
+        if(out->nout)
+            out->out = ralloc(out->out, (out->nout + 1) * sizeof(*out->out));
+        else
+            out->out = alloc(sizeof *out->out);
+        out->out[out->nout] = in;
+        out->nout++;
+        
+        if(in->nin)
+            in->in = ralloc(in->in, (in->nin + 1) * sizeof(*in->in));
+        else
+            in->in = alloc(sizeof *in->in);
+        in->in[in->nin] = out;
+        in->nin++;
+    }
 }
 
 void fflow_stmt(flow_s *flow)

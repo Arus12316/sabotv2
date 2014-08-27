@@ -375,7 +375,7 @@ void MainWindow::raid()
         Connection *c = new Connection(server, this, NULL);
         Connection::randName(name, 15);
         Connection::createAccount(name, "derp");
-        c->login(name, "derpp");
+        c->login(name, "derp");
     }
 }
 
