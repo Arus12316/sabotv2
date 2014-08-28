@@ -22,7 +22,8 @@ SOURCES += main.cpp\
     createaccount.cpp \
     crypt.c \
     general.c \
-    database.cpp
+    database.cpp \
+    raid.cpp
 
 HEADERS  += mainwindow.h \
     connection.h \
@@ -33,9 +34,11 @@ HEADERS  += mainwindow.h \
     createaccount.h \
     crypt.h \
     general.h \
-    database.h
+    database.h \
+    raid.h
 
 FORMS    += mainwindow.ui \
     loginmultiusers.ui \
-    createaccount.ui
+    createaccount.ui \
+    raid.ui
 CONFIG += c++11

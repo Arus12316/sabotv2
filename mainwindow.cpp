@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "connection.h"
+#include "raid.h"
 #include "ui_mainwindow.h"
 #include "user.h"
 #include "server.h"
@@ -10,6 +11,7 @@
 #include <QListWidgetItem>
 
 
+
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
@@ -17,15 +19,14 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     currServer = NULL;
     ca = NULL;
-    raidSched.setInterval(500);
+    raidDialog = NULL;
 
     connect(ui->loginButton, SIGNAL(clicked()), this, SLOT(loginButtonPressed()));
     connect(ui->password, SIGNAL(returnPressed()), this, SLOT(loginButtonPressed()));
     connect(ui->createAccountButton, SIGNAL(clicked()), this, SLOT(createAccount()));
 
 
-    connect(ui->raidButton, SIGNAL(pressed()), &raidSched, SLOT(start()));
-    connect(&raidSched, SIGNAL(timeout()), this, SLOT(raid()));
+    connect(ui->raidButton, SIGNAL(pressed()), this, SLOT(raid()));
 
     connect(this, &MainWindow::postMiscMessage,
         [=](Server *server, QString *msg) {
@@ -236,6 +237,11 @@ void MainWindow::postMessage(message_s *msg)
     delete msg;
 }
 
+int MainWindow::currServerIndex()
+{
+    return ui->serverList->currentIndex();
+}
+
 void MainWindow::userDisconnected(User *u)
 {
     Connection *conn = u->conn;
@@ -367,16 +373,12 @@ void MainWindow::createAccount()
 
 void MainWindow::raid()
 {
-    char *name;
-    int server = ui->serverList->currentIndex();
+    if(!raidDialog)
+        raidDialog = new Raid(this);
+    raidDialog->show();
+    raidDialog->raise();
+    raidDialog->activateWindow();
 
-    for(int i = 0; i < 1; i++) {
-        name = new char[20];
-        Connection *c = new Connection(server, this, NULL);
-        Connection::randName(name, 15);
-        Connection::createAccount(name, "derp");
-        c->login(name, "derp");
-    }
 }
 
 void MainWindow::loginRecover(Connection *last)

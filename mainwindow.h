@@ -50,7 +50,7 @@ public:
     class QLabel *getCurrUserLabel();
     class QLineEdit *getInputRaw();
     void postMessage();
-
+    int currServerIndex();
     void newTab(class Server *server);
 
 signals:
@@ -80,10 +80,10 @@ public slots:
 
 private:
     Ui::MainWindow *ui;
-    QTimer raidSched;
 
     class Connection *conn;
     class CreateAccount *ca;
+    class Raid *raidDialog;
 };
 
 #endif // MAINWINDOW_H

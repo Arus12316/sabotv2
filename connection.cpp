@@ -210,6 +210,7 @@ void Connection::sessionInit()
     enum { SLEEP_TIME = 10000 };
     qint64 n;
     char buf[SOCK_BUFSIZE];
+    bool isfirst;
     sock = new QTcpSocket;
 
     connect(sock, SIGNAL(connected()), this, SLOT(userConnected()));
@@ -226,6 +227,11 @@ void Connection::sessionInit()
 
         n = sock->read(buf, sizeof buf);
 
+        if(!strcmp(buf, "08")) {
+          //  qDebug() << "IS FIRST";
+           // isfirst = true;
+        }
+
         //sprintf in c++ umad
         sprintf(buf, LOGIN_FLAG "%s;%s", username, password);
         sock->write(buf, strlen(buf) + 1);
@@ -233,8 +239,6 @@ void Connection::sessionInit()
         sock->waitForReadyRead();
 
         n = sock->read(buf, sizeof buf);
-
-        qDebug() << buf;
 
         if(!server->master) {
             server->master = this;
@@ -277,7 +281,13 @@ void Connection::sessionInit()
             emit newUser(user);
             emit newSelf(user);
 
-            sock->write(finishLogin, sizeof finishLogin);
+            sock->write(ackX0, sizeof ackX0);
+            sock->write(ackX2, sizeof ackX2);
+
+            if(isfirst)
+                sock->write("02Z900_", sizeof "02Z900_");
+            else
+                sock->write(finishLogin, sizeof finishLogin);
 
             connect(sock, SIGNAL(readyRead()), this, SLOT(gameEvent()));
             connect(&timer, SIGNAL(timeout()), this, SLOT(keepAlive()));
@@ -286,9 +296,7 @@ void Connection::sessionInit()
             active = true;
         }
     }
-
 }
-
 
 void Connection::gameEvent()
 {
