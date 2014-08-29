@@ -32,7 +32,7 @@ var derp : (bob : d, int, real, (int, real) -> int, (...) -> int) -> real[20]
 
 var bob := if x = 3 { 3 } else {4}
 
-
+y := 'h'
 
 return x;
 

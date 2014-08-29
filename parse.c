@@ -188,6 +188,7 @@ enum {
     TOKTYPE_CONTINUE,
     TOKTYPE_CLASS,
     TOKTYPE_CHAR,
+    TOKTYPE_CHARTYPE,
     TOKTYPE_UNNEG
 };
 
@@ -290,7 +291,7 @@ keywords[] = {
     {"let", TOKTYPE_LET},
     {"void", TOKTYPE_VOID},
     {"int", TOKTYPE_INTEGER},
-    {"char", TOKTYPE_CHAR},
+    {"char", TOKTYPE_CHARTYPE},
     {"real", TOKTYPE_REAL},
     {"string", TOKTYPE_STRINGTYPE},
     {"regex", TOKTYPE_REGEXTYPE},
@@ -596,6 +597,7 @@ tokiter_s *lex(char *src)
                 if(prev) {
                     switch(prev->type) {
                         case TOKTYPE_NUM:
+                        case TOKTYPE_CHAR:
                         case TOKTYPE_STRING:
                         case TOKTYPE_REGEX:
                         case TOKTYPE_CLOSEPAREN:
@@ -674,6 +676,21 @@ tokiter_s *lex(char *src)
                     prev = mtok(&curr, line, "=", 1, TOKTYPE_RELOP, TOKATT_DEFAULT);
                     src++;
                 }
+                break;
+            case '\'':
+                bptr = src++;
+                while(*src != '\'') {
+                    if(*src)
+                        src++;
+                    else {
+                        adderr(ti, "Lexical Error", "EOF", line, "null byte", NULL);
+                        break;
+                    }
+                }
+                c = *++src;
+                *src = '\0';
+                prev = mtok(&curr, line, bptr, src - bptr, TOKTYPE_CHAR, TOKATT_DEFAULT);
+                *src = c;
                 break;
             case '"':
                 bptr = src++;
@@ -890,6 +907,7 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
         case TOKTYPE_OPENBRACE:
         case TOKTYPE_LAMBDA:
         case TOKTYPE_REGEX:
+        case TOKTYPE_CHAR:
         case TOKTYPE_STRING:
         case TOKTYPE_NOT:
         case TOKTYPE_OPENPAREN:
@@ -956,6 +974,7 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_NOT:
         case TOKTYPE_IF:
         case TOKTYPE_SWITCH:
+        case TOKTYPE_CHAR:
         case TOKTYPE_STRING:
         case TOKTYPE_REGEX:
         case TOKTYPE_LAMBDA:
@@ -1266,6 +1285,12 @@ node_s *p_factor_(tokiter_s *ti, flow_s *flow)
             addchild(n, op);
             addchild(n, f);
             break;
+        case TOKTYPE_CHAR:
+            nexttok(ti);
+            n = MAKENODE();
+            n->type = TYPE_STRING;
+            n->tok = t;
+            break;
         case TOKTYPE_STRING:
             nexttok(ti);
             n = MAKENODE();
@@ -1488,6 +1513,7 @@ node_s *p_optarglist(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_OPENBRACE:
         case TOKTYPE_LAMBDA:
         case TOKTYPE_REGEX:
+        case TOKTYPE_CHAR:
         case TOKTYPE_STRING:
         case TOKTYPE_NOT:
         case TOKTYPE_OPENPAREN:
@@ -2032,7 +2058,7 @@ node_s *p_type(tokiter_s *ti, flow_s *flow)
             type->tok = t;
             p_array(ti, type, flow);
             break;
-        case TOKTYPE_CHAR:
+        case TOKTYPE_CHARTYPE:
             nexttok(ti);
             type = MAKENODE();
             type->type = TYPE_TYPEEXP;
