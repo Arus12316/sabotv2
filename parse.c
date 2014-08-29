@@ -103,14 +103,14 @@
  
  <array> -> [ <expression> ] <array> | ε
  
- <typelist> -> <optname> <type> <typelist'> | ε
- <typelist'> -> , <optname> <type> <typelist'> | ε
+ <typelist> -> <optname> <type> <typelist'> | vararg | ε
+ <typelist'> -> , <optname> <type> <typelist'> | vararg | ε
  <optname> -> id : | ε
  
  <optparamlist> -> <paramlist> | ε
  <param> -> id <opttype> <assign>
- <paramlist> -> <param> <paramlist'>
- <paramlist'> -> , <param> <paramlist'> | ε
+ <paramlist> -> <param> <paramlist'> | vararg
+ <paramlist'> -> , <param> <paramlist'> | vararg | ε
  
  <set> -> openbrace <expression> <optnext> <set'> closebrace
  
@@ -171,6 +171,7 @@ enum {
     TOKTYPE_CASE,
     TOKTYPE_DEFAULT,
     TOKTYPE_DO,
+    TOKTYPE_VARARG,
     TOKTYPE_WHILE,
     TOKTYPE_FOR,
     TOKTYPE_LISTENER,
@@ -480,8 +481,14 @@ tokiter_s *lex(char *src)
                 src++;
                 break;
             case '.':
-                prev = mtok(&curr, line, ".", 1, TOKTYPE_DOT, TOKATT_DEFAULT);
-                src++;
+                if(*(src + 1) == '.' && *(src + 2) == '.') {
+                    prev = mtok(&curr, line, "...", 1, TOKTYPE_VARARG, TOKATT_DEFAULT);
+                    src += 3;
+                }
+                else {
+                    prev = mtok(&curr, line, ".", 1, TOKTYPE_DOT, TOKATT_DEFAULT);
+                    src++;
+                }
                 break;
             case '(':
                 prev = mtok(&curr, line, "(", 1, TOKTYPE_OPENPAREN, TOKATT_DEFAULT);
@@ -2203,6 +2210,9 @@ node_s *p_typelist(tokiter_s *ti, flow_s *flow)
             addchild(root, type);
             p_typelist_(ti, root, flow);
             break;
+        case TOKTYPE_VARARG:
+            nexttok(ti);
+            break;
         default:
             //epsilon production
             break;
@@ -2218,16 +2228,25 @@ void p_typelist_(tokiter_s *ti, node_s *root, flow_s *flow)
     
     if(t->type == TOKTYPE_COMMA) {
         t = nexttok(ti);
-        if(t->type == TOKTYPE_IDENT) {
-            t = peeknexttok(ti);
-            if(t->type == TOKTYPE_COLON) {
-                nexttok(ti);
-                nexttok(ti);
-            }
+        if(t->type == TOKTYPE_VARARG) {
+            type = MAKENODE();
+            type->type = TYPE_TYPEEXP;
+            type->tok = t;
+            addchild(root, type);
+            nexttok(ti);
         }
-        type = p_type(ti, flow);
-        addchild(root, type);
-        p_typelist_(ti, root, flow);
+        else {
+            if(t->type == TOKTYPE_IDENT) {
+                t = peeknexttok(ti);
+                if(t->type == TOKTYPE_COLON) {
+                    nexttok(ti);
+                    nexttok(ti);
+                }
+            }
+            type = p_type(ti, flow);
+            addchild(root, type);
+            p_typelist_(ti, root, flow);
+        }
     }
 }
 
@@ -2267,7 +2286,7 @@ node_s *p_optparamlist(tokiter_s *ti, flow_s *flow)
     node_s *empty;
     tok_s *t = tok(ti);
     
-    if(t->type == TOKTYPE_IDENT) {
+    if(t->type == TOKTYPE_IDENT || t->type == TOKTYPE_VARARG) {
         return p_paramlist(ti, flow);
     }
     else {
@@ -2280,13 +2299,24 @@ node_s *p_optparamlist(tokiter_s *ti, flow_s *flow)
 
 node_s *p_paramlist(tokiter_s *ti, flow_s *flow)
 {
+    tok_s *t = tok(ti);
     node_s *root = MAKENODE(), *dec;
 
     root->type = TYPE_PARAMLIST;
-    dec = p_param(ti, flow);
     
-    addchild(root, dec);
-    p_paramlist_(ti, root, flow);
+    if(t->type == TOKTYPE_IDENT) {
+        dec = p_param(ti, flow);
+        addchild(root, dec);
+        p_paramlist_(ti, root, flow);
+    }
+    else if(t->type == TOKTYPE_VARARG){
+        nexttok(ti);
+    }
+    else {
+        //syntax error
+        adderr(ti, "Syntax Error", t->lex, t->line, "identifier", "...", NULL);
+        synerr_rec(ti);
+    }
     
     return root;
 }
@@ -2297,12 +2327,26 @@ void p_paramlist_(tokiter_s *ti, node_s *root, flow_s *flow)
     tok_s *t = tok(ti);
     
     if(t->type == TOKTYPE_COMMA) {
-        nexttok(ti);
+        t = nexttok(ti);
         
-        dec = p_param(ti, flow);
+        if(t->type == TOKTYPE_IDENT) {
+            dec = p_param(ti, flow);
         
-        addchild(root, dec);
-        p_paramlist_(ti, root, flow);
+            addchild(root, dec);
+            p_paramlist_(ti, root, flow);
+        }
+        else if(t->type == TOKTYPE_VARARG) {
+            dec = MAKENODE();
+            dec->type = TYPE_DEC;
+            dec->tok = t;
+            nexttok(ti);
+            addchild(root, dec);
+        }
+        else {
+            //syntax error
+            adderr(ti, "Syntax Error", t->lex, t->line, "identifier", "...", NULL);
+            synerr_rec(ti);
+        }
     }
     else {
         //epsilon production
@@ -2666,7 +2710,7 @@ void adderr(tokiter_s *ti, char *prefix, char *got, uint16_t line, ...)
     errlist_s *e;
     size_t totallen = strlen(prefix), nargs, curr;
     char *args[MAX_ERRARGS], *s;
-    
+
     va_start(argp, line);
     
     while((s = va_arg(argp, char *))) {

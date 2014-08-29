@@ -4,12 +4,13 @@ var x : int := 32;
 var y : real[3] := {1.1, 2.2, 3.3};
 
 
-var x : (a : int) -> int := @(){
+var x : (a : int) -> int := @(...){
     var array : real[30] 
             := {1,3,4};
 
     return array;
 };
+
 
 
 var woah :  (a : int) ->
@@ -21,13 +22,16 @@ var woah :  (a : int) ->
     break
 };
 
-var tom : (x : int, y : int, z : int) -> real[30]
+var derp : (int, real, int, ...) -> (int, int[30], ...) -> real := @(a, b) {
 
-var derp : (bob : d, int, real, (int, real) -> int, () -> int) -> real[20]
+}
+
+var tom : (x : int, y : int, z : int, ...) -> real[30]
+
+var derp : (bob : d, int, real, (int, real) -> int, (...) -> int) -> real[20]
 
 var bob := if x = 3 { 3 } else {4}
 
-(+ 1 3)
 
 
 return x;
