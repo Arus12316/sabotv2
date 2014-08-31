@@ -6,7 +6,7 @@ typedef struct errlist_s errlist_s;
 struct errlist_s
 {
     errlist_s *next;
-    char msg[];
+    char *msg;
 };
 
 extern errlist_s *parse(char *src);

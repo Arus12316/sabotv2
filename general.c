@@ -1,5 +1,50 @@
 #include "general.h"
 #include <stdio.h>
+#include <string.h>
+
+#define INIT_BSIZE 512
+
+buf_s *bufinit(void)
+{
+    buf_s *b;
+    
+    b = alloc(sizeof *b);
+    b->bsize = INIT_BSIZE;
+    b->size = 0;
+    b->buf = alloc(INIT_BSIZE);
+    return b;
+}
+
+void bufaddc(buf_s *b, char c)
+{
+    b->size++;
+    
+    if(b->size > b->bsize) {
+        b->bsize *= 2;
+        b->buf = ralloc(b->buf, b->size);
+    }
+    b->buf[b->size - 1] = c;
+}
+
+void bufaddstr(buf_s *b, char *str, size_t len)
+{
+    b->size += len;
+
+    if(b->size > b->bsize) {
+        do {
+            b->bsize *= 2;
+        }
+        while(b->size > b->bsize);
+        b->buf = ralloc(b->buf, b->bsize);
+    }
+    strcpy(&b->buf[b->size - len], str);
+}
+
+void buf_trim(buf_s *b)
+{
+    b->bsize = b->size;
+    b->buf = ralloc(b->buf, b->bsize);
+}
 
 void *alloc(size_t n)
 {

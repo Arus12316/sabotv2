@@ -38,6 +38,8 @@
 		2F84DE811994741100527AFF /* regex.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = regex.h; path = ../../regex.h; sourceTree = "<group>"; };
 		2F84DE851994743900527AFF /* general.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = general.h; path = ../../general.h; sourceTree = "<group>"; };
 		2F84DE8819955CC500527AFF /* testcase1 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = testcase1; sourceTree = "<group>"; };
+		2FCF2C6319B10E1800D53AE2 /* testcase2 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = testcase2; sourceTree = "<group>"; };
+		2FCF2C6419B246BC00D53AE2 /* testcase3 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = testcase3; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,8 +72,10 @@
 		2F84DE73199473E100527AFF /* botparse */ = {
 			isa = PBXGroup;
 			children = (
-				2F84DE74199473E100527AFF /* main.c */,
 				2F84DE8819955CC500527AFF /* testcase1 */,
+				2FCF2C6319B10E1800D53AE2 /* testcase2 */,
+				2FCF2C6419B246BC00D53AE2 /* testcase3 */,
+				2F84DE74199473E100527AFF /* main.c */,
 				2F84DE7E1994741100527AFF /* parse.h */,
 				2F84DE7D1994741100527AFF /* parse.c */,
 				2F84DE811994741100527AFF /* regex.h */,
@@ -245,6 +249,7 @@
 				2F84DE7C199473E100527AFF /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

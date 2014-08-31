@@ -135,6 +135,7 @@
 #define PUSHSCOPE() pushscope(ti)
 #define POPSCOPE() popscope(ti)
 #define MAKENODE() node_s_(ti->scope)
+#define ERR(str) adderr(ti,str,-1)
 
 #define SYM_TABLE_SIZE 19
 
@@ -238,6 +239,7 @@ typedef struct tokiter_s tokiter_s;
 typedef struct node_s node_s;
 typedef struct flow_s flow_s;
 typedef struct flnode_s flnode_s;
+typedef struct edge_s edge_s;
 
 typedef struct rec_s rec_s;
 typedef struct scope_s scope_s;
@@ -271,6 +273,8 @@ struct tokiter_s
     errlist_s *ecurr;
     scope_s *scope;
     node_s *graph;
+    buf_s *code;
+    unsigned labelcount;
 };
 
 static struct keyw_s {
@@ -306,8 +310,11 @@ keywords[] = {
 
 struct node_s
 {
-    uint8_t type;
+    uint8_t ntype;
+    uint8_t stype;
     
+    node_s *ctype;
+    bool branch_complete;
     tok_s *tok;
     scope_s *scope;
     
@@ -316,8 +323,6 @@ struct node_s
     node_s **children;
     node_s *parent;
     
-    node_s *currtype;
-    node_s *statement;
 };
 
 struct rec_s
@@ -345,9 +350,15 @@ struct flnode_s
 {
     unsigned nin;
     unsigned nout;
+    edge_s **in;
+    edge_s **out;
+};
+
+struct edge_s
+{
     node_s *value;
-    flnode_s **in;
-    flnode_s **out;
+    flnode_s *out;
+    flnode_s *in;
 };
 
 static tokiter_s *lex(char *src);
@@ -369,7 +380,7 @@ static void p_simple_expression_(tokiter_s *ti, node_s *sexp, flow_s *flow);
 static node_s *p_term(tokiter_s *ti, flow_s *flow);
 static void p_term_(tokiter_s *ti, node_s *term, flow_s *flow);
 static node_s *p_factor(tokiter_s *ti, flow_s *flow);
-static void p_optexp(tokiter_s *ti, node_s *factor, flow_s *flow);
+static node_s *p_optexp(tokiter_s *ti, node_s *fact, flow_s *flow);
 static node_s *p_factor_(tokiter_s *ti, flow_s *flow);
 static void p_factor__(tokiter_s *ti, node_s *root, flow_s *flow);
 static void p_assign(tokiter_s *ti, node_s *root, flow_s *flow);
@@ -380,9 +391,9 @@ static node_s *p_arglist(tokiter_s *ti, flow_s *flow);
 static void p_arglist_(tokiter_s *ti, node_s *root, flow_s *flow);
 static node_s *p_control(tokiter_s *ti, flow_s *flow);
 static node_s *p_if(tokiter_s *ti, flow_s *flow);
+static void p_else(tokiter_s *ti, node_s *root, flow_s *flow);
 static node_s *p_switch(tokiter_s *ti, flow_s *flow);
 static void p_caselist(tokiter_s *ti, node_s *root, flow_s *flow);
-static void p_else(tokiter_s *ti, node_s *root, flow_s *flow);
 static void p_controlsuffix(tokiter_s *ti, node_s *root, flow_s *flow);
 static node_s *p_dec(tokiter_s *ti, flow_s *flow);
 static void p_enumlist(tokiter_s *ti, node_s *root, flow_s *flow);
@@ -415,10 +426,12 @@ static bool addident(scope_s *root, node_s *ident);
 static scope_s *idtinit(scope_s *parent);
 static void pushscope(tokiter_s *ti);
 static inline void popscope(tokiter_s *ti);
+static edge_s *edge_s_(node_s *stmt);
 static flow_s *flow_s_(void);
 static flnode_s *flnode_s_(void);
-static void addflow(flnode_s *out, flnode_s *in);
-static void fflow_stmt(flow_s *flow);
+static bool checkflow(node_s *root);
+static void addflow(flnode_s *out, node_s *stmt, flnode_s *in);
+static void flow_reparent(flnode_s *f1, flnode_s *f2);
 static node_s *getparentfunc(node_s *start);
 static node_s *getparentloop(node_s *start);
 static void walk_tree(node_s *root);
@@ -426,10 +439,10 @@ static bool typeeq(node_s *typeexp, node_s *literal);
 
 static void freetree(node_s *root);
 
+static void emit(tokiter_s *ti, char *code, ...);
+static void makelabel(tokiter_s *ti, char *buf);
 
-static void emit(char *, ...);
-
-static void adderr(tokiter_s *ti, char *prefix, char *got, uint16_t line, ...);
+static void adderr(tokiter_s *ti, char *str, int lineno);
 
 errlist_s *parse(char *src)
 {
@@ -438,6 +451,8 @@ errlist_s *parse(char *src)
     ti = lex(src);
     
     start(ti);
+    
+    printf("code:\n%s\n", ti->code->buf);
     
     return ti->err;
 }
@@ -623,7 +638,8 @@ tokiter_s *lex(char *src)
                         if(*src)
                             src++;
                         else {
-                            adderr(ti, "Lexical Error", "EOF", line, "/", NULL);
+                            //adderr(ti, "Lexical Error", "EOF", line, "/", NULL);
+                            adderr(ti, "Lexical Error: Expected '/' but got EOF", line);
                             break;
                         }
                     }
@@ -683,7 +699,7 @@ tokiter_s *lex(char *src)
                     if(*src)
                         src++;
                     else {
-                        adderr(ti, "Lexical Error", "EOF", line, "null byte", NULL);
+                        adderr(ti, "Lexical Error: Expected ' but got EOF", line);
                         break;
                     }
                 }
@@ -698,7 +714,7 @@ tokiter_s *lex(char *src)
                     if(*src)
                         src++;
                     else {
-                        adderr(ti, "Lexical Error", "EOF", line, "null byte", NULL);
+                        adderr(ti, "Lexical Error: Expected \" but got EOF", line);
                         break;
                     }
                 }
@@ -720,7 +736,7 @@ tokiter_s *lex(char *src)
                                 src++;
                             }
                             else {
-                                adderr(ti, "Lexical Error", ".", line, "valid number", NULL);
+                                adderr(ti, "Lexical Error: Invalid number", line);
                                 src++;
                             }
                         }
@@ -758,7 +774,7 @@ tokiter_s *lex(char *src)
                 else {
                     c = *++src;
                     *src = '\0';
-                    adderr(ti, "Lexical Error", src - 1, line, "language chararacter", NULL);
+                    adderr(ti, "Lexical Error: Unknown Language Character", line);
                     *src = c;
                 }
                 break;
@@ -870,18 +886,20 @@ node_s *start(tokiter_s *ti)
     flow_s *flow = flow_s_();
     node_s *root = MAKENODE();
     
-    root->type = TYPE_NODE;
+    root->ntype = TYPE_NODE;
     
     ti->scope = idtinit(NULL);
     ti->graph = MAKENODE();
-    ti->graph->type = TYPE_NODE;
+    ti->graph->ntype = TYPE_NODE;
+    ti->code = bufinit();
+    ti->labelcount = 0;
 
     p_statementlist(ti, root, flow);
     t = tok(ti);
     
     if(t->type != TOKTYPE_EOF) {
         //syntax error
-        adderr(ti, "Syntax Error", t->lex, t->line, "EOF", NULL);
+        ERR("Syntax Error: Expected EOF");
     }
     
     return root;
@@ -926,18 +944,17 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
                     if(tcmp) {
                         if(tcmp->type == TOKTYPE_RETURN) {
                             if(!getparentfunc(root)) {
-                                adderr(ti, "Return Error", "return from invalid scope", tcmp->line, "return from lambda expression", NULL);
+                                ERR("Error: return from non-closure block");
                             }
                         }
                         else if(tcmp->type == TOKTYPE_BREAK) {
                             if(!getparentloop(root)) {
-                                adderr(ti, "Break Error", "break from invalid scope", tcmp->line, "break from loop", NULL);
-
+                                ERR("Error: break from non-loop block");
                             }
                         }
                         else if(tcmp->type == TOKTYPE_CONTINUE) {
                             if(!getparentloop(root)) {
-                                adderr(ti, "Continue Error", "continue from invalid scope", tcmp->line, "continue from loop", NULL);
+                                ERR("Error: continue from non-loop block");
                             }
                         }
                     }
@@ -952,8 +969,8 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
             //epsilon production
             break;
         default:
-            adderr(ti, "Syntax Error", t->lex, t->line, "class", "var", "listener", "switch", "for", "while", "if",
-                                                        "+", "-", "{", "@", "regex", "string", "!", "(", "number", "identifier", "return", NULL);
+            ERR("Syntax Error: Expected class, var, listener, switch, for, while, if, +, -, {, }, @, \
+                regex, string, !, (, number, identifier, or return");
             synerr_rec(ti);
             break;
     }
@@ -961,7 +978,6 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
 
 node_s *p_statement(tokiter_s *ti, flow_s *flow)
 {
-    flow_s *nf;
     flnode_s *fn = flnode_s_();
     node_s *statement, *exp, *jmp;
     tok_s *t = tok(ti);
@@ -980,73 +996,79 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_LAMBDA:
         case TOKTYPE_OPENBRACE:
         case TOKTYPE_ADDOP:
-            nf = flow_s_();
-            nf->final = flnode_s_();
-            flow->curr = nf->final;
-            statement = p_expression(ti, nf);
+            statement = p_expression(ti, flow);
+            addflow(flow->curr, statement, fn);
+            flow->curr = fn;
             return statement;
         case TOKTYPE_WHILE:
         case TOKTYPE_DO:
         case TOKTYPE_FOR:
         case TOKTYPE_LISTENER:
             statement =  p_control(ti, flow);
-            fn->value = NULL;
-            addflow(flow->curr, fn);
+            addflow(flow->curr, statement, fn);
             flow->curr = fn;
             return statement;
         case TOKTYPE_VAR:
         case TOKTYPE_LET:
         case TOKTYPE_CLASS:
         case TOKTYPE_ENUM:
-            fn->value = NULL;
-            addflow(flow->curr, fn);
+            addflow(flow->curr, NULL, fn);
             flow->curr = fn;
             return p_dec(ti, flow);
         case TOKTYPE_RETURN:
             nexttok(ti);
             statement = MAKENODE();
-            statement->type = TYPE_NODE;
+            statement->ntype = TYPE_NODE;
             jmp = MAKENODE();
-            jmp->type = TYPE_OP;
+            jmp->ntype = TYPE_OP;
             jmp->tok = t;
             exp = p_expression(ti, flow);
+            statement->stype = exp->stype;
+            statement->ctype = exp->ctype;
+            statement->branch_complete = exp->branch_complete;
             addchild(statement, jmp);
             addchild(statement, exp);
-            fn->value = exp;
-            addflow(flow->curr, fn);
-            addflow(fn, flow->final);
+            addflow(flow->curr, exp, fn);
+            flow->final = fn;
             return statement;
         case TOKTYPE_SEMICOLON:
             nexttok(ti);
-            addflow(flow->curr, fn);
-            flow->curr = fn;
-            return NULL;
+            statement = MAKENODE();
+            statement->ntype = TYPE_NODE;
+            statement->stype = TYPE_VOID;
+            statement->ctype = NULL;
+            statement->branch_complete = false;
+            return statement;
         case TOKTYPE_BREAK:
             nexttok(ti);
             statement = MAKENODE();
-            statement->type = TYPE_NODE;
+            statement->ntype = TYPE_NODE;
+            statement->stype = TYPE_VOID;
+            statement->ctype = NULL;
             jmp = MAKENODE();
-            jmp->type = TYPE_OP;
+            jmp->ntype = TYPE_OP;
             jmp->tok = t;
             addchild(statement, jmp);
-            addflow(flow->curr, fn);
+            addflow(flow->curr, statement, fn);
             flow->curr = fn;
             return statement;
         case TOKTYPE_CONTINUE:
             nexttok(ti);
             statement = MAKENODE();
-            statement->type = TYPE_NODE;
+            statement->ntype = TYPE_NODE;
+            statement->stype = TYPE_VOID;
+            statement->ctype = NULL;
             jmp = MAKENODE();
-            jmp->type = TYPE_OP;
+            jmp->ntype = TYPE_OP;
             jmp->tok = t;
             addchild(statement, jmp);
-            addflow(flow->curr, fn);
+            addflow(flow->curr, statement, fn);
             flow->curr = fn;
             return statement;
         default:
             //syntax error
-            adderr(ti, "Syntax Error", t->lex, t->line, "identifier", "number", "(", "not", "string",
-                   "regex", "@", "{", "+", "-", "|", "if", "while", "for", "switch", "var", "return", NULL);
+            ERR("Syntax Error: Expected identifier, number, (, not, string, regex, @, {, +, -, !, if, while \
+                for, switch, var, or return");
             synerr_rec(ti);
             return NULL;
     }
@@ -1057,11 +1079,14 @@ node_s *p_expression(tokiter_s *ti, flow_s *flow)
     node_s *node, *exp;
     
     exp = MAKENODE();
-    exp->type = TYPE_NODE;
+    exp->ntype = TYPE_NODE;
     
     node = p_simple_expression(ti, flow);
     addchild(exp, node);
     p_expression_(ti, exp, flow);
+    
+    exp->stype = node->stype;
+    exp->ctype = node->ctype;
     
     return exp;
 }
@@ -1076,7 +1101,7 @@ void p_expression_(tokiter_s *ti, node_s *exp, flow_s *flow)
         s = p_simple_expression(ti, flow);
         
         op = MAKENODE();
-        op->type = TYPE_OP;
+        op->ntype = TYPE_OP;
         
         addchild(exp, op);
         addchild(exp, s);
@@ -1090,7 +1115,7 @@ node_s *p_simple_expression(tokiter_s *ti, flow_s *flow)
     tok_s *t = tok(ti);
     
     sexp = MAKENODE();
-    sexp->type = TYPE_OP;
+    sexp->ntype = TYPE_OP;
     
     if(t->type == TOKTYPE_ADDOP)
         sign = p_sign(ti);
@@ -1098,13 +1123,17 @@ node_s *p_simple_expression(tokiter_s *ti, flow_s *flow)
     
     if(sign == -1) {
         un = MAKENODE();
-        un->type = TYPE_OP;
+        un->ntype = TYPE_OP;
         un->tok = t;
         t->type = TOKTYPE_UNNEG;
         addchild(sexp, un);
     }
     addchild(sexp, term);
     p_simple_expression_(ti, sexp, flow);
+    
+    sexp->stype = term->stype;
+    sexp->ctype = term->ctype;
+    
     return sexp;
 }
 
@@ -1118,7 +1147,7 @@ void p_simple_expression_(tokiter_s *ti, node_s *sexp, flow_s *flow)
         term = p_term(ti, flow);
         
         op = MAKENODE();
-        op->type = TYPE_OP;
+        op->ntype = TYPE_OP;
         op->tok = t;
         
         addchild(sexp, op);
@@ -1133,12 +1162,15 @@ node_s *p_term(tokiter_s *ti, flow_s *flow)
     node_s *f, *term;
     
     term = MAKENODE();
-    term->type = TYPE_NODE;
+    term->ntype = TYPE_NODE;
     
     f = p_factor(ti, flow);
     addchild(term, f);
     
     p_term_(ti, term, flow);
+    
+    term->stype = f->stype;
+    term->ctype = f->ctype;
     
     return term;
 }
@@ -1153,7 +1185,7 @@ void p_term_(tokiter_s *ti, node_s *term, flow_s *flow)
         f = p_factor(ti, flow);
         
         op = MAKENODE();
-        op->type = TYPE_OP;
+        op->ntype = TYPE_OP;
         op->tok = t;
         
         addchild(term, op);
@@ -1165,34 +1197,48 @@ void p_term_(tokiter_s *ti, node_s *term, flow_s *flow)
 
 node_s *p_factor(tokiter_s *ti, flow_s *flow)
 {
-    node_s *f, *fact;
+    node_s *f, *fact, *expon;
     
     fact = MAKENODE();
-    fact->type = TYPE_NODE;
+    fact->ntype = TYPE_NODE;
     
     f = p_factor_(ti, flow);
+    
+    if(f)
+        fact->branch_complete = f->branch_complete;
+    
+    
     addchild(fact, f);
-    p_optexp(ti, fact, flow);
+    expon = p_optexp(ti, fact, flow);
     
     return fact;
 }
 
-void p_optexp(tokiter_s *ti, node_s *factor, flow_s *flow)
+node_s *p_optexp(tokiter_s *ti, node_s *fact, flow_s *flow)
 {
     tok_s *t = tok(ti);
-    node_s *f = NULL, *op;
+    node_s  *f, *op;
     
     if(t->type == TOKTYPE_EXPOP) {
         nexttok(ti);
         f = p_factor(ti, flow);
-        
         op = MAKENODE();
-        op->type = TYPE_OP;
+        op->ntype = TYPE_OP;
         op->tok = t;
+        addchild(fact, op);
+        addchild(fact, f);
         
-        addchild(factor, op);
-        addchild(factor, f);
+        if(f->branch_complete) {
+            
+        }
+        else {
+            
+        }
     }
+    else {
+        f = NULL;
+    }
+    return f;
 }
 
 node_s *p_factor_(tokiter_s *ti, flow_s *flow)
@@ -1206,10 +1252,10 @@ node_s *p_factor_(tokiter_s *ti, flow_s *flow)
             nexttok(ti);
             
             n = MAKENODE();
-            n->type = TYPE_NODE;
+            n->ntype = TYPE_NODE;
             
             ident = MAKENODE();
-            ident->type = TYPE_IDENT;
+            ident->ntype = TYPE_IDENT;
             ident->tok = t;
             
             addchild(n, ident);
@@ -1217,46 +1263,48 @@ node_s *p_factor_(tokiter_s *ti, flow_s *flow)
             p_factor__(ti, n, flow_s_());
             p_assign(ti, n, flow_s_());
             
-            fl->value = ident;
-            addflow(flow->curr, fl);
+            addflow(flow->curr, ident, fl);
             flow->curr = fl;
             break;
         case TOKTYPE_DOT:
             op = MAKENODE();
-            op->type = TYPE_OP;
+            op->ntype = TYPE_OP;
             op->tok = t;
             t = nexttok(ti);
 
             n = MAKENODE();
-            n->type = TYPE_NODE;
+            n->ntype = TYPE_NODE;
 
             if(t->type == TOKTYPE_IDENT) {
                 nexttok(ti);
                 ident = MAKENODE();
-                ident->type = TYPE_IDENT;
+                ident->ntype = TYPE_IDENT;
                 ident->tok = t;
                 addchild(n, op);
                 addchild(n, ident);
                 p_factor__(ti, n, flow_s_());
                 
-                fl->value = ident;
-                addflow(flow->curr, fl);
+                addflow(flow->curr, ident, fl);
                 flow->curr = fl;
             }
             else {
                 n = NULL;
                 //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
+                ERR("Syntax Error: Expected identifier");
                 synerr_rec(ti);
             }
             break;
         case TOKTYPE_NUM:
             nexttok(ti);
             n = MAKENODE();
-            n->type = TYPE_NUM;
+            n->ntype = TYPE_NODE;
             n->tok = t;
-            fl->value = n;
-            addflow(flow->curr, fl);
+            if(t->att == TOKATT_NUMINT)
+                n->stype = TYPE_INTEGER;
+            else
+                n->stype = TYPE_REAL;
+            n->ctype = NULL;
+            addflow(flow->curr, n, fl);
             flow->curr = fl;
             break;
         case TOKTYPE_OPENPAREN:
@@ -1268,17 +1316,19 @@ node_s *p_factor_(tokiter_s *ti, flow_s *flow)
             }
             else {
                 //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
+                ERR("Syntax Error: Expected )");
                 synerr_rec(ti);
             }
             break;
         case TOKTYPE_NOT:
             nexttok(ti);
             n = MAKENODE();
-            n->type = TYPE_NODE;
+            n->ntype = TYPE_NODE;
+            n->stype = TYPE_INTEGER;
+            n->ctype = NULL;
             
             op = MAKENODE();
-            op->type = TYPE_OP;
+            op->ntype = TYPE_OP;
             op->tok = t;
             
             f = p_factor(ti, flow);
@@ -1288,19 +1338,25 @@ node_s *p_factor_(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_CHAR:
             nexttok(ti);
             n = MAKENODE();
-            n->type = TYPE_STRING;
+            n->ntype = TYPE_NODE;
+            n->stype = TYPE_INTEGER;
+            n->ctype = NULL;
             n->tok = t;
             break;
         case TOKTYPE_STRING:
             nexttok(ti);
             n = MAKENODE();
-            n->type = TYPE_STRING;
+            n->ntype = TYPE_NODE;
+            n->stype = TYPE_STRING;
+            n->ctype = NULL;
             n->tok = t;
             break;
         case TOKTYPE_REGEX:
             nexttok(ti);
             n = MAKENODE();
-            n->type = TYPE_REGEX;
+            n->ntype = TYPE_NODE;
+            n->stype = TYPE_REGEX;
+            n->ctype = NULL;
             n->tok = t;
             break;
         case TOKTYPE_OPENBRACE:
@@ -1319,7 +1375,7 @@ node_s *p_factor_(tokiter_s *ti, flow_s *flow)
         default:
             //syntax error
             n = NULL;
-            adderr(ti, "Syntax Error", t->lex, t->line, "identifier", "number", "(", "string", "regex", "{", "@", NULL);
+            ERR("Syntax Error: Expected identifier, number, (, string, regex, {, @");
             synerr_rec(ti);
             break;
     }
@@ -1337,7 +1393,7 @@ void p_factor__(tokiter_s *ti, node_s *root, flow_s *flow)
             exp = p_expression(ti, flow);
             
             op = MAKENODE();
-            op->type = TYPE_OP;
+            op->ntype = TYPE_OP;
             op->tok = t;
         
             addchild(root, op);
@@ -1350,20 +1406,20 @@ void p_factor__(tokiter_s *ti, node_s *root, flow_s *flow)
             }
             else {
                 //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, "]", NULL);
+                ERR("Syntax Error: Expected ]");
                 synerr_rec(ti);
             }
             break;
         case TOKTYPE_DOT:
             op = MAKENODE();
-            op->type = TYPE_OP;
+            op->ntype = TYPE_OP;
             op->tok = t;
-
+            
             t = nexttok(ti);
             if(t->type == TOKTYPE_IDENT) {
                 nexttok(ti);
                 ident = MAKENODE();
-                ident->type = TYPE_IDENT;
+                ident->ntype = TYPE_IDENT;
                 ident->tok = t;
                 addchild(root, op);
                 addchild(root, ident);
@@ -1371,7 +1427,7 @@ void p_factor__(tokiter_s *ti, node_s *root, flow_s *flow)
             }
             else {
                 //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
+                ERR("Syntax Error: Expected identifier");
                 synerr_rec(ti);
             }
             break;
@@ -1379,7 +1435,7 @@ void p_factor__(tokiter_s *ti, node_s *root, flow_s *flow)
             nexttok(ti);
             
             op = MAKENODE();
-            op->type = TYPE_OP;
+            op->ntype = TYPE_OP;
             op->tok = t;
             
             opt = p_optarglist(ti, flow);
@@ -1393,7 +1449,7 @@ void p_factor__(tokiter_s *ti, node_s *root, flow_s *flow)
             }
             else {
                 //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
+                ERR("Syntax Error: Expected )");
                 synerr_rec(ti);
             }
             break;
@@ -1413,7 +1469,7 @@ void p_assign(tokiter_s *ti, node_s *root, flow_s *flow)
         exp = p_expression(ti, flow);
         
         op = MAKENODE();
-        op->type = TYPE_OP;
+        op->ntype = TYPE_OP;
         op->tok = t;
         
         addchild(root, op);
@@ -1427,9 +1483,9 @@ node_s *p_lambda(tokiter_s *ti)
     tok_s *t = tok(ti);
     node_s *lambda = MAKENODE(), *op = MAKENODE(), *param, *body = MAKENODE();
     
-    lambda->type = TYPE_NODE;
-    body->type = TYPE_NODE;
-    op->type = TYPE_OP;
+    lambda->ntype = TYPE_NODE;
+    body->ntype = TYPE_NODE;
+    op->ntype = TYPE_OP;
     op->tok = t;
     
     t = nexttok(ti);
@@ -1455,21 +1511,21 @@ node_s *p_lambda(tokiter_s *ti)
                 }
                 else {
                     //syntax error
-                    adderr(ti, "Syntax Error", t->lex, t->line, "}", NULL);
+                    ERR("Syntax Error: Expected }");
                     synerr_rec(ti);
                 }
             }
             else {
                 lambda = NULL;
                 //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
+                ERR("Syntax Error: Expected {");
                 synerr_rec(ti);
             }
         }
         else {
             lambda = NULL;
             //syntax error
-            adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
+            ERR("Syntax Error: Expected )");
             synerr_rec(ti);
         }
         POPSCOPE();
@@ -1477,7 +1533,7 @@ node_s *p_lambda(tokiter_s *ti)
     else {
         lambda = NULL;
         //syntax error
-        adderr(ti, "Syntax Error", t->lex, t->line, "(", NULL);
+        ERR("Syntax Error: Expected (");
         synerr_rec(ti);
     }
     return lambda;
@@ -1497,7 +1553,7 @@ int p_sign(tokiter_s *ti)
     }
     else {
         //syntax error
-        adderr(ti, "Syntax Error", t->lex, t->line, "+", "-", NULL);
+        ERR("Syntax Error: Expected + or -");
         synerr_rec(ti);
         return 1;
     }
@@ -1526,7 +1582,7 @@ node_s *p_optarglist(tokiter_s *ti, flow_s *flow)
             break;
         default:
             empty = MAKENODE();
-            empty->type = TYPE_NODE;
+            empty->ntype = TYPE_NODE;
             //epsilon production
             return empty;
     }
@@ -1566,9 +1622,12 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
     node_s *control = MAKENODE(), *op = MAKENODE(),
                     *exp, *arg, *ident, *suffix = MAKENODE();
     
-    suffix->type = TYPE_NODE;
+    control->ntype = TYPE_NODE;
+    control->stype = TYPE_VOID;
+    control->ctype = NULL;
+    suffix->ntype = TYPE_NODE;
     
-    op->type = TYPE_OP;
+    op->ntype = TYPE_OP;
     op->tok = t;
 
     switch(t->type) {
@@ -1584,7 +1643,7 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
             t = nexttok(ti);
             if(t->type == TOKTYPE_IDENT) {
                 ident = MAKENODE();
-                ident->type = TYPE_IDENT;
+                ident->ntype = TYPE_IDENT;
                 ident->tok = t;
                 t = nexttok(ti);
                 if(t->type == TOKTYPE_FORVAR) {
@@ -1599,14 +1658,14 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
                 else {
                     control = NULL;
                     //syntax error
-                    adderr(ti, "Syntax Error", t->lex, t->line, "<-", NULL);
+                    ERR("Syntax Error: Expected <-");
                     synerr_rec(ti);
                 }
             }
             else {
                 control = NULL;
                 //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
+                ERR("Syntax Error: Expected identifier");
                 synerr_rec(ti);
             }
             break;
@@ -1632,28 +1691,28 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
                         }
                         else {
                             //syntax error
-                            adderr(ti, "Syntax Error", t->lex, t->line, "}", NULL);
+                            ERR("Syntax Error: Expected )");
                             synerr_rec(ti);
                         }
                     }
                     else {
                         control = NULL;
                         //syntax error
-                        adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
+                        ERR("Syntax Error: Expected {");
                         synerr_rec(ti);
                     }
                 }
                 else {
                     control = NULL;
                     //syntax error
-                    adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
+                    ERR("Syntax Error: Expected )");
                     synerr_rec(ti);
                 }
             }
             else {
                 control = NULL;
                 //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, "(", NULL);
+                ERR("Syntax Error: Expected (");
                 synerr_rec(ti);
             }
             break;
@@ -1671,14 +1730,14 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
             else {
                 control = NULL;
                 //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, "while", NULL);
+                ERR("Syntax Error: Expected while");
                 synerr_rec(ti);
             }
             break;
         default:
             control = NULL;
             //syntax error
-            adderr(ti, "Syntax Error", t->lex, t->line, "if", "while", "for", "switch", NULL);
+            ERR("Syntax Error: Expected if, while, for, or switch");
             synerr_rec(ti);
             break;
     }
@@ -1687,28 +1746,83 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
 
 node_s *p_if(tokiter_s *ti, flow_s *flow)
 {
-    flnode_s *cond = flnode_s_();
-    node_s *root = MAKENODE(), *op = MAKENODE(), *exp, *suffix = MAKENODE();
+    char label1[16], label2[16];
+    flnode_s *cond = flnode_s_(), *final = flnode_s_();
+    node_s *root = MAKENODE(), *op = MAKENODE(), *exp, *suffix = MAKENODE(), *esuffix;
     
-    root->type = TYPE_NODE;
-    suffix->type = TYPE_NODE;
+    makelabel(ti, label1);
+    makelabel(ti, label2);
     
-    op->type = TYPE_OP;
+    root->ntype = TYPE_NODE;
+    suffix->ntype = TYPE_NODE;
+    
+    op->ntype = TYPE_OP;
     op->tok = tok(ti);
     
     nexttok(ti);
     exp = p_expression(ti, flow);
+    emit(ti, "\ttest: exp\n", NULL);
+    emit(ti, "\tbne ", label1, NULL);
+    emit(ti, "\t...\n", NULL);
+    emit(ti, "\tjmp ", label2, NULL);
+    emit(ti, label1, "\n\t...\n", label2, NULL);
+    
     addchild(root, op);
     addchild(root, exp);
     addchild(root, suffix);
-    addflow(flow->curr, cond);
+    addflow(flow->curr, exp, cond);
     flow->curr = cond;
     p_controlsuffix(ti, suffix, flow);
-    addflow(flow->curr, flow->final);
+    addflow(flow->curr, NULL, final);
     flow->curr = cond;
     p_else(ti, root, flow);
+    addflow(flow->curr, NULL, final);
+    flow->curr = final;
+    
+    if(root->nchildren > 4) {
+        esuffix = root->children[4];
+        if(esuffix->stype == suffix->stype) {
+            root->stype = suffix->stype;
+        }
+        else {
+            root->stype = TYPE_VOID;
+            puts("if statement type mismatch");
+        }
+    }
+    else {
+        root->stype = suffix->stype;
+        root->branch_complete = false;
+    }
+    
     
     return root;
+}
+
+bool checkflow(node_s *root)
+{
+    if(root->nchildren > 4) {
+        return true;
+    }
+    return false;
+}
+
+void p_else(tokiter_s *ti, node_s *root, flow_s *flow)
+{
+    tok_s *t = tok(ti);
+    node_s *op, *suffix = MAKENODE();
+    
+    suffix->ntype = TYPE_NODE;
+    
+    if(t->type == TOKTYPE_ELSE) {
+        nexttok(ti);
+        op = MAKENODE();
+        op->ntype = TYPE_OP;
+        op->tok = t;
+        addchild(root, op);
+        addchild(root, suffix);
+        p_controlsuffix(ti, suffix, flow);
+        addflow(flow->curr, NULL, flow->final);
+    }
 }
 
 node_s *p_switch(tokiter_s *ti, flow_s *flow)
@@ -1716,8 +1830,8 @@ node_s *p_switch(tokiter_s *ti, flow_s *flow)
     tok_s *t = tok(ti);
     node_s *root = MAKENODE(), *op = MAKENODE(), *exp;
     
-    root->type = TYPE_NODE;
-    op->type = TYPE_OP;
+    root->ntype = TYPE_NODE;
+    op->ntype = TYPE_OP;
     op->tok = t;
     
     t = nexttok(ti);
@@ -1740,25 +1854,25 @@ node_s *p_switch(tokiter_s *ti, flow_s *flow)
                 }
                 else {
                     //syntax error
-                    adderr(ti, "Syntax Error", t->lex, t->line, "}", NULL);
+                    ERR("Syntax Error: Expected }");
                     synerr_rec(ti);
                 }
             }
             else {
                 //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
+                ERR("Syntax Error: Expected {");
                 synerr_rec(ti);
             }
         }
         else {
             //syntax error
-            adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
+            ERR("Syntax Error: Expected )");
             synerr_rec(ti);
         }
     }
     else {
         //syntax error
-        adderr(ti, "Syntax Error", t->lex, t->line, "(", NULL);
+        ERR("Syntax Error: Expected (");
         synerr_rec(ti);
     }
     return root;
@@ -1774,7 +1888,7 @@ void p_caselist(tokiter_s *ti, node_s *root, flow_s *flow)
         nexttok(ti);
         
         cadef = MAKENODE();
-        cadef->type = TYPE_OP;
+        cadef->ntype = TYPE_OP;
         cadef->tok = t;
         
         arg = p_arglist(ti, flow);
@@ -1783,7 +1897,7 @@ void p_caselist(tokiter_s *ti, node_s *root, flow_s *flow)
             nexttok(ti);
             
             op = MAKENODE();
-            op->type = TYPE_OP;
+            op->ntype = TYPE_OP;
             op->tok = t;
             
             exp = p_expression(ti, flow);
@@ -1795,13 +1909,13 @@ void p_caselist(tokiter_s *ti, node_s *root, flow_s *flow)
         }
         else {
             //syntax error
-            adderr(ti, "Syntax Error", t->lex, t->line, "->", NULL);
+            ERR("Syntax Error: Expected ->");
             synerr_rec(ti);
         }
     }
     else if(t->type == TOKTYPE_DEFAULT) {
         cadef = MAKENODE();
-        cadef->type = TYPE_OP;
+        cadef->ntype = TYPE_OP;
         cadef->tok = t;
         
         t = nexttok(ti);
@@ -1815,54 +1929,45 @@ void p_caselist(tokiter_s *ti, node_s *root, flow_s *flow)
         }
         else {
             //syntax error
-            adderr(ti, "Syntax Error", t->lex, t->line, "->", NULL);
+            ERR("Syntax Error: Expected ->");
             synerr_rec(ti);
         }
-    }
-}
-
-void p_else(tokiter_s *ti, node_s *root, flow_s *flow)
-{
-    tok_s *t = tok(ti);
-    node_s *op, *suffix = MAKENODE();
-
-    suffix->type = TYPE_NODE;
-    
-    if(t->type == TOKTYPE_ELSE) {
-        nexttok(ti);
-        op = MAKENODE();
-        op->type = TYPE_OP;
-        op->tok = t;
-        addchild(root, op);
-        addchild(root, suffix);
-        p_controlsuffix(ti, suffix, flow);
-        addflow(flow->curr, flow->final);
     }
 }
 
 void p_controlsuffix(tokiter_s *ti, node_s *root, flow_s *flow)
 {
     tok_s *t = tok(ti);
-    node_s *statement;
+    node_s *statement, *last;
     
     if(t->type == TOKTYPE_OPENBRACE) {
         nexttok(ti);
         PUSHSCOPE();
         p_statementlist(ti, root, flow);
         POPSCOPE();
+        if(root->nchildren) {
+            last = root->children[root->nchildren - 1];
+            root->stype = last->stype;
+            root->ctype = last->ctype;
+            root->branch_complete = last->branch_complete;
+        }
         t = tok(ti);
         if(t->type == TOKTYPE_CLOSEBRACE) {
             nexttok(ti);
         }
         else {
             //syntax error
-            adderr(ti, "Syntax Error", t->lex, t->line, "}", NULL);
+            ERR("Syntax Error: Expected }");
             synerr_rec(ti);
         }
     }
     else {
         statement = p_statement(ti, flow);
         addchild(root, statement);
+        root->branch_complete = statement->branch_complete;
+        root->stype = statement->stype;
+        root->ctype = statement->ctype;
+        
     }
 }
 
@@ -1872,10 +1977,12 @@ node_s *p_dec(tokiter_s *ti, flow_s *flow)
     tok_s *t = tok(ti);
     
     dec = MAKENODE();
-    dec->type = TYPE_NODE;
+    dec->ntype = TYPE_NODE;
+    dec->stype = TYPE_VOID;
+    dec->ctype = NULL;
     
     op = MAKENODE();
-    op->type = TYPE_OP;
+    op->ntype = TYPE_OP;
     op->tok = t;
     
     if(t->type == TOKTYPE_VAR || t->type == TOKTYPE_LET) {
@@ -1884,7 +1991,7 @@ node_s *p_dec(tokiter_s *ti, flow_s *flow)
             nexttok(ti);
             
             ident = MAKENODE();
-            ident->type = TYPE_IDENT;
+            ident->ntype = TYPE_IDENT;
             ident->tok = t;
             
             addchild(dec, op);
@@ -1901,7 +2008,7 @@ node_s *p_dec(tokiter_s *ti, flow_s *flow)
         else {
             dec = NULL;
             //syntax error
-            adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
+            ERR("Syntax Error: Expected identifier");
             synerr_rec(ti);
         }
     }
@@ -1910,7 +2017,7 @@ node_s *p_dec(tokiter_s *ti, flow_s *flow)
         if(t->type == TOKTYPE_IDENT) {
             
             ident = MAKENODE();
-            ident->type = TYPE_IDENT;
+            ident->ntype = TYPE_IDENT;
             ident->tok = t;
             
             addchild(dec, op);
@@ -1933,19 +2040,19 @@ node_s *p_dec(tokiter_s *ti, flow_s *flow)
                 }
                 else {
                     //syntax error
-                    adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
+                    ERR("Syntax Error: Expected identifier");
                     synerr_rec(ti);
                 }
             }
             else {
                 //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
+                ERR("Syntax Error: Expected {");
                 synerr_rec(ti);
             }
         }
         else {
             //syntax error
-            adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
+            ERR("Syntax Error: Expected identifier");
             synerr_rec(ti);
         }
     }
@@ -1953,7 +2060,7 @@ node_s *p_dec(tokiter_s *ti, flow_s *flow)
         nexttok(ti);
         
         ident = MAKENODE();
-        ident->type = TYPE_IDENT;
+        ident->ntype = TYPE_IDENT;
         ident->tok = t;
         
         p_optid(ti, ident);
@@ -1967,18 +2074,18 @@ node_s *p_dec(tokiter_s *ti, flow_s *flow)
                 nexttok(ti);
             }
             else {
-                adderr(ti, "Syntax Error", t->lex, t->line, "}", NULL);
+                ERR("Syntax Error: Expected }");
                 synerr_rec(ti);
             }
         }
         else {
-            adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
+            ERR("Syntax Error: Expected {");
             synerr_rec(ti);
         }
     }
     else {
         //syntax error
-        adderr(ti, "Syntax Error", t->lex, t->line, "var", NULL);
+        ERR("Syntax Error: Expected var");
         synerr_rec(ti);
     }
     return dec;
@@ -2007,7 +2114,7 @@ void p_enumlist_(tokiter_s *ti, node_s *root, flow_s *flow)
             p_enumlist_(ti, root, flow);
         }
         else {
-            adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
+            ERR("Syntax Error: Expected identifier");
             synerr_rec(ti);
         }
     }
@@ -2048,55 +2155,55 @@ node_s *p_type(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_VOID:
             nexttok(ti);
             type = MAKENODE();
-            type->type = TYPE_TYPEEXP;
+            type->ntype = TYPE_TYPEEXP;
             type->tok= t;
             break;
         case TOKTYPE_INTEGER:
             nexttok(ti);
             type = MAKENODE();
-            type->type = TYPE_TYPEEXP;
+            type->ntype = TYPE_TYPEEXP;
             type->tok = t;
             p_array(ti, type, flow);
             break;
         case TOKTYPE_CHARTYPE:
             nexttok(ti);
             type = MAKENODE();
-            type->type = TYPE_TYPEEXP;
+            type->ntype = TYPE_TYPEEXP;
             type->tok = t;
             p_array(ti, type, flow);
             break;
         case TOKTYPE_REAL:
             nexttok(ti);
             type = MAKENODE();
-            type->type = TYPE_TYPEEXP;
+            type->ntype = TYPE_TYPEEXP;
             type->tok = t;
             p_array(ti, type, flow);
             break;
         case TOKTYPE_STRINGTYPE:
             nexttok(ti);
             type = MAKENODE();
-            type->type = TYPE_TYPEEXP;
+            type->ntype = TYPE_TYPEEXP;
             type->tok = t;
             p_array(ti, type, flow);
             break;
         case TOKTYPE_REGEXTYPE:
             nexttok(ti);
             type = MAKENODE();
-            type->type = TYPE_TYPEEXP;
+            type->ntype = TYPE_TYPEEXP;
             type->tok = t;
             p_array(ti, type, flow);
             break;
         case TOKTYPE_LIST:
             nexttok(ti);
             type = MAKENODE();
-            type->type = TYPE_TYPEEXP;
+            type->ntype = TYPE_TYPEEXP;
             type->tok = t;
             p_array(ti, type, flow);
             break;
         case TOKTYPE_IDENT:
             nexttok(ti);
             type = MAKENODE();
-            type->type = TYPE_TYPEEXP;
+            type->ntype = TYPE_TYPEEXP;
             type->tok = t;
             p_array(ti, type, flow);
             break;
@@ -2104,7 +2211,7 @@ node_s *p_type(tokiter_s *ti, flow_s *flow)
             nexttok(ti);
             
             type = MAKENODE();
-            type->type = TYPE_TYPEEXP;
+            type->ntype = TYPE_TYPEEXP;
             type->tok = t;
             opt = p_typelist(ti, flow);
             addchild(type, opt);
@@ -2122,21 +2229,21 @@ node_s *p_type(tokiter_s *ti, flow_s *flow)
                 else {
                     type = NULL;
                     //syntax error
-                    adderr(ti, "Syntax Error", t->lex, t->line, "->", NULL);
+                    ERR("Syntax Error: Expected ->");
                     synerr_rec(ti);
                 }
             }
             else {
                 type = NULL;
                 //syntax error
-                adderr(ti, "Syntax Error", t->lex, t->line, ")", NULL);
+                ERR("Syntax Error: Expected )");
                 synerr_rec(ti);
             }
             break;
         default:
             type = NULL;
             //syntax error
-            adderr(ti, "Syntax Error", t->lex, t->line, "void", "int", "real", "string", "regex", "set", "(", NULL);
+            ERR("Syntax Error: Expected void, int, real, string, regex, set, or (");
             synerr_rec(ti);
             break;
     }
@@ -2150,20 +2257,20 @@ void p_inh(tokiter_s *ti, node_s *root)
     
     if(t->type == TOKTYPE_COLON) {
         op = MAKENODE();
-        op->type = TYPE_OP;
+        op->ntype = TYPE_OP;
         op->tok = t;
         
         t = nexttok(ti);
         if(t->type == TOKTYPE_IDENT) {
             nexttok(ti);
             ident = MAKENODE();
-            ident->type = TYPE_IDENT;
+            ident->ntype = TYPE_IDENT;
             ident->tok = t;
             addchild(root, op);
             addchild(root, ident);
         }
         else {
-            adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
+            ERR("Syntax Error: Expected identifier");
             synerr_rec(ti);
         }
     }
@@ -2201,7 +2308,7 @@ void p_array(tokiter_s *ti, node_s *root, flow_s *flow)
         }
         else {
             //syntax error
-            adderr(ti, "Syntax Error", t->lex, t->line, "]", NULL);
+            ERR("Syntax Error: Expected ]");
             synerr_rec(ti);
         }
     }
@@ -2212,7 +2319,7 @@ node_s *p_typelist(tokiter_s *ti, flow_s *flow)
     node_s *type;
     tok_s *t = tok(ti);
     node_s *root = MAKENODE();
-    root->type = TYPE_NODE;
+    root->ntype = TYPE_NODE;
     
     switch(t->type) {
         case TOKTYPE_VOID:
@@ -2256,7 +2363,7 @@ void p_typelist_(tokiter_s *ti, node_s *root, flow_s *flow)
         t = nexttok(ti);
         if(t->type == TOKTYPE_VARARG) {
             type = MAKENODE();
-            type->type = TYPE_TYPEEXP;
+            type->ntype = TYPE_TYPEEXP;
             type->tok = t;
             addchild(root, type);
             nexttok(ti);
@@ -2284,10 +2391,10 @@ node_s *p_param(tokiter_s *ti, flow_s *flow)
     if(t->type == TOKTYPE_IDENT) {
         nexttok(ti);
         n = MAKENODE();
-        n->type = TYPE_NODE;
+        n->ntype = TYPE_NODE;
 
         ident = MAKENODE();
-        ident->type = TYPE_IDENT;
+        ident->ntype = TYPE_IDENT;
         ident->tok = t;
         
         if(addident(ti->scope, ident)) {
@@ -2301,7 +2408,7 @@ node_s *p_param(tokiter_s *ti, flow_s *flow)
     }
     else {
         //syntax error
-        adderr(ti, "Syntax Error", t->lex, t->line, "identifier", NULL);
+        ERR("Syntax Error: Expected identifier");
         synerr_rec(ti);
         return NULL;
     }
@@ -2318,7 +2425,7 @@ node_s *p_optparamlist(tokiter_s *ti, flow_s *flow)
     else {
         //epsilon production
         empty = MAKENODE();
-        empty->type = TYPE_NODE;
+        empty->ntype = TYPE_NODE;
         return empty;
     }
 }
@@ -2328,7 +2435,7 @@ node_s *p_paramlist(tokiter_s *ti, flow_s *flow)
     tok_s *t = tok(ti);
     node_s *root = MAKENODE(), *dec;
 
-    root->type = TYPE_PARAMLIST;
+    root->ntype = TYPE_PARAMLIST;
     
     if(t->type == TOKTYPE_IDENT) {
         dec = p_param(ti, flow);
@@ -2340,7 +2447,7 @@ node_s *p_paramlist(tokiter_s *ti, flow_s *flow)
     }
     else {
         //syntax error
-        adderr(ti, "Syntax Error", t->lex, t->line, "identifier", "...", NULL);
+        ERR("Syntax Error: Expected identifier or ...");
         synerr_rec(ti);
     }
     
@@ -2363,14 +2470,14 @@ void p_paramlist_(tokiter_s *ti, node_s *root, flow_s *flow)
         }
         else if(t->type == TOKTYPE_VARARG) {
             dec = MAKENODE();
-            dec->type = TYPE_DEC;
+            dec->ntype = TYPE_DEC;
             dec->tok = t;
             nexttok(ti);
             addchild(root, dec);
         }
         else {
             //syntax error
-            adderr(ti, "Syntax Error", t->lex, t->line, "identifier", "...", NULL);
+            ERR("Syntax Error: Expected identifier or ...");
             synerr_rec(ti);
         }
     }
@@ -2384,7 +2491,9 @@ node_s *p_set(tokiter_s *ti, flow_s *flow)
     tok_s *t = tok(ti);
     node_s *set = MAKENODE(), *exp;
     
-    set->type = TYPE_NODE;
+    set->ntype = TYPE_NODE;
+    set->stype = TYPE_SET;
+    set->ctype = set;
     
     if(t->type == TOKTYPE_OPENBRACE) {
         nexttok(ti);
@@ -2398,13 +2507,13 @@ node_s *p_set(tokiter_s *ti, flow_s *flow)
         }
         else {
             //syntax error
-            adderr(ti, "Syntax Error", t->lex, t->line, "}", NULL);
+            ERR("Syntax Error: Expected }");
             synerr_rec(ti);
         }
     }
     else {
         //syntax error
-        adderr(ti, "Syntax Error", t->lex, t->line, "{", NULL);
+        ERR("Syntax Error: Expected {");
         synerr_rec(ti);
     }
     return set;
@@ -2419,7 +2528,7 @@ void p_optnext(tokiter_s *ti, node_s *root, flow_s *flow)
     if(t->type == TOKTYPE_MAP) {
         nexttok(ti);
         op = MAKENODE();
-        op->type = TYPE_OP;
+        op->ntype = TYPE_OP;
         op->tok = t;
         exp = p_expression(ti, flow);
         addchild(root, op);
@@ -2428,7 +2537,7 @@ void p_optnext(tokiter_s *ti, node_s *root, flow_s *flow)
     else if(t->type == TOKTYPE_RANGE) {
         nexttok(ti);
         op = MAKENODE();
-        op->type = TYPE_OP;
+        op->ntype = TYPE_OP;
         op->tok = t;
         exp = p_expression(ti, flow);
         addchild(root, op);
@@ -2470,6 +2579,7 @@ node_s *node_s_(scope_s *scope)
     e->index = 0;
     e->scope = scope;
     e->nchildren = 0;
+    e->branch_complete = true;
     return e;
 }
 
@@ -2588,7 +2698,7 @@ void checkvar(node_s *var)
             *assign = right(id);
     
     if(assign) {
-        if(assign->type == TYPE_OP) {
+        if(assign->ntype == TYPE_OP) {
             
         }
         else {
@@ -2599,6 +2709,13 @@ void checkvar(node_s *var)
             }
         }
     }
+}
+
+edge_s *edge_s_(node_s *stmt)
+{
+    edge_s *e = alloc(sizeof *e);
+    e->value = stmt;
+    return e;
 }
 
 flow_s *flow_s_(void)
@@ -2616,33 +2733,34 @@ flnode_s *flnode_s_(void)
     return allocz(sizeof(flnode_s));
 }
 
-
-void addflow(flnode_s *out, flnode_s *in)
+void addflow(flnode_s *out, node_s *stmt, flnode_s *in)
 {
+    edge_s *e;
+    
     if(out && in) {
-        if(out->nout)
-            out->out = ralloc(out->out, (out->nout + 1) * sizeof(*out->out));
-        else
-            out->out = alloc(sizeof *out->out);
-        out->out[out->nout] = in;
+        e = edge_s_(stmt);
+        e->in = in;
+        e->out = out;
+        
+        out->out = ralloc(out->out, (out->nout + 1) * sizeof(*out->out));
+        out->out[out->nout] = e;
         out->nout++;
         
-        if(in->nin)
-            in->in = ralloc(in->in, (in->nin + 1) * sizeof(*in->in));
-        else
-            in->in = alloc(sizeof *in->in);
-        in->in[in->nin] = out;
+        in->in = ralloc(in->in, (in->nin + 1) * sizeof(*in->in));
+        in->in[in->nin] = e;
         in->nin++;
     }
 }
 
-void fflow_stmt(flow_s *flow)
+void flow_reparent(flnode_s *f1, flnode_s *f2)
 {
-    flnode_s *old = flow->curr;
-    flnode_s *nn = allocz(sizeof *nn);
+    unsigned i;
     
-    addflow(old, nn);
-    flow->curr = nn;
+    for(i = 0; i < f1->nin; i++) {
+        f2->in = ralloc(f2->in, (f2->nin + 1) * sizeof(*f2->in));
+        f2->in[f2->nin] = f1->in[i];
+        f2->nin++;
+    }
 }
 
 node_s *getparentfunc(node_s *start)
@@ -2691,7 +2809,7 @@ void walk_tree(node_s *root)
     for(i = 0; i < root->nchildren; i++)
         walk_tree(root->children[i]);
     
-    if(root->type == TYPE_OP) {
+    if(root->ntype == TYPE_OP) {
        /* switch(root->tok->type) {
             case TOKTYPE_VAR:
                 break;
@@ -2715,6 +2833,28 @@ void freetree(node_s *root)
     free(root);
 }
 
+void emit(tokiter_s *ti, char *str, ...)
+{
+    char *s;
+    buf_s *b = ti->code;
+    va_list argp;
+    
+    va_start(argp, str);
+    
+    bufaddstr(b, str, strlen(str));
+
+    while((s = va_arg(argp, char *))) {
+        bufaddstr(b, s, strlen(s));
+    }
+    va_end(argp);
+}
+
+void makelabel(tokiter_s *ti, char *buf)
+{
+    sprintf(buf, "_l%u:\n", ti->labelcount);
+    ti->labelcount++;
+}
+
 
 void printerrs(errlist_s *err)
 {
@@ -2729,47 +2869,29 @@ void printerrs(errlist_s *err)
     }
 }
 
-void adderr(tokiter_s *ti, char *prefix, char *got, uint16_t line, ...)
+void adderr(tokiter_s *ti, char *err, int lineno)
 {
-    va_list argp;
-    uint8_t i = 0;
+    char *s;
     errlist_s *e;
-    size_t totallen = strlen(prefix), nargs, curr;
-    char *args[MAX_ERRARGS], *s;
-
-    va_start(argp, line);
+    tok_s *t;
+    short ndig;
     
-    while((s = va_arg(argp, char *))) {
-        totallen += strlen(s);
-        args[i++] = s;
-    }
-    
-    nargs = i;
-    
-    if(nargs > 1) {
-        totallen += (sizeof(" at line: ") - 1) + ndigits(line) + (sizeof(". Expected ") - 1) +
-        (nargs - 1)*2 + sizeof("or ") + sizeof(" but got ") + strlen(got);
-        e = alloc(sizeof(*e) + totallen);
-        e->next = NULL;
+    if(lineno < 0) {
+        t = tok(ti);
         
-        curr = sprintf(e->msg, "%s at line: %u. Expected ", prefix , line);
-        
-        for(i = 0; i < nargs - 1; i++)
-            curr += sprintf(&e->msg[curr], "%s, ", args[i]);
-        
-        sprintf(&e->msg[curr], "or %s but got %s.", args[i], got);
+        ndig = ndigits(t->line);
+        s = alloc(strlen(err) + sizeof(" but got") + strlen(t->lex) + sizeof(" at line: ") + ndig);
+        sprintf(s, "%s but got %s at line: %d.", err, t->lex, t->line);
     }
     else {
-        totallen += (sizeof(" at line: ") - 1) + ndigits(line) + (sizeof(". Expected ") - 1) +
-        sizeof(" but got ") + strlen(got) + 1;
-        e = alloc(sizeof(*e) + totallen);
-        e->next = NULL;
-        
-        curr = sprintf(e->msg, "%s at line: %u. Expected %s but got %s.", prefix , line, args[0], got);
+        ndig = ndigits(lineno);
+        s = alloc(strlen(err) + sizeof(" at line: .") + ndig);
+        sprintf(s, "%s at line: %d.", err, lineno);
     }
     
-    va_end(argp);
-    
+    e = alloc(sizeof(*e));
+    e->next = NULL;
+    e->msg = s;
     if(ti->err)
         ti->ecurr->next = e;
     else
