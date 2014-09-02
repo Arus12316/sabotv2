@@ -452,7 +452,7 @@ errlist_s *parse(char *src)
     
     start(ti);
     
-    printf("code:\n%s\n", ti->code->buf);
+    printf("code: %s\n", ti->code->buf);
     
     return ti->err;
 }
@@ -1085,6 +1085,7 @@ node_s *p_expression(tokiter_s *ti, flow_s *flow)
     addchild(exp, node);
     p_expression_(ti, exp, flow);
     
+    exp->branch_complete = node->branch_complete;
     exp->stype = node->stype;
     exp->ctype = node->ctype;
     
@@ -1131,6 +1132,7 @@ node_s *p_simple_expression(tokiter_s *ti, flow_s *flow)
     addchild(sexp, term);
     p_simple_expression_(ti, sexp, flow);
     
+    sexp->branch_complete = term->branch_complete;
     sexp->stype = term->stype;
     sexp->ctype = term->ctype;
     
@@ -1169,6 +1171,7 @@ node_s *p_term(tokiter_s *ti, flow_s *flow)
     
     p_term_(ti, term, flow);
     
+    term->branch_complete = f->branch_complete;
     term->stype = f->stype;
     term->ctype = f->ctype;
     
@@ -1228,11 +1231,13 @@ node_s *p_optexp(tokiter_s *ti, node_s *fact, flow_s *flow)
         addchild(fact, op);
         addchild(fact, f);
         
-        if(f->branch_complete) {
-            
+        if(f && f->branch_complete) {
+            if(f->stype == TYPE_VOID) {
+                adderr(ti, "Error: Right operand of exponent contains branches that evaluate to different incompatible types", 0);
+            }
         }
         else {
-            
+            adderr(ti, "Error: Right operand of exponent contains branch that evaluates to void statement", 0);
         }
     }
     else {
@@ -1773,6 +1778,7 @@ node_s *p_if(tokiter_s *ti, flow_s *flow)
     addflow(flow->curr, exp, cond);
     flow->curr = cond;
     p_controlsuffix(ti, suffix, flow);
+    
     addflow(flow->curr, NULL, final);
     flow->curr = cond;
     p_else(ti, root, flow);
@@ -1781,19 +1787,26 @@ node_s *p_if(tokiter_s *ti, flow_s *flow)
     
     if(root->nchildren > 4) {
         esuffix = root->children[4];
+        
+        root->branch_complete = suffix->branch_complete && esuffix->branch_complete;
+        
+        
         if(esuffix->stype == suffix->stype) {
             root->stype = suffix->stype;
         }
+        else if((suffix->stype == TYPE_REAL && esuffix->stype == TYPE_INTEGER) || (suffix->stype == TYPE_INTEGER && esuffix->stype == TYPE_REAL)) {
+            root->stype = TYPE_REAL;
+        }
         else {
+            printf("suffix: %d\tesuffix: %d\n", suffix->stype, esuffix->stype);
             root->stype = TYPE_VOID;
-            puts("if statement type mismatch");
         }
     }
     else {
         root->stype = suffix->stype;
+        root->ctype = suffix->ctype;
         root->branch_complete = false;
     }
-    
     
     return root;
 }
@@ -2876,12 +2889,18 @@ void adderr(tokiter_s *ti, char *err, int lineno)
     tok_s *t;
     short ndig;
     
-    if(lineno < 0) {
+    if(lineno <= 0) {
         t = tok(ti);
-        
         ndig = ndigits(t->line);
-        s = alloc(strlen(err) + sizeof(" but got") + strlen(t->lex) + sizeof(" at line: ") + ndig);
-        sprintf(s, "%s but got %s at line: %d.", err, t->lex, t->line);
+        if(lineno) {
+            s = alloc(strlen(err) + sizeof(" but got") + strlen(t->lex) + sizeof(" at line: ") + ndig);
+            sprintf(s, "%s but got %s at line: %d.", err, t->lex, t->line);
+        }
+        else {
+            s = alloc(strlen(err) + sizeof(" at line: .") + ndig);
+            sprintf(s, "%s at line: %d.", err, t->line);
+        }
+        
     }
     else {
         ndig = ndigits(lineno);

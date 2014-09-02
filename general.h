@@ -1,6 +1,10 @@
 #ifndef GENERAL_H
 #define GENERAL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdlib.h>
 
 typedef struct buf_s buf_s;
@@ -23,4 +27,8 @@ extern void *ralloc(void *ptr, size_t size);
 
 extern short ndigits(int num);
 
+#endif
+
+#ifdef __cplusplus
+}
 #endif

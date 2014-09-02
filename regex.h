@@ -84,5 +84,4 @@ extern void print_nfa(nfa_s *nfa);
 }
 #endif
 
-
 #endif

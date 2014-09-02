@@ -42,3 +42,5 @@ FORMS    += mainwindow.ui \
     createaccount.ui \
     raid.ui
 CONFIG += c++11
+QMAKE_CC= gcc -std=c11
+

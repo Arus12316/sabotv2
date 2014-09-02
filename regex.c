@@ -65,7 +65,7 @@ static bool rp_closure(void);
 static void rp_union(void);
 
 static fsmnode_s *rp_makenode(fsmnode_s *parent, regx_val_s val);
-static inline fsmnode_s *fsmnode_s_(void);
+static fsmnode_s *fsmnode_s_(void);
 static void rp_bridge(fsmnode_s *parent, fsmnode_s *child, regx_val_s val);
 static void rp_add_edge(fsmnode_s *parent, fsmedge_s *edge);
 
