@@ -11,7 +11,6 @@
                         |
                         <term> <simple_expression'>
  
- 
  <simple_expression'> -> addop <term> <simple_expression'> | ε
  
  <term> -> <factor> <term'>
@@ -36,20 +35,30 @@
                 |
                 regex
                 |
-                <set>
+                <structliteral>
+                |
+                <mapliteral>
                 |
                 <lambda> <factor''> { <factor'>.type := closure; <factor'>.val := <lambda>.val }
                 |
                 <if>
                 |
                 <switch>
- 
- 
+
  <factor''> -> [ <expression> ] <factor''> | . id <factor''> | ( <optarglist> ) <factor''> | ε
  
  <assign> -> assignop <expression> | ε
  
- <lambda> -> @ (<optparamlist>) openbrace <statementlist> closebrace
+ <structliteral> -> ${ <initializerlist> }
+ 
+ <initializerlist> -> <expression> , <initializerlist> | dot id assignop <expression> , <initializerlist> | ε
+ 
+ <mapliteral> -> #{ <maplist> }
+ 
+ <maplist> -> <expression> map <expression> <maplist> | ε
+ 
+ 
+ <lambda> -> ^ (<optparamlist>) openbrace <statementlist> closebrace
  
  <sign> -> + | -
  
@@ -68,8 +77,6 @@
  
  <if> -> if <expression> <controlsuffix> <else>
  
-    {
-    }
  
  <switch> -> switch(<expression>) openbrace <caselist> closebrace
  
@@ -83,7 +90,7 @@
  
  <controlsuffix> -> openbrace <statementlist> closebrace | <statement>
  
- <dec> -> <varlet> id <opttype> <assign> | class id <inh> { <declist> } | enum <optid> { <enumlist> }
+ <dec> -> <varlet> id <opttype> <assign> | class id <inh> { <declist> } | enum <optid> { <enumlist> } | struct
  
  <varlet> -> var | let
  
@@ -94,7 +101,11 @@
  
  <opttype> -> : <type> | ε
  
- <type> -> void | integer <array> | char <array> | real <array> | String <array> | Regex <array> | set <array> | id <array> |( <typelist> ) <array> map <type>
+ <type> -> void | int <array> | char <array> | real <array> | string <array> | 
+            regex <array> | Map <array> <optmaptype> |
+            id <array> | ( <typelist> ) <array> map <type>
+ 
+ <optmaptype> -> openbrace <type> map <type> closebrace
  
  <inh> -> : id | ε
  <declist> -> <dec> <optsemicolon> <declist> | ε
@@ -111,12 +122,6 @@
  <param> -> id <opttype> <assign>
  <paramlist> -> <param> <paramlist'> | vararg
  <paramlist'> -> , <param> <paramlist'> | vararg | ε
- 
- <set> -> openbrace <expression> <optnext> <set'> closebrace
- 
- <optnext> -> map <expression> | range <expression> | ε
- 
- <set'> -> , <expression> <optnext> <set'> | ε
  
  */
 
@@ -183,14 +188,17 @@ enum {
     TOKTYPE_REAL,
     TOKTYPE_STRINGTYPE,
     TOKTYPE_REGEXTYPE,
-    TOKTYPE_LIST,
     TOKTYPE_RETURN,
     TOKTYPE_BREAK,
     TOKTYPE_CONTINUE,
     TOKTYPE_CLASS,
     TOKTYPE_CHAR,
     TOKTYPE_CHARTYPE,
-    TOKTYPE_UNNEG
+    TOKTYPE_UNNEG,
+    TOKTYPE_STRUCTLITERAL,
+    TOKTYPE_MAPLITERAL,
+    TOKTYPE_STRUCTTYPE,
+    TOKTYPE_MAPTYPE
 };
 
 enum {
@@ -265,6 +273,7 @@ struct tokchunk_s
     tokchunk_s *next;
 };
 
+
 struct tokiter_s
 {
     uint8_t i;
@@ -299,30 +308,28 @@ keywords[] = {
     {"real", TOKTYPE_REAL},
     {"string", TOKTYPE_STRINGTYPE},
     {"regex", TOKTYPE_REGEXTYPE},
-    {"list", TOKTYPE_LIST},
     {"return", TOKTYPE_RETURN},
     {"class", TOKTYPE_CLASS},
     {"do", TOKTYPE_DO},
     {"break", TOKTYPE_BREAK},
     {"continue", TOKTYPE_CONTINUE},
-    {"enum", TOKTYPE_ENUM}
+    {"enum", TOKTYPE_ENUM},
+    {"struct", TOKTYPE_STRUCTTYPE},
+    {"map", TOKTYPE_MAPTYPE}
 };
 
 struct node_s
 {
     uint8_t ntype;
     uint8_t stype;
-    
     node_s *ctype;
     bool branch_complete;
     tok_s *tok;
     scope_s *scope;
-    
     unsigned index;
     unsigned nchildren;
     node_s **children;
     node_s *parent;
-    
 };
 
 struct rec_s
@@ -384,6 +391,10 @@ static node_s *p_optexp(tokiter_s *ti, node_s *fact, flow_s *flow);
 static node_s *p_factor_(tokiter_s *ti, flow_s *flow);
 static void p_factor__(tokiter_s *ti, node_s *root, flow_s *flow);
 static void p_assign(tokiter_s *ti, node_s *root, flow_s *flow);
+static void p_structliteral(tokiter_s *ti);
+static void p_initializerlist(tokiter_s *ti);
+static void p_mapliteral(tokiter_s *ti);
+static void p_maplist(tokiter_s *ti);
 static node_s *p_lambda(tokiter_s *ti);
 static int p_sign(tokiter_s *ti);
 static node_s *p_optarglist(tokiter_s *ti, flow_s *flow);
@@ -411,9 +422,6 @@ static void p_typelist_(tokiter_s *ti, node_s *root, flow_s *flow);
 static node_s *p_optparamlist(tokiter_s *ti, flow_s *flow);
 static node_s *p_paramlist(tokiter_s *ti, flow_s *flow);
 static void p_paramlist_(tokiter_s *ti, node_s *root, flow_s *flow);
-static node_s *p_set(tokiter_s *ti, flow_s *flow);
-static void p_optnext(tokiter_s *ti, node_s *root, flow_s *flow);
-static void p_set_(tokiter_s *ti, node_s *set, flow_s *flow);
 static void synerr_rec(tokiter_s *ti);
 
 static node_s *node_s_(scope_s *scope);
@@ -478,12 +486,6 @@ tokiter_s *lex(char *src)
     
     while(*src) {
         switch(*src) {
-            case '#':
-                do {
-                    src++;
-                }
-                while(*src && *src != '\n');
-                break;
             case '\n':
                 line++;
             case ' ':
@@ -518,6 +520,10 @@ tokiter_s *lex(char *src)
                 prev = mtok(&curr, line, "[", 1, TOKTYPE_OPENBRACKET, TOKATT_DEFAULT);
                 src++;
                 break;
+            case '@':
+                prev = mtok(&curr, line, "@", 1, TOKTYPE_LAMBDA, TOKATT_DEFAULT);
+                src++;
+                break;
             case ']':
                 prev = mtok(&curr, line, "]", 1, TOKTYPE_CLOSEBRACKET, TOKATT_DEFAULT);
                 src++;
@@ -528,10 +534,6 @@ tokiter_s *lex(char *src)
                 break;
             case '}':
                 prev = mtok(&curr, line, "}", 1, TOKTYPE_CLOSEBRACE, TOKATT_DEFAULT);
-                src++;
-                break;
-            case '@':
-                prev = mtok(&curr, line, "@", 1, TOKTYPE_LAMBDA, TOKATT_DEFAULT);
                 src++;
                 break;
             case '!':
@@ -545,6 +547,24 @@ tokiter_s *lex(char *src)
             case '|':
                 prev = mtok(&curr, line, "!", 1, TOKTYPE_ADDOP, TOKATT_OR);
                 src++;
+                break;
+            case '$':
+                if(*(src + 1) == '{') {
+                    prev = mtok(&curr, line, "${", 1, TOKTYPE_STRUCTLITERAL, TOKATT_DEFAULT);
+                    src += 2;
+                }
+                else {
+                    adderr(ti, "Lexical Error: Expected '{' for '${", line);
+                }
+                break;
+            case '#':
+                if(*(src + 1) == '{') {
+                    prev = mtok(&curr, line, "!", 1, TOKTYPE_MAPLITERAL, TOKATT_DEFAULT);
+                    src += 2;
+                }
+                else {
+                    adderr(ti, "Lexical Error: Expected '{' for '${", line);
+                }
                 break;
             case '<':
                 if(*(src + 1) == '-') {
@@ -609,44 +629,52 @@ tokiter_s *lex(char *src)
                 }
                 break;
             case '/':
-                if(prev) {
-                    switch(prev->type) {
-                        case TOKTYPE_NUM:
-                        case TOKTYPE_CHAR:
-                        case TOKTYPE_STRING:
-                        case TOKTYPE_REGEX:
-                        case TOKTYPE_CLOSEPAREN:
-                        case TOKTYPE_CLOSEBRACKET:
-                        case TOKTYPE_CLOSEBRACE:
-                            if(*(src + 1) == '=') {
-                                prev = mtok(&curr, line, "/=", 2, TOKTYPE_ASSIGN, TOKATT_DIV);
-                                src += 2;
-                            }
-                            else {
-                                prev = mtok(&curr, line, "/", 1, TOKTYPE_MULOP, TOKATT_DIV);
-                                src++;
-                            }
-                            break;
-                        default:
-                            goto parse_regex;
+                if(*(src + 1) == '/') {
+                    do {
+                        src++;
                     }
+                    while(*src && *src != '\n');
                 }
                 else {
-                parse_regex:
-                    bptr = src++;
-                    while(*src != '/') {
-                        if(*src)
-                            src++;
-                        else {
-                            //adderr(ti, "Lexical Error", "EOF", line, "/", NULL);
-                            adderr(ti, "Lexical Error: Expected '/' but got EOF", line);
-                            break;
+                    if(prev) {
+                        switch(prev->type) {
+                            case TOKTYPE_NUM:
+                            case TOKTYPE_CHAR:
+                            case TOKTYPE_STRING:
+                            case TOKTYPE_REGEX:
+                            case TOKTYPE_CLOSEPAREN:
+                            case TOKTYPE_CLOSEBRACKET:
+                            case TOKTYPE_CLOSEBRACE:
+                                if(*(src + 1) == '=') {
+                                    prev = mtok(&curr, line, "/=", 2, TOKTYPE_ASSIGN, TOKATT_DIV);
+                                    src += 2;
+                                }
+                                else {
+                                    prev = mtok(&curr, line, "/", 1, TOKTYPE_MULOP, TOKATT_DIV);
+                                    src++;
+                                }
+                                break;
+                            default:
+                                goto parse_regex;
                         }
                     }
-                    c = *++src;
-                    *src = '\0';
-                    prev = mtok(&curr, line, bptr, src - bptr, TOKTYPE_REGEX, TOKATT_DEFAULT);
-                    *src = c;
+                    else {
+                    parse_regex:
+                        bptr = src++;
+                        while(*src != '/') {
+                            if(*src)
+                                src++;
+                            else {
+                                //adderr(ti, "Lexical Error", "EOF", line, "/", NULL);
+                                adderr(ti, "Lexical Error: Expected '/' but got EOF", line);
+                                break;
+                            }
+                        }
+                        c = *++src;
+                        *src = '\0';
+                        prev = mtok(&curr, line, bptr, src - bptr, TOKTYPE_REGEX, TOKATT_DEFAULT);
+                        *src = c;
+                    }
                 }
                 break;
             case '%':
@@ -753,9 +781,9 @@ tokiter_s *lex(char *src)
                         }
                     }
                 }
-                else if(isalpha(*src) || *src == '_' || *src == '$') {
+                else if(isalpha(*src) || *src == '_') {
                     bptr = src++;
-                    while(isalnum(*src) || *src == '_' || *src == '$')
+                    while(isalnum(*src) || *src == '_')
                         src++;
                     c = *src;
                     *src = '\0';
@@ -930,6 +958,8 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
         case TOKTYPE_NOT:
         case TOKTYPE_OPENPAREN:
         case TOKTYPE_NUM:
+        case TOKTYPE_STRUCTLITERAL:
+        case TOKTYPE_MAPLITERAL:
         case TOKTYPE_DOT:
         case TOKTYPE_IDENT:
         case TOKTYPE_RETURN:
@@ -969,7 +999,7 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
             //epsilon production
             break;
         default:
-            ERR("Syntax Error: Expected class, var, listener, switch, for, while, if, +, -, {, }, @, \
+            ERR("Syntax Error: Expected class, var, listener, switch, for, while, if, +, -, {, }, ^{, \
                 regex, string, !, (, number, identifier, or return");
             synerr_rec(ti);
             break;
@@ -995,6 +1025,8 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_REGEX:
         case TOKTYPE_LAMBDA:
         case TOKTYPE_OPENBRACE:
+        case TOKTYPE_STRUCTLITERAL:
+        case TOKTYPE_MAPLITERAL:
         case TOKTYPE_ADDOP:
             statement = p_expression(ti, flow);
             addflow(flow->curr, statement, fn);
@@ -1214,6 +1246,9 @@ node_s *p_factor(tokiter_s *ti, flow_s *flow)
     addchild(fact, f);
     expon = p_optexp(ti, fact, flow);
     
+    fact->stype = f->stype;
+    fact->ctype = f->ctype;
+    
     return fact;
 }
 
@@ -1234,6 +1269,9 @@ node_s *p_optexp(tokiter_s *ti, node_s *fact, flow_s *flow)
         if(f && f->branch_complete) {
             if(f->stype == TYPE_VOID) {
                 adderr(ti, "Error: Right operand of exponent contains branches that evaluate to different incompatible types", 0);
+            }
+            else if(f->stype == TYPE_LIST) {
+                adderr(ti, "Error: Right operand of exponent contains incompatible list type", 0);
             }
         }
         else {
@@ -1364,8 +1402,21 @@ node_s *p_factor_(tokiter_s *ti, flow_s *flow)
             n->ctype = NULL;
             n->tok = t;
             break;
-        case TOKTYPE_OPENBRACE:
-            n = p_set(ti, flow);
+        case TOKTYPE_STRUCTLITERAL:
+            n = MAKENODE();
+            n->ntype = TYPE_NODE;
+            n->stype = TYPE_NUM;
+            n->ctype = NULL;
+            n->tok = t;
+            p_structliteral(ti);
+            break;
+        case TOKTYPE_MAPLITERAL:
+            n = MAKENODE();
+            n->ntype = TYPE_NODE;
+            n->stype = TYPE_NUM;
+            n->ctype = NULL;
+            n->tok = t;
+            p_mapliteral(ti);
             break;
         case TOKTYPE_LAMBDA:
             n = p_lambda(ti);
@@ -1479,6 +1530,124 @@ void p_assign(tokiter_s *ti, node_s *root, flow_s *flow)
         
         addchild(root, op);
         addchild(root, exp);
+    }
+}
+
+void p_structliteral(tokiter_s *ti)
+{
+    //<structliteral> -> ${ <initializerlist> }
+
+    tok_s *t = tok(ti);
+    
+    if(t->type == TOKTYPE_STRUCTLITERAL) {
+        nexttok(ti);
+        p_initializerlist(ti);
+        t = tok(ti);
+        if(t->type != TOKTYPE_CLOSEBRACE) {
+            ERR("Syntax Error: Expected } but got:");
+            synerr_rec(ti);
+        }
+    }
+    else {
+        ERR("Syntax Error: Expected ${ but got:");
+        synerr_rec(ti);
+    }
+}
+
+void p_initializerlist(tokiter_s *ti)
+{
+    // <initializerlist> -> <expression> , <initializerlist> | dot id assignop <expression> , <initializerlist> | ε
+    
+    tok_s *t = tok(ti);
+    
+    switch(t->type) {
+        case TOKTYPE_SWITCH:
+        case TOKTYPE_IF:
+        case TOKTYPE_ADDOP:
+        case TOKTYPE_LAMBDA:
+        case TOKTYPE_MAPLITERAL:
+        case TOKTYPE_STRUCTLITERAL:
+        case TOKTYPE_REGEX:
+        case TOKTYPE_STRING:
+        case TOKTYPE_NOT:
+        case TOKTYPE_OPENPAREN:
+        case TOKTYPE_NUM:
+        case TOKTYPE_IDENT:
+            p_expression(ti, NULL);
+            t = tok(ti);
+            if(t->type == TOKTYPE_COMMA) {
+                p_initializerlist(ti);
+            }
+            break;
+        case TOKTYPE_DOT:
+            t = nexttok(ti);
+            if(t->type == TOKTYPE_IDENT) {
+                t = nexttok(ti);
+                if(t->type == TOKTYPE_ASSIGN) {
+                    nexttok(ti);
+                    p_expression(ti, NULL);
+                    t = tok(ti);
+                    if(t->type == TOKTYPE_COMMA) {
+                        p_initializerlist(ti);
+                    }
+                }
+            }
+            break;
+        default:
+            //epsilon production
+            break;
+    }
+    
+}
+
+void p_mapliteral(tokiter_s *ti)
+{
+    tok_s *t = tok(ti);
+    
+    if(t->type == TOKTYPE_MAPLITERAL) {
+        nexttok(ti);
+        p_mapliteral(ti);
+        t = tok(ti);
+        if(t->type != TOKTYPE_CLOSEBRACE) {
+            ERR("Syntax Error: Expected } but got:");
+            synerr_rec(ti);
+        }
+    }
+    else {
+        ERR("Syntax Error: Expected #{ but got:");
+        synerr_rec(ti);
+    }
+}
+
+void p_maplist(tokiter_s *ti)
+{
+    tok_s *t = tok(ti);
+    
+    switch(t->type) {
+        case TOKTYPE_SWITCH:
+        case TOKTYPE_IF:
+        case TOKTYPE_ADDOP:
+        case TOKTYPE_LAMBDA:
+        case TOKTYPE_MAPLITERAL:
+        case TOKTYPE_STRUCTLITERAL:
+        case TOKTYPE_REGEX:
+        case TOKTYPE_STRING:
+        case TOKTYPE_NOT:
+        case TOKTYPE_OPENPAREN:
+        case TOKTYPE_NUM:
+        case TOKTYPE_DOT:
+        case TOKTYPE_IDENT:
+            p_expression(ti, NULL);
+            t = tok(ti);
+            if(t->type == TOKTYPE_MAP) {
+                nexttok(ti);
+                p_expression(ti, NULL);
+                p_mapliteral(ti);
+            }
+            break;
+        default:
+            //epsilon production
+            break;
     }
 }
 
@@ -1790,7 +1959,6 @@ node_s *p_if(tokiter_s *ti, flow_s *flow)
         
         root->branch_complete = suffix->branch_complete && esuffix->branch_complete;
         
-        
         if(esuffix->stype == suffix->stype) {
             root->stype = suffix->stype;
         }
@@ -1976,11 +2144,11 @@ void p_controlsuffix(tokiter_s *ti, node_s *root, flow_s *flow)
     }
     else {
         statement = p_statement(ti, flow);
+        assert(statement->stype != TYPE_VOID);
         addchild(root, statement);
         root->branch_complete = statement->branch_complete;
         root->stype = statement->stype;
         root->ctype = statement->ctype;
-        
     }
 }
 
@@ -2206,19 +2374,33 @@ node_s *p_type(tokiter_s *ti, flow_s *flow)
             type->tok = t;
             p_array(ti, type, flow);
             break;
-        case TOKTYPE_LIST:
-            nexttok(ti);
-            type = MAKENODE();
-            type->ntype = TYPE_TYPEEXP;
-            type->tok = t;
-            p_array(ti, type, flow);
-            break;
         case TOKTYPE_IDENT:
             nexttok(ti);
             type = MAKENODE();
             type->ntype = TYPE_TYPEEXP;
             type->tok = t;
             p_array(ti, type, flow);
+            break;
+        case TOKTYPE_MAPTYPE:
+            nexttok(ti);
+            type = MAKENODE();
+            type->ntype = TYPE_NODE;
+            type->tok = t;
+            p_array(ti, type, flow);
+            t = nexttok(ti);
+            if(t->type == TOKTYPE_OPENBRACE) {
+                nexttok(ti);
+                p_type(ti, flow);
+                t = nexttok(ti);
+                if(t->type == TOKTYPE_MAP) {
+                    nexttok(ti);
+                    p_type(ti, flow);
+                }
+                else {
+                    ERR("Syntax Error: Expected -> but got:");
+                    synerr_rec(ti);
+                }
+            }
             break;
         case TOKTYPE_OPENPAREN:
             nexttok(ti);
@@ -2340,7 +2522,6 @@ node_s *p_typelist(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_REAL:
         case TOKTYPE_STRINGTYPE:
         case TOKTYPE_REGEXTYPE:
-        case TOKTYPE_LIST:
         case TOKTYPE_OPENPAREN:
             type = p_type(ti, flow);
             addchild(root, type);
@@ -2493,83 +2674,6 @@ void p_paramlist_(tokiter_s *ti, node_s *root, flow_s *flow)
             ERR("Syntax Error: Expected identifier or ...");
             synerr_rec(ti);
         }
-    }
-    else {
-        //epsilon production
-    }
-}
-
-node_s *p_set(tokiter_s *ti, flow_s *flow)
-{
-    tok_s *t = tok(ti);
-    node_s *set = MAKENODE(), *exp;
-    
-    set->ntype = TYPE_NODE;
-    set->stype = TYPE_SET;
-    set->ctype = set;
-    
-    if(t->type == TOKTYPE_OPENBRACE) {
-        nexttok(ti);
-        exp = p_expression(ti, flow);
-        addchild(set, exp);
-        p_optnext(ti, exp, flow);
-        p_set_(ti, set, flow);
-        t = tok(ti);
-        if(t->type == TOKTYPE_CLOSEBRACE) {
-            nexttok(ti);
-        }
-        else {
-            //syntax error
-            ERR("Syntax Error: Expected }");
-            synerr_rec(ti);
-        }
-    }
-    else {
-        //syntax error
-        ERR("Syntax Error: Expected {");
-        synerr_rec(ti);
-    }
-    return set;
-}
-
-void p_optnext(tokiter_s *ti, node_s *root, flow_s *flow)
-{
-    node_s *exp;
-    tok_s *t = tok(ti);
-    node_s *op;
-    
-    if(t->type == TOKTYPE_MAP) {
-        nexttok(ti);
-        op = MAKENODE();
-        op->ntype = TYPE_OP;
-        op->tok = t;
-        exp = p_expression(ti, flow);
-        addchild(root, op);
-        addchild(root, exp);
-    }
-    else if(t->type == TOKTYPE_RANGE) {
-        nexttok(ti);
-        op = MAKENODE();
-        op->ntype = TYPE_OP;
-        op->tok = t;
-        exp = p_expression(ti, flow);
-        addchild(root, op);
-        addchild(root, exp);
-    }
-}
-
-
-void p_set_(tokiter_s *ti, node_s *set, flow_s *flow)
-{
-    tok_s *t = tok(ti);
-    node_s *exp;
-    
-    if(t->type == TOKTYPE_COMMA) {
-        nexttok(ti);
-        exp = p_expression(ti, flow);
-        p_optnext(ti, exp, flow);
-        addchild(set, exp);
-        p_set_(ti, set, flow);
     }
     else {
         //epsilon production

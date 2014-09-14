@@ -171,7 +171,7 @@ void Connection::createAccount(const char name[], const char pass[], const char 
     query.addQueryItem("email_address", email);
     query.addQueryItem("usercol", color);
     query.addQueryItem("userpass", pass);
-    query.addQueryItem("username", name);
+    query.addQueryItem("use rname", name);
     query.addQueryItem("action", "create");
 
     request.setUrl(url);
@@ -248,7 +248,6 @@ void Connection::sessionInit()
             connect(win, SIGNAL(sendPrivateMessage(message_s *)), this, SLOT(sendPrivateMessage(message_s *)));
             connect(win, SIGNAL(sendRawMessage(QString)), this, SLOT(sendRaw(QString)));
         }
-
 
         if(!strcmp(buf, BAN_MSG)) {
 
