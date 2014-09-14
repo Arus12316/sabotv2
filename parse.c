@@ -35,6 +35,8 @@
                 |
                 regex
                 |
+                { <arrayinit> }
+                |
                 <structliteral>
                 |
                 <mapliteral>
@@ -48,6 +50,8 @@
  <factor''> -> [ <expression> ] <factor''> | . id <factor''> | ( <optarglist> ) <factor''> | ε
  
  <assign> -> assignop <expression> | ε
+ 
+ <arrayinit> -> <expression> , <arrayinit> | ε
  
  <structliteral> -> ${ <initializerlist> }
  
@@ -230,7 +234,7 @@ enum {
     TYPE_REAL,
     TYPE_STRING,
     TYPE_REGEX,
-    TYPE_SET,
+    TYPE_STRUCTLITERAL,
     TYPE_LIST,
     TYPE_CLOSURE,
     TYPE_TYPEEXP,
@@ -393,10 +397,11 @@ static node_s *p_optexp(tokiter_s *ti, node_s *fact, flow_s *flow);
 static node_s *p_factor_(tokiter_s *ti, flow_s *flow);
 static void p_factor__(tokiter_s *ti, node_s *root, flow_s *flow);
 static void p_assign(tokiter_s *ti, node_s *root, flow_s *flow);
-static void p_structliteral(tokiter_s *ti);
-static void p_initializerlist(tokiter_s *ti);
-static void p_mapliteral(tokiter_s *ti);
-static void p_maplist(tokiter_s *ti);
+static void p_arrayinit(tokiter_s *ti, node_s *root);
+static node_s *p_structliteral(tokiter_s *ti);
+static void p_initializerlist(tokiter_s *ti, node_s *root);
+static node_s *p_mapliteral(tokiter_s *ti);
+static void p_maplist(tokiter_s *ti, node_s *root);
 static node_s *p_lambda(tokiter_s *ti);
 static int p_sign(tokiter_s *ti);
 static node_s *p_optarglist(tokiter_s *ti, flow_s *flow);
@@ -412,7 +417,7 @@ static node_s *p_dec(tokiter_s *ti, flow_s *flow);
 static void p_enumlist(tokiter_s *ti, node_s *root, flow_s *flow);
 static void p_enumlist_(tokiter_s *ti, node_s *root, flow_s *flow);
 static void p_optid(tokiter_s *ti, node_s *root);
-static void p_structdeclarator(tokiter_s *ti);
+static void p_structdeclarator(tokiter_s *ti, node_s *root);
 static node_s *p_opttype(tokiter_s *ti, flow_s *flow);
 static node_s *p_type(tokiter_s *ti,flow_s *flow);
 static void p_inh(tokiter_s *ti, node_s *root);
@@ -938,7 +943,7 @@ node_s *start(tokiter_s *ti)
 
 void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
 {
-    node_s *statement, *last;
+    node_s *statement, *last, *func, *exp;
     tok_s *t = tok(ti), *tcmp;
     
     switch(t->type) {
@@ -977,7 +982,13 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
                     tcmp = statement->children[0]->tok;
                     if(tcmp) {
                         if(tcmp->type == TOKTYPE_RETURN) {
-                            if(!getparentfunc(root)) {
+                            func = getparentfunc(root);
+                            if(func) {
+                                exp = statement->children[1];
+                                addchild(func->ctype, exp);
+                            }
+                            else {
+                            
                                 ERR("Error: return from non-closure block");
                             }
                         }
@@ -1406,21 +1417,26 @@ node_s *p_factor_(tokiter_s *ti, flow_s *flow)
             n->ctype = NULL;
             n->tok = t;
             break;
-        case TOKTYPE_STRUCTLITERAL:
+        case TOKTYPE_OPENBRACE:
             n = MAKENODE();
             n->ntype = TYPE_NODE;
-            n->stype = TYPE_NUM;
-            n->ctype = NULL;
             n->tok = t;
-            p_structliteral(ti);
+            nexttok(ti);
+            p_arrayinit(ti, n);
+            t = tok(ti);
+            if(t->type == TOKTYPE_CLOSEBRACE) {
+                nexttok(ti);
+            }
+            else {
+                ERR("Syntax Error: Expected } but got");
+                synerr_rec(ti);
+            }
+            break;
+        case TOKTYPE_STRUCTLITERAL:
+            n = p_structliteral(ti);
             break;
         case TOKTYPE_MAPLITERAL:
-            n = MAKENODE();
-            n->ntype = TYPE_NODE;
-            n->stype = TYPE_NUM;
-            n->ctype = NULL;
-            n->tok = t;
-            p_mapliteral(ti);
+            return p_mapliteral(ti);
             break;
         case TOKTYPE_LAMBDA:
             n = p_lambda(ti);
@@ -1537,31 +1553,10 @@ void p_assign(tokiter_s *ti, node_s *root, flow_s *flow)
     }
 }
 
-void p_structliteral(tokiter_s *ti)
+void p_arrayinit(tokiter_s *ti, node_s *root)
 {
     tok_s *t = tok(ti);
-    
-    if(t->type == TOKTYPE_STRUCTLITERAL) {
-        nexttok(ti);
-        p_initializerlist(ti);
-        t = tok(ti);
-        if(t->type == TOKTYPE_CLOSEBRACE) {
-            nexttok(ti);
-        }
-        else {
-            ERR("Syntax Error: Expected } but got:");
-            synerr_rec(ti);
-        }
-    }
-    else {
-        ERR("Syntax Error: Expected ${ but got:");
-        synerr_rec(ti);
-    }
-}
-
-void p_initializerlist(tokiter_s *ti)
-{
-    tok_s *t = tok(ti);
+    node_s *exp;
     
     switch(t->type) {
         case TOKTYPE_SWITCH:
@@ -1576,24 +1571,98 @@ void p_initializerlist(tokiter_s *ti)
         case TOKTYPE_OPENPAREN:
         case TOKTYPE_NUM:
         case TOKTYPE_IDENT:
-            p_expression(ti, flow_s_());
+            exp = p_expression(ti, flow_s_());
+            addchild(root, exp);
             t = tok(ti);
             if(t->type == TOKTYPE_COMMA) {
                 nexttok(ti);
-                p_initializerlist(ti);
+                p_arrayinit(ti, root);
+            }
+            break;
+        default:
+            //epsilon production
+            break;
+    }
+    
+}
+
+node_s *p_structliteral(tokiter_s *ti)
+{
+    tok_s *t = tok(ti);
+    node_s *root = MAKENODE();
+    
+    root->tok = t;
+    root->ntype = TYPE_STRUCTLITERAL;
+    
+    if(t->type == TOKTYPE_STRUCTLITERAL) {
+        nexttok(ti);
+        p_initializerlist(ti, root);
+        t = tok(ti);
+        if(t->type == TOKTYPE_CLOSEBRACE) {
+            nexttok(ti);
+        }
+        else {
+            ERR("Syntax Error: Expected } but got:");
+            synerr_rec(ti);
+        }
+    }
+    else {
+        ERR("Syntax Error: Expected ${ but got:");
+        synerr_rec(ti);
+    }
+    return root;
+}
+
+void p_initializerlist(tokiter_s *ti, node_s *root)
+{
+    tok_s *t = tok(ti);
+    node_s *p, *n1, *n2;
+    
+    switch(t->type) {
+        case TOKTYPE_SWITCH:
+        case TOKTYPE_IF:
+        case TOKTYPE_ADDOP:
+        case TOKTYPE_LAMBDA:
+        case TOKTYPE_MAPLITERAL:
+        case TOKTYPE_STRUCTLITERAL:
+        case TOKTYPE_REGEX:
+        case TOKTYPE_STRING:
+        case TOKTYPE_NOT:
+        case TOKTYPE_OPENPAREN:
+        case TOKTYPE_NUM:
+        case TOKTYPE_IDENT:
+            p = MAKENODE();
+            p->ntype = TYPE_NODE;
+            p->tok = t;
+            n1 = p_expression(ti, flow_s_());
+            addchild(p, n1);
+            addchild(root, p);
+            t = tok(ti);
+            if(t->type == TOKTYPE_COMMA) {
+                nexttok(ti);
+                p_initializerlist(ti, root);
             }
             break;
         case TOKTYPE_DOT:
+            p = MAKENODE();
+            p->ntype = TYPE_NODE;
+            p->tok = t;
             t = nexttok(ti);
             if(t->type == TOKTYPE_IDENT) {
+                n1 = MAKENODE();
+                n1->ntype = TYPE_NODE;
+                n1->tok = t;
                 t = nexttok(ti);
                 if(t->type == TOKTYPE_ASSIGN) {
                     nexttok(ti);
-                    p_expression(ti, flow_s_());
+                    n2 = p_expression(ti, flow_s_());
+                    addchild(p, n1);
+                    addchild(p, n2);
+                    addchild(root, p);
                     t = tok(ti);
                     if(t->type == TOKTYPE_COMMA) {
                         nexttok(ti);
-                        p_initializerlist(ti);
+                        p_initializerlist(ti, root);
                     }
                 }
                 else {
@@ -1610,16 +1679,19 @@ void p_initializerlist(tokiter_s *ti)
             //epsilon production
             break;
     }
-    
 }
 
-void p_mapliteral(tokiter_s *ti)
+node_s *p_mapliteral(tokiter_s *ti)
 {
     tok_s *t = tok(ti);
+    node_s *root = MAKENODE();
+    
+    root->ntype = TYPE_NODE;
+    root->tok = t;
     
     if(t->type == TOKTYPE_MAPLITERAL) {
         nexttok(ti);
-        p_maplist(ti);
+        p_maplist(ti, root);
         t = tok(ti);
         if(t->type == TOKTYPE_CLOSEBRACE) {
             nexttok(ti);
@@ -1633,11 +1705,13 @@ void p_mapliteral(tokiter_s *ti)
         ERR("Syntax Error: Expected #{ but got:");
         synerr_rec(ti);
     }
+    return root;
 }
 
-void p_maplist(tokiter_s *ti)
+void p_maplist(tokiter_s *ti, node_s *root)
 {
     tok_s *t = tok(ti);
+    node_s *n, *key, *val;
     
     switch(t->type) {
         case TOKTYPE_SWITCH:
@@ -1653,15 +1727,21 @@ void p_maplist(tokiter_s *ti)
         case TOKTYPE_NUM:
         case TOKTYPE_DOT:
         case TOKTYPE_IDENT:
-            p_expression(ti, flow_s_());
+            n = MAKENODE();
+            n->ntype = TYPE_NODE;
+            n->tok = t;
+            key = p_expression(ti, flow_s_());
             t = tok(ti);
             if(t->type == TOKTYPE_DMAP) {
                 nexttok(ti);
-                p_expression(ti, flow_s_());
+                val = p_expression(ti, flow_s_());
+                addchild(n, key);
+                addchild(n, val);
+                addchild(root, n);
                 t = tok(ti);
                 if(t->type == TOKTYPE_COMMA) {
                     nexttok(ti);
-                    p_maplist(ti);
+                    p_maplist(ti, root);
                 }
             }
             else {
@@ -1677,6 +1757,7 @@ void p_maplist(tokiter_s *ti)
 
 node_s *p_lambda(tokiter_s *ti)
 {
+    unsigned i;
     flow_s *flow = flow_s_();
     tok_s *t = tok(ti);
     node_s *lambda = MAKENODE(), *op = MAKENODE(), *param, *body = MAKENODE();
@@ -1685,6 +1766,10 @@ node_s *p_lambda(tokiter_s *ti)
     body->ntype = TYPE_NODE;
     op->ntype = TYPE_OP;
     op->tok = t;
+    
+    lambda->ctype = MAKENODE();
+    lambda->ctype->ntype = TYPE_NODE;
+    lambda->ctype->tok = NULL;
     
     t = nexttok(ti);
     
@@ -1701,6 +1786,7 @@ node_s *p_lambda(tokiter_s *ti)
                 addchild(lambda, param);
                 addchild(lambda, body);
                 p_statementlist(ti, body, flow);
+                
                 flow = flow_s_();
                 
                 t = tok(ti);
@@ -2178,7 +2264,7 @@ void p_controlsuffix(tokiter_s *ti, node_s *root, flow_s *flow)
 
 node_s *p_dec(tokiter_s *ti, flow_s *flow)
 {
-    node_s *ident, *dectype, *dec, *op;
+    node_s *ident, *dectype, *dec, *op, *str;
     tok_s *t = tok(ti);
     
     dec = MAKENODE();
@@ -2290,12 +2376,14 @@ node_s *p_dec(tokiter_s *ti, flow_s *flow)
     }
     else if(t->type == TOKTYPE_STRUCTTYPE) {
         nexttok(ti);
-        //struct <optid> { <structdeclarator> }
         p_optid(ti, dec);
         t = tok(ti);
         if(t->type == TOKTYPE_OPENBRACE) {
+            str = MAKENODE();
+            str->ntype = TYPE_NODE;
+            str->tok = t;
             nexttok(ti);
-            p_structdeclarator(ti);
+            p_structdeclarator(ti, str);
             t = tok(ti);
             if(t->type == TOKTYPE_CLOSEBRACE) {
                 nexttok(ti);
@@ -2350,26 +2438,40 @@ void p_enumlist_(tokiter_s *ti, node_s *root, flow_s *flow)
 void p_optid(tokiter_s *ti, node_s *root)
 {
     tok_s *t = tok(ti);
+    node_s *n;
     
     if(t->type == TOKTYPE_IDENT) {
+        n = MAKENODE();
+        n->ntype = TYPE_IDENT;
+        n->tok = t;
+        addchild(root, n);
         nexttok(ti);
-        
     }
 }
 
-void p_structdeclarator(tokiter_s *ti)
+void p_structdeclarator(tokiter_s *ti, node_s *root)
 {
     tok_s *t = tok(ti);
+    node_s *p, *ident, *type;
     
     if(t->type == TOKTYPE_IDENT) {
+        p = MAKENODE();
+        p->ntype = TYPE_NODE;
+        p->tok = t;
+        ident = MAKENODE();
+        ident->ntype = TYPE_IDENT;
+        ident->tok = t;
         t = nexttok(ti);
         if(t->type == TOKTYPE_COLON) {
             nexttok(ti);
-            p_type(ti, NULL);
+            type = p_type(ti, NULL);
+            addchild(p, ident);
+            addchild(p, type);
+            addchild(root, p);
             t = tok(ti);
             if(t->type == TOKTYPE_COMMA) {
                 nexttok(ti);
-                p_structdeclarator(ti);
+                p_structdeclarator(ti, root);
             }
         }
         else {

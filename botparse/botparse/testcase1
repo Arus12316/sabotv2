@@ -1,5 +1,3 @@
-
-
 var bob : () -> real := @(){
     return bob()
     ${
@@ -9,6 +7,8 @@ var bob : () -> real := @(){
     
     }
     
+    return {1, 3, 3}
+    return {}
 
 }
 
@@ -16,6 +16,7 @@ struct bob {
     a : int, 
     b : real
 }
+
 
 
 var bob : map{ () -> real => int } := #{
