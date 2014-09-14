@@ -1,6 +1,24 @@
 
 
-var bob : () -> real := ^{
+var bob : () -> real := @(){
     return bob()
+    ${
+        .x := 32,
+        33,
+        .y := 32
+    
+    }
+    
+
 }
 
+struct bob {
+    a : int, 
+    b : real
+}
+
+
+var bob : map{ () -> real => int } := #{
+    44 => "hey",
+    "hey" => 44
+}

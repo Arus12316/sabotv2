@@ -3,7 +3,7 @@
 #include "general.h"
 #include <assert.h>
 
-char testcase1f[] = "/Users/jhamm/sabotv2/botparse/botparse/testcase3";
+char testcase1f[] = "/Users/jhamm/sabotv2/botparse/botparse/testcase1";
 
 
 char *readsrc(char *file);
