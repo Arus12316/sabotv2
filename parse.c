@@ -1,9 +1,9 @@
 /*
  <statementlist> -> <statement> <statementlist> | ε
  
- <statement> ->  <expression> | <control> | <dec> | return <optret> | ; | continue | break
+ <statement> ->  <expression> | <control> | <dec> | return <optexpression> | ; | continue | break
 
- <optret> -> <expression> | ε
+ <optexpression> -> <expression> | ε
  
  <expression> -> <simple_expression> <expression'>
  
@@ -122,7 +122,7 @@
 
  <optsemicolon> -> ; | ε
  
- <array> -> [ <expression> ] <array> | ε
+ <array> -> [ <optexpression> ] <array> | ε
  
  <typelist> -> <optname> <type> <typelist'> | vararg | ε
  <typelist'> -> , <optname> <type> <typelist'> | vararg | ε
@@ -392,6 +392,7 @@ static tok_s *peeknexttok(tokiter_s *ti);
 static node_s *start(tokiter_s *ti);
 static void p_statementlist(tokiter_s *ti, node_s *root, node_s *last, flow_s *flow);
 static node_s *p_statement(tokiter_s *ti, flow_s *flow);
+static node_s *p_optexpression(tokiter_s *ti, flow_s *flow);
 static node_s *p_expression(tokiter_s *ti, flow_s *flow);
 static void p_expression_(tokiter_s *ti, node_s *exp, flow_s *flow);
 static node_s *p_simple_expression(tokiter_s *ti, flow_s *flow);
@@ -1036,7 +1037,7 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
 {
     flnode_s *fn = flnode_s_();
     node_s *statement, *exp, *jmp;
-    tok_s *t = tok(ti), *tr;
+    tok_s *t = tok(ti);
     
     switch(t->type) {
         case TOKTYPE_IDENT:
@@ -1076,7 +1077,7 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
             flow->curr = fn;
             return p_dec(ti, flow);
         case TOKTYPE_RETURN:
-            tr = nexttok(ti);
+            nexttok(ti);
             statement = MAKENODE();
             statement->ntype = TYPE_NODE;
             jmp = MAKENODE();
@@ -1084,35 +1085,18 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
             jmp->tok = t;
             
             addchild(statement, jmp);
-            switch(tr->type) {
-                case TOKTYPE_IDENT:
-                case TOKTYPE_NUM:
-                case TOKTYPE_DOT:
-                case TOKTYPE_OPENPAREN:
-                case TOKTYPE_NOT:
-                case TOKTYPE_IF:
-                case TOKTYPE_SWITCH:
-                case TOKTYPE_CHAR:
-                case TOKTYPE_STRING:
-                case TOKTYPE_REGEX:
-                case TOKTYPE_LAMBDA:
-                case TOKTYPE_OPENBRACE:
-                case TOKTYPE_STRUCTLITERAL:
-                case TOKTYPE_MAPLITERAL:
-                case TOKTYPE_ADDOP:
-                    exp = p_expression(ti, flow);
-                    statement->stype = exp->stype;
-                    statement->ctype = exp->ctype;
-                    statement->branch_complete = exp->branch_complete;
-                    jmp->branch_complete = exp->branch_complete;
-                    addchild(statement, exp);
-                    break;
-                default:
-                    exp = NULL;
-                    statement->stype = TYPE_VOID;
-                    statement->ctype = NULL;
-                    statement->branch_complete = false;
-                    break;
+            exp = p_optexpression(ti, flow);
+            if(exp) {
+                statement->stype = exp->stype;
+                statement->ctype = exp->ctype;
+                statement->branch_complete = exp->branch_complete;
+                jmp->branch_complete = exp->branch_complete;
+                addchild(statement, exp);
+            }
+            else {
+                statement->stype = TYPE_VOID;
+                statement->ctype = NULL;
+                statement->branch_complete = false;
             }
             addflow(flow->curr, exp, fn);
             flow->final = fn;
@@ -1158,6 +1142,33 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
             ERR("Syntax Error: Expected identifier, number, (, not, string, regex, @, {, +, -, !, if, while \
                 for, switch, var, or return");
             synerr_rec(ti);
+            return NULL;
+    }
+}
+
+node_s *p_optexpression(tokiter_s *ti, flow_s *flow)
+{
+    tok_s *t = tok(ti);
+    
+    switch(t->type) {
+        case TOKTYPE_IDENT:
+        case TOKTYPE_NUM:
+        case TOKTYPE_DOT:
+        case TOKTYPE_OPENPAREN:
+        case TOKTYPE_NOT:
+        case TOKTYPE_IF:
+        case TOKTYPE_SWITCH:
+        case TOKTYPE_CHAR:
+        case TOKTYPE_STRING:
+        case TOKTYPE_REGEX:
+        case TOKTYPE_LAMBDA:
+        case TOKTYPE_OPENBRACE:
+        case TOKTYPE_STRUCTLITERAL:
+        case TOKTYPE_MAPLITERAL:
+        case TOKTYPE_ADDOP:
+            return p_expression(ti, flow);
+        default:
+            //epsilon production
             return NULL;
     }
 }
@@ -1802,7 +1813,7 @@ node_s *p_lambda(tokiter_s *ti)
     unsigned i;
     flow_s *flow = flow_s_();
     tok_s *t = tok(ti);
-    node_s *lambda = MAKENODE(), *op = MAKENODE(), *param, *body = MAKENODE(), *curr;
+    node_s *lambda = MAKENODE(), *op = MAKENODE(), *param, *body = MAKENODE(), *accum, *curr;
     
     lambda->ntype = TYPE_NODE;
     body->ntype = TYPE_NODE;
@@ -1828,14 +1839,16 @@ node_s *p_lambda(tokiter_s *ti)
                 addchild(lambda, param);
                 addchild(lambda, body);
                 p_statementlist(ti, body, NULL, flow);
-                
                 if(lambda->ctype->nchildren) {
-                    curr = lambda->children[0];
+                    accum = lambda->children[0];
                     for(i = 1; i < lambda->ctype->nchildren; i++) {
+                        curr = lambda->ctype->children[i];
                         if(!lambda->ctype->children[i]->branch_complete) {
                             lambda->stype = TYPE_VOID;
                         }
-                        
+                        if(accum->stype == TYPE_VOID && curr->stype != TYPE_VOID) {
+                            ERR("Error: Incompatible Return types in lambda expression");
+                        }
                     }
                 }
                 flow = flow_s_();
@@ -2744,7 +2757,7 @@ void p_array(tokiter_s *ti, node_s *root, flow_s *flow)
     if(t->type == TOKTYPE_OPENBRACKET) {
         nexttok(ti);
         
-        exp = p_expression(ti, flow);
+        exp = p_optexpression(ti, flow);
         addchild(root, exp);
         
         t = tok(ti);
