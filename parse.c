@@ -62,7 +62,7 @@
  <maplist> -> <expression> => <expression> <maplist> | ε
  
  
- <lambda> -> ^ (<optparamlist>) openbrace <statementlist> closebrace
+ <lambda> -> @ (<optparamlist>) openbrace <statementlist> closebrace
  
  <sign> -> + | -
  
@@ -95,6 +95,7 @@
  <controlsuffix> -> openbrace <statementlist> closebrace | <statement>
  
  <dec> -> <varlet> id <opttype> <assign> | class id <inh> { <declist> } | enum <optid> { <enumlist> } | struct <optid> { <structdeclarator> }
+            | func id (<optparamlist>) <optftype> { <statementlist> }
  
  <varlet> -> var | let
  
@@ -107,6 +108,8 @@
  
  <opttype> -> : <type> | ε
  
+ <optftype> -> \-\> <type> | ε
+ 
  <type> -> void | int <array> | char <array> | real <array> | string <array> | 
             regex <array> | Map <array> <optmaptype> |
             id <array> | ( <typelist> ) <array> map <type>
@@ -114,7 +117,9 @@
  <optmaptype> -> openbrace <type> => <type> closebrace
  
  <inh> -> : id | ε
- <declist> -> <dec> <optsemicolon> <declist> | ε
+ <declist> ->  <optsign> <dec> <optsemicolon> <declist> | ε
+ 
+ <optsign> -> <sign> | ε
 
  <optsemicolon> -> ; | ε
  
@@ -204,7 +209,8 @@ enum {
     TOKTYPE_STRUCTLITERAL,
     TOKTYPE_MAPLITERAL,
     TOKTYPE_STRUCTTYPE,
-    TOKTYPE_MAPTYPE
+    TOKTYPE_MAPTYPE,
+    TOKTYPE_FUNCDEC
 };
 
 enum {
@@ -321,7 +327,8 @@ keywords[] = {
     {"continue", TOKTYPE_CONTINUE},
     {"enum", TOKTYPE_ENUM},
     {"struct", TOKTYPE_STRUCTTYPE},
-    {"map", TOKTYPE_MAPTYPE}
+    {"map", TOKTYPE_MAPTYPE},
+    {"func", TOKTYPE_FUNCDEC}
 };
 
 struct node_s
@@ -384,7 +391,7 @@ static tok_s *nexttok(tokiter_s *ti);
 static tok_s *peeknexttok(tokiter_s *ti);
 
 static node_s *start(tokiter_s *ti);
-static void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow);
+static void p_statementlist(tokiter_s *ti, node_s *root, node_s *last, flow_s *flow);
 static node_s *p_statement(tokiter_s *ti, flow_s *flow);
 static node_s *p_expression(tokiter_s *ti, flow_s *flow);
 static void p_expression_(tokiter_s *ti, node_s *exp, flow_s *flow);
@@ -459,6 +466,8 @@ static void emit(tokiter_s *ti, char *code, ...);
 static void makelabel(tokiter_s *ti, char *buf);
 
 static void adderr(tokiter_s *ti, char *str, int lineno);
+
+static void print_node(node_s *node);
 
 errlist_s *parse(char *src)
 {
@@ -930,7 +939,7 @@ node_s *start(tokiter_s *ti)
     ti->code = bufinit();
     ti->labelcount = 0;
 
-    p_statementlist(ti, root, flow);
+    p_statementlist(ti, root, NULL, flow);
     t = tok(ti);
     
     if(t->type != TOKTYPE_EOF) {
@@ -941,9 +950,9 @@ node_s *start(tokiter_s *ti)
     return root;
 }
 
-void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
+void p_statementlist(tokiter_s *ti, node_s *root, node_s *last, flow_s *flow)
 {
-    node_s *statement, *last, *func, *exp;
+    node_s *statement, *func, *exp;
     tok_s *t = tok(ti), *tcmp;
     
     switch(t->type) {
@@ -974,6 +983,7 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
         case TOKTYPE_BREAK:
         case TOKTYPE_CONTINUE:
         case TOKTYPE_STRUCTTYPE:
+        case TOKTYPE_FUNCDEC:
         case TOKTYPE_SEMICOLON:
             statement = p_statement(ti, flow);
             addchild(root, statement);
@@ -988,9 +998,9 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
                                 addchild(func->ctype, exp);
                             }
                             else {
-                            
                                 ERR("Error: return from non-closure block");
                             }
+                            return p_statementlist(ti, root, NULL, flow);
                         }
                         else if(tcmp->type == TOKTYPE_BREAK) {
                             if(!getparentloop(root)) {
@@ -1005,12 +1015,14 @@ void p_statementlist(tokiter_s *ti, node_s *root, flow_s *flow)
                     }
                 }
             }
-            last = statement;
-            p_statementlist(ti, root, flow);
+            p_statementlist(ti, root, statement, flow);
             break;
         case TOKTYPE_CLOSEBRACE:
         case TOKTYPE_EOF:
             flow->final = flow->curr;
+            if(last && root->parent && getparentfunc(root) == root->parent) {
+                addchild(root->parent->ctype, last);
+            }
             //epsilon production
             break;
         default:
@@ -1060,6 +1072,7 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_CLASS:
         case TOKTYPE_ENUM:
         case TOKTYPE_STRUCTTYPE:
+        case TOKTYPE_FUNCDEC:
             addflow(flow->curr, NULL, fn);
             flow->curr = fn;
             return p_dec(ti, flow);
@@ -1261,8 +1274,10 @@ node_s *p_factor(tokiter_s *ti, flow_s *flow)
     addchild(fact, f);
     expon = p_optexp(ti, fact, flow);
     
-    fact->stype = f->stype;
-    fact->ctype = f->ctype;
+    if(f) {
+        fact->stype = f->stype;
+        fact->ctype = f->ctype;
+    }
     
     return fact;
 }
@@ -1785,7 +1800,12 @@ node_s *p_lambda(tokiter_s *ti)
                 addchild(lambda, op);
                 addchild(lambda, param);
                 addchild(lambda, body);
-                p_statementlist(ti, body, flow);
+                p_statementlist(ti, body, NULL, flow);
+                
+                for(i = 0; i < lambda->ctype->nchildren; i++) {
+                    print_node(lambda->ctype->children[i]);
+                    putchar('\n');
+                }
                 
                 flow = flow_s_();
                 
@@ -1967,7 +1987,7 @@ node_s *p_control(tokiter_s *ti, flow_s *flow)
                         addchild(control, arg);
                         addchild(control, suffix);
                         PUSHSCOPE();
-                        p_statementlist(ti, suffix, flow);
+                        p_statementlist(ti, suffix, NULL, flow);
                         POPSCOPE();
                         t =tok(ti);
                         if(t->type == TOKTYPE_CLOSEBRACE) {
@@ -2234,7 +2254,7 @@ void p_controlsuffix(tokiter_s *ti, node_s *root, flow_s *flow)
     if(t->type == TOKTYPE_OPENBRACE) {
         nexttok(ti);
         PUSHSCOPE();
-        p_statementlist(ti, root, flow);
+        p_statementlist(ti, root, NULL, flow);
         POPSCOPE();
         if(root->nchildren) {
             last = root->children[root->nchildren - 1];
@@ -2395,6 +2415,57 @@ node_s *p_dec(tokiter_s *ti, flow_s *flow)
         }
         else {
             ERR("Syntax Error: Expected {");
+            synerr_rec(ti);
+        }
+    }
+    else if(t->type == TOKTYPE_FUNCDEC) {
+        //func id (<optparamlist>) -> <type> { <statementlist> }
+        
+        t = nexttok(ti);
+        if(t->type == TOKTYPE_IDENT) {
+            t = nexttok(ti);
+            if(t->type == TOKTYPE_OPENPAREN) {
+                nexttok(ti);
+                p_optparamlist(ti, flow);
+                t = tok(ti);
+                if(t->type == TOKTYPE_CLOSEPAREN) {
+                     t = nexttok(ti);
+                    
+                    if(t->type == TOKTYPE_MAP) {
+                        nexttok(ti);
+                        p_type(ti, flow);
+                        t = tok(ti);
+                    }
+                    
+                    if(t->type == TOKTYPE_OPENBRACE) {
+                        nexttok(ti);
+                        p_statementlist(ti, dec, NULL, flow);
+                        t = tok(ti);
+                        if(t->type == TOKTYPE_CLOSEBRACE) {
+                            nexttok(ti);
+                        }
+                        else {
+                            ERR("Syntax Error: Expected }");
+                            synerr_rec(ti);
+                        }
+                    }
+                    else {
+                        ERR("Syntax Error: Expected {");
+                        synerr_rec(ti);
+                    }
+                }
+                else {
+                    ERR("Syntax Error: Expected )");
+                    synerr_rec(ti);
+                }
+            }
+            else {
+                ERR("Syntax Error: Expected (");
+                synerr_rec(ti);
+            }
+        }
+        else {
+            ERR("Syntax Error: Expected identifier");
             synerr_rec(ti);
         }
     }
@@ -2657,12 +2728,31 @@ void p_declist(tokiter_s *ti, node_s *root)
     tok_s *t = tok(ti);
     node_s *dec;
     
-    while(t->type == TOKTYPE_VAR || t->type == TOKTYPE_CLASS || t->type == TOKTYPE_ENUM || t->type == TOKTYPE_LET) {
-        dec = p_dec(ti, NULL);
-        addchild(root, dec);
-        t = tok(ti);
-        if(t->type == TOKTYPE_SEMICOLON)
-            t = nexttok(ti);
+    switch(t->type) {
+        case TOKTYPE_LET:
+        case TOKTYPE_VAR:
+        case TOKTYPE_CLASS:
+        case TOKTYPE_ENUM:
+        case TOKTYPE_STRUCTTYPE:
+            dec = p_dec(ti, NULL);
+            addchild(root, dec);
+            t = tok(ti);
+            if(t->type == TOKTYPE_SEMICOLON)
+                t = nexttok(ti);
+            p_declist(ti, root);
+            break;
+        case TOKTYPE_ADDOP:
+            p_sign(ti);
+            dec = p_dec(ti, NULL);
+            addchild(root, dec);
+            t = tok(ti);
+            if(t->type == TOKTYPE_SEMICOLON)
+                t = nexttok(ti);
+            p_declist(ti, root);
+            break;
+        default:
+            //epsilon production
+            break;
     }
 }
 
@@ -3192,7 +3282,7 @@ void adderr(tokiter_s *ti, char *err, int lineno)
         s = alloc(strlen(err) + sizeof(" at line: .") + ndig);
         sprintf(s, "%s at line: %d.", err, lineno);
     }
-    asm("hlt");
+    //asm("hlt");
     
     e = alloc(sizeof(*e));
     e->next = NULL;
@@ -3203,3 +3293,16 @@ void adderr(tokiter_s *ti, char *err, int lineno)
         ti->err = e;
     ti->ecurr = e;
 }
+
+void print_node(node_s *node)
+{
+    unsigned i;
+    
+    for(i = 0; i < node->nchildren; i++) {
+        print_node(node->children[i]);
+    }
+    if(node->tok) {
+        printf(" %s ", node->tok->lex);
+    }
+}
+
