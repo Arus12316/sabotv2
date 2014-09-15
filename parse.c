@@ -1,8 +1,10 @@
 /*
  <statementlist> -> <statement> <statementlist> | ε
  
- <statement> ->  <expression> | <control> | <dec> | return <expression> | ; | continue | break
+ <statement> ->  <expression> | <control> | <dec> | return <optret> | ; | continue | break
 
+ <optret> -> <expression> | ε
+ 
  <expression> -> <simple_expression> <expression'>
  
  <expression'> -> relop <simple_expression> | ε
@@ -62,7 +64,7 @@
  <maplist> -> <expression> => <expression> <maplist> | ε
  
  
- <lambda> -> @ (<optparamlist>) openbrace <statementlist> closebrace
+ <lambda> -> @(<optparamlist>) openbrace <statementlist> closebrace
  
  <sign> -> + | -
  
@@ -95,7 +97,6 @@
  <controlsuffix> -> openbrace <statementlist> closebrace | <statement>
  
  <dec> -> <varlet> id <opttype> <assign> | class id <inh> { <declist> } | enum <optid> { <enumlist> } | struct <optid> { <structdeclarator> }
-            | func id (<optparamlist>) <optftype> { <statementlist> }
  
  <varlet> -> var | let
  
@@ -107,8 +108,6 @@
  <structdeclarator> -> id : type , <structdeclarator> | ε
  
  <opttype> -> : <type> | ε
- 
- <optftype> -> \-\> <type> | ε
  
  <type> -> void | int <array> | char <array> | real <array> | string <array> | 
             regex <array> | Map <array> <optmaptype> |
@@ -209,8 +208,7 @@ enum {
     TOKTYPE_STRUCTLITERAL,
     TOKTYPE_MAPLITERAL,
     TOKTYPE_STRUCTTYPE,
-    TOKTYPE_MAPTYPE,
-    TOKTYPE_FUNCDEC
+    TOKTYPE_MAPTYPE
 };
 
 enum {
@@ -233,7 +231,7 @@ enum {
     TOKATT_EXP,
 };
 
-enum {
+typedef enum {
     TYPE_VOID,
     TYPE_NUM,
     TYPE_INTEGER,
@@ -250,8 +248,10 @@ enum {
     TYPE_DEC,
     TYPE_IDENT,
     TYPE_NODE,
-    TYPE_INCOMPLETE
-};
+    TYPE_INCOMPLETE,
+    TYPE_ERROR
+}
+type_e;
 
 typedef struct tok_s tok_s;
 typedef struct tokchunk_s tokchunk_s;
@@ -327,8 +327,7 @@ keywords[] = {
     {"continue", TOKTYPE_CONTINUE},
     {"enum", TOKTYPE_ENUM},
     {"struct", TOKTYPE_STRUCTTYPE},
-    {"map", TOKTYPE_MAPTYPE},
-    {"func", TOKTYPE_FUNCDEC}
+    {"map", TOKTYPE_MAPTYPE}
 };
 
 struct node_s
@@ -431,6 +430,7 @@ static void p_inh(tokiter_s *ti, node_s *root);
 static void p_declist(tokiter_s *ti, node_s *root);
 static void p_array(tokiter_s *ti, node_s *root, flow_s *flow);
 
+
 static node_s *p_typelist(tokiter_s *ti, flow_s *flow);
 static void p_typelist_(tokiter_s *ti, node_s *root, flow_s *flow);
 
@@ -458,7 +458,7 @@ static void flow_reparent(flnode_s *f1, flnode_s *f2);
 static node_s *getparentfunc(node_s *start);
 static node_s *getparentloop(node_s *start);
 static void walk_tree(node_s *root);
-static bool typeeq(node_s *typeexp, node_s *literal);
+static node_s *typecmp(node_s *t1, node_s *t2);
 
 static void freetree(node_s *root);
 
@@ -983,7 +983,6 @@ void p_statementlist(tokiter_s *ti, node_s *root, node_s *last, flow_s *flow)
         case TOKTYPE_BREAK:
         case TOKTYPE_CONTINUE:
         case TOKTYPE_STRUCTTYPE:
-        case TOKTYPE_FUNCDEC:
         case TOKTYPE_SEMICOLON:
             statement = p_statement(ti, flow);
             addchild(root, statement);
@@ -1037,7 +1036,7 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
 {
     flnode_s *fn = flnode_s_();
     node_s *statement, *exp, *jmp;
-    tok_s *t = tok(ti);
+    tok_s *t = tok(ti), *tr;
     
     switch(t->type) {
         case TOKTYPE_IDENT:
@@ -1064,6 +1063,7 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_FOR:
         case TOKTYPE_LISTENER:
             statement =  p_control(ti, flow);
+            statement->branch_complete = false;
             addflow(flow->curr, statement, fn);
             flow->curr = fn;
             return statement;
@@ -1072,23 +1072,48 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
         case TOKTYPE_CLASS:
         case TOKTYPE_ENUM:
         case TOKTYPE_STRUCTTYPE:
-        case TOKTYPE_FUNCDEC:
             addflow(flow->curr, NULL, fn);
             flow->curr = fn;
             return p_dec(ti, flow);
         case TOKTYPE_RETURN:
-            nexttok(ti);
+            tr = nexttok(ti);
             statement = MAKENODE();
             statement->ntype = TYPE_NODE;
             jmp = MAKENODE();
             jmp->ntype = TYPE_OP;
             jmp->tok = t;
-            exp = p_expression(ti, flow);
-            statement->stype = exp->stype;
-            statement->ctype = exp->ctype;
-            statement->branch_complete = exp->branch_complete;
+            
             addchild(statement, jmp);
-            addchild(statement, exp);
+            switch(tr->type) {
+                case TOKTYPE_IDENT:
+                case TOKTYPE_NUM:
+                case TOKTYPE_DOT:
+                case TOKTYPE_OPENPAREN:
+                case TOKTYPE_NOT:
+                case TOKTYPE_IF:
+                case TOKTYPE_SWITCH:
+                case TOKTYPE_CHAR:
+                case TOKTYPE_STRING:
+                case TOKTYPE_REGEX:
+                case TOKTYPE_LAMBDA:
+                case TOKTYPE_OPENBRACE:
+                case TOKTYPE_STRUCTLITERAL:
+                case TOKTYPE_MAPLITERAL:
+                case TOKTYPE_ADDOP:
+                    exp = p_expression(ti, flow);
+                    statement->stype = exp->stype;
+                    statement->ctype = exp->ctype;
+                    statement->branch_complete = exp->branch_complete;
+                    jmp->branch_complete = exp->branch_complete;
+                    addchild(statement, exp);
+                    break;
+                default:
+                    exp = NULL;
+                    statement->stype = TYPE_VOID;
+                    statement->ctype = NULL;
+                    statement->branch_complete = false;
+                    break;
+            }
             addflow(flow->curr, exp, fn);
             flow->final = fn;
             return statement;
@@ -1106,6 +1131,7 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
             statement->ntype = TYPE_NODE;
             statement->stype = TYPE_VOID;
             statement->ctype = NULL;
+            statement->branch_complete = false;
             jmp = MAKENODE();
             jmp->ntype = TYPE_OP;
             jmp->tok = t;
@@ -1119,6 +1145,7 @@ node_s *p_statement(tokiter_s *ti, flow_s *flow)
             statement->ntype = TYPE_NODE;
             statement->stype = TYPE_VOID;
             statement->ctype = NULL;
+            statement->branch_complete = false;
             jmp = MAKENODE();
             jmp->ntype = TYPE_OP;
             jmp->tok = t;
@@ -1775,7 +1802,7 @@ node_s *p_lambda(tokiter_s *ti)
     unsigned i;
     flow_s *flow = flow_s_();
     tok_s *t = tok(ti);
-    node_s *lambda = MAKENODE(), *op = MAKENODE(), *param, *body = MAKENODE();
+    node_s *lambda = MAKENODE(), *op = MAKENODE(), *param, *body = MAKENODE(), *curr;
     
     lambda->ntype = TYPE_NODE;
     body->ntype = TYPE_NODE;
@@ -1802,11 +1829,15 @@ node_s *p_lambda(tokiter_s *ti)
                 addchild(lambda, body);
                 p_statementlist(ti, body, NULL, flow);
                 
-                for(i = 0; i < lambda->ctype->nchildren; i++) {
-                    print_node(lambda->ctype->children[i]);
-                    putchar('\n');
+                if(lambda->ctype->nchildren) {
+                    curr = lambda->children[0];
+                    for(i = 1; i < lambda->ctype->nchildren; i++) {
+                        if(!lambda->ctype->children[i]->branch_complete) {
+                            lambda->stype = TYPE_VOID;
+                        }
+                        
+                    }
                 }
-                
                 flow = flow_s_();
                 
                 t = tok(ti);
@@ -2274,7 +2305,7 @@ void p_controlsuffix(tokiter_s *ti, node_s *root, flow_s *flow)
     }
     else {
         statement = p_statement(ti, flow);
-        assert(statement->stype != TYPE_VOID);
+    //    assert(statement->stype != TYPE_VOID);
         addchild(root, statement);
         root->branch_complete = statement->branch_complete;
         root->stype = statement->stype;
@@ -2415,57 +2446,6 @@ node_s *p_dec(tokiter_s *ti, flow_s *flow)
         }
         else {
             ERR("Syntax Error: Expected {");
-            synerr_rec(ti);
-        }
-    }
-    else if(t->type == TOKTYPE_FUNCDEC) {
-        //func id (<optparamlist>) -> <type> { <statementlist> }
-        
-        t = nexttok(ti);
-        if(t->type == TOKTYPE_IDENT) {
-            t = nexttok(ti);
-            if(t->type == TOKTYPE_OPENPAREN) {
-                nexttok(ti);
-                p_optparamlist(ti, flow);
-                t = tok(ti);
-                if(t->type == TOKTYPE_CLOSEPAREN) {
-                     t = nexttok(ti);
-                    
-                    if(t->type == TOKTYPE_MAP) {
-                        nexttok(ti);
-                        p_type(ti, flow);
-                        t = tok(ti);
-                    }
-                    
-                    if(t->type == TOKTYPE_OPENBRACE) {
-                        nexttok(ti);
-                        p_statementlist(ti, dec, NULL, flow);
-                        t = tok(ti);
-                        if(t->type == TOKTYPE_CLOSEBRACE) {
-                            nexttok(ti);
-                        }
-                        else {
-                            ERR("Syntax Error: Expected }");
-                            synerr_rec(ti);
-                        }
-                    }
-                    else {
-                        ERR("Syntax Error: Expected {");
-                        synerr_rec(ti);
-                    }
-                }
-                else {
-                    ERR("Syntax Error: Expected )");
-                    synerr_rec(ti);
-                }
-            }
-            else {
-                ERR("Syntax Error: Expected (");
-                synerr_rec(ti);
-            }
-        }
-        else {
-            ERR("Syntax Error: Expected identifier");
             synerr_rec(ti);
         }
     }
@@ -2963,6 +2943,7 @@ node_s *node_s_(scope_s *scope)
 {
     node_s *e = alloc(sizeof *e);
     
+    e->stype = TYPE_INCOMPLETE;
     e->tok = NULL;
     e->index = 0;
     e->scope = scope;
@@ -3206,9 +3187,28 @@ void walk_tree(node_s *root)
     
 }
 
-bool typeeq(node_s *typeexp, node_s *literal)
+node_s *typecmp(node_s *t1, node_s *t2)
 {
-    return false;
+    if(t1->stype == TYPE_VOID && t2->stype == TYPE_VOID) {
+        if(!t1->ctype && !t2->ctype) {
+            return t1;
+        }
+        else {
+            //...
+        }
+    }
+    else if(t1->stype == TYPE_INTEGER) {
+        if(t1->ctype) {
+            
+        }
+        else {
+            if(!t2->ctype) {
+             //   if(t2->stype = TYPE_)
+            }
+        }
+    }
+    
+    return NULL;
 }
 
 

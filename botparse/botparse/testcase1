@@ -13,10 +13,11 @@ var bob : () -> real := @(){
     56
     43
     return bob
+    return
     32
     32
     12
-
+    return if a b
 }
 
 struct bob {
@@ -24,30 +25,20 @@ struct bob {
     b : real
 }
 
-
 class bob {
     var a : int
     + var a : int
     + var b : int
-
-
 }
-
 
 var b : (() -> real) -> () -> (real) -> real
 
-var bob : map{ () -> real => int } := #{
-    44 => "hey",
-    "hey" => 44
-}
+
 
 let x : () -> void := @(){
     switch(.rand()) {
     
-
     }
 }
 
-func bob(x : int, y : int) -> real {
 
-}
