@@ -12,7 +12,7 @@ int main(int argc, const char *argv[])
 {
     char *src;
     errlist_s *err;
-    
+
     src = readsrc(testcase1f);
     
     err = parse(src);

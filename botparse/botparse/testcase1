@@ -1,22 +1,22 @@
-var bob : () -> real := @(){
-    return bob()
-    ${
-        .x := 32,
-        33,
-        .y := 32
-    }
-    
-    return {1, 3, 3}
-    return {}
+let f : (a : int, b : int) -> int
+let g : (a : real, b : real) -> real
+
+var bob : (a : int[]) -> real[] := @(){
+    return 4;
+    return 4
+
+
+    return 32
+    return 2
+
     34
     56
     43
-    return bob
-    return ;
-    32
+    return 1
+    return 3;    32
     32
     12
-    return 3
+    return 32
 }
 
 struct bob {
@@ -24,18 +24,36 @@ struct bob {
     b : real
 }
 
-class bob {
-    var a : int
-    + var a : int
-    + var b : int
-}
-
-var b : (() -> real) -> () -> (real[3232]) -> real
-
-let x : () -> void := @(){
-    switch(.rand()) {
+class bob : tom {
+    
+    _() {
     
     }
+
+    ~_() {
+
+    }
+
+    ~_() {
+    
+    }
+
+    var a : int
+
+    - var a : int
+    + var b : int
+
+
 }
+
+let bob := @(x, y){x + y}
+
+
+let b := @(x : real , y : real) {
+    x + y
+}
+
+
+
 
 
