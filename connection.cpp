@@ -154,7 +154,6 @@ void Connection::findUser(const char *name)
     sock->write(buf, strlen(buf) + 1);
 }
 
-
 void Connection::createAccount(const char name[], const char pass[], const char email[], quint8 r, quint8 g, quint8 b)
 {
     static QByteArray incl = "_.", excl = "=&?";
@@ -213,6 +212,8 @@ void Connection::sessionInit()
     bool isfirst;
     sock = new QTcpSocket;
 
+    spamCount = 0;
+
     connect(sock, SIGNAL(connected()), this, SLOT(userConnected()));
     connect(sock, SIGNAL(disconnected()), this, SLOT(userDisconnected()));
     connect(sock, SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(errorConnection(QAbstractSocket::SocketError)));
@@ -267,6 +268,7 @@ void Connection::sessionInit()
 
             sock->write(finishLogin, sizeof finishLogin);
 
+            lastTime = time(NULL);
             connect(sock, SIGNAL(readyRead()), this, SLOT(gameEvent()));
             connect(&timer, SIGNAL(timeout()), this, SLOT(keepAlive()));
             timer.start(SLEEP_TIME);
@@ -288,6 +290,7 @@ void Connection::sessionInit()
             else
                 sock->write(finishLogin, sizeof finishLogin);
 
+            lastTime = time(NULL);
             connect(sock, SIGNAL(readyRead()), this, SLOT(gameEvent()));
             connect(&timer, SIGNAL(timeout()), this, SLOT(keepAlive()));
             timer.start(SLEEP_TIME);
@@ -305,6 +308,7 @@ void Connection::gameEvent()
     char *bptr, *mptr;
     User *u;
     char id[4];
+    time_t nowTime;
     message_s *msg;
 
     while(sock->getChar(&c)) {
@@ -431,7 +435,24 @@ void Connection::gameEvent()
                         *mptr = '\0';
                         msg->sender = server->lookupUser(id);
                         msg->view = this;
-                        emit postMessage(msg);
+
+                        nowTime = time(NULL);
+
+                        if(nowTime - lastTime == 0) {
+                            spamCount++;
+                        }
+                        else {
+                            spamCount = 0;
+                        }
+
+                        if(spamCount < 10) {
+                            emit postMessage(msg);
+                        }
+                        else {
+                            qDebug() << "Entering flood mode";
+                        }
+
+                        lastTime = nowTime;
                         break;
                     }
             }

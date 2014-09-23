@@ -23,9 +23,11 @@ int main(int argc, char *argv[])
         Server::servers[i] = new Server(i, NULL);
     }
 
+    //61.147.67.2:9125
+
     proxy.setType(QNetworkProxy::Socks5Proxy);
-    proxy.setHostName("127.0.0.1");
-    proxy.setPort(9050);
+    proxy.setHostName("121.9.210.197");
+    proxy.setPort(1080);
 
     QNetworkProxy::setApplicationProxy(proxy);
 

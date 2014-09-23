@@ -345,6 +345,7 @@ struct node_s
     unsigned nchildren;
     node_s **children;
     node_s *parent;
+    
 };
 
 struct rec_s
@@ -688,8 +689,12 @@ tokiter_s *lex(char *src)
                     parse_regex:
                         bptr = src++;
                         while(*src != '/') {
-                            if(*src)
+                            if(*src == '\\') {
                                 src++;
+                            }
+                            if(*src) {
+                                src++;
+                            }
                             else {
                                 //adderr(ti, "Lexical Error", "EOF", line, "/", NULL);
                                 adderr(ti, "Lexical Error: Expected '/' but got EOF", line);
@@ -1044,6 +1049,16 @@ void p_statementlist(tokiter_s *ti, node_s *root, node_s *last, flow_s *flow)
         case TOKTYPE_EOF:
             flow->final = flow->curr;
             if(last && root->parent && getparentfunc(root) == root->parent) {
+                if(last->nchildren) {
+                    tcmp = last->children[0]->tok;
+                    if(tcmp) {
+                        if(tcmp->type != TOKTYPE_RETURN) {
+                            
+                        }
+                    }
+                }
+                
+                
                 addchild(root->parent->ctype, last);
             }
             //epsilon production

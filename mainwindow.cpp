@@ -4,12 +4,12 @@
 #include "ui_mainwindow.h"
 #include "user.h"
 #include "server.h"
+#include "proxyscan.h"
 #include "createaccount.h"
 #include <QtTest/QTest>
 #include <QTabWidget>
 #include <QListWidget>
 #include <QListWidgetItem>
-
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -19,12 +19,13 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     currServer = NULL;
     ca = NULL;
+    prox = NULL;
     raidDialog = NULL;
 
     connect(ui->loginButton, SIGNAL(clicked()), this, SLOT(loginButtonPressed()));
     connect(ui->password, SIGNAL(returnPressed()), this, SLOT(loginButtonPressed()));
     connect(ui->createAccountButton, SIGNAL(clicked()), this, SLOT(createAccount()));
-
+    connect(ui->proxyScanButton, SIGNAL(pressed()), this, SLOT(openProxyScan()));
 
     connect(ui->raidButton, SIGNAL(pressed()), this, SLOT(raid()));
 
@@ -378,7 +379,6 @@ void MainWindow::raid()
     raidDialog->show();
     raidDialog->raise();
     raidDialog->activateWindow();
-
 }
 
 void MainWindow::loginRecover(Connection *last)
@@ -400,6 +400,15 @@ void MainWindow::loginRecover(Connection *last)
 
     rec->login(last->username, last->password);
     last->deleteLater();
+}
+
+void MainWindow::openProxyScan()
+{
+    if(!prox)
+        prox = new ProxyScan(this);
+    prox->show();
+    prox->raise();
+    prox->activateWindow();
 }
 
 MainWindow::~MainWindow()

@@ -76,6 +76,7 @@ public slots:
     void createAccount();
     void raid();
     void loginRecover(class Connection *last);
+    void openProxyScan();
 
 
 private:
@@ -83,6 +84,7 @@ private:
 
     class Connection *conn;
     class CreateAccount *ca;
+    class ProxyScan *prox;
     class Raid *raidDialog;
 };
 

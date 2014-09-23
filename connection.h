@@ -2,6 +2,7 @@
 #define CONNECTION_H
 
 #include "mainwindow.h"
+#include <ctime>
 #include <QObject>
 #include <QThread>
 #include <QTimer>
@@ -105,6 +106,7 @@ public slots:
     void sendRaw(QString str);
 
 private:
+    void openProxyScan();
 
     quint16 hashUid(const char *uid);
     void insertUser(class User *u);
@@ -117,6 +119,9 @@ private:
     QTimer timer;
     MainWindow *win;
     QString general;
+    time_t lastTime;
+    int spamCount;
+
     char findBuf[21];
 
     static const quint16 PORT;
