@@ -310,6 +310,7 @@ void Connection::gameEvent()
     char id[4];
     time_t nowTime;
     message_s *msg;
+    enum {SPAM_THRESHOLD = 10};
 
     while(sock->getChar(&c)) {
 
@@ -319,8 +320,7 @@ void Connection::gameEvent()
             n = gameBuf.size();
             bptr = gameBuf.data();
 
-            if(server->master == this) {
-                qDebug() << gameBuf << endl;
+            if(server->master == this) {                
                 switch(*bptr) {
                     case '0':
                         switch(*++bptr) {
@@ -416,6 +416,30 @@ void Connection::gameEvent()
                     case 'C':
                         break;
                     case 'M':
+                        nowTime = time(NULL);
+
+                        if(nowTime - lastTime <= 1) {
+                            spamCount++;
+                        }
+                        else {
+                            if(spamCount >= SPAM_THRESHOLD) {
+                                emit postGeneralMain(server, "<<Leaving Flood Mode>>");
+                            }
+                            if(spamCount > SPAM_THRESHOLD - 3)
+                                spamCount = SPAM_THRESHOLD - 3;
+                            else if(spamCount) {
+                                spamCount--;
+                            }
+                        }
+                        lastTime = nowTime;
+                        if(spamCount >= SPAM_THRESHOLD) {
+                            if(spamCount == SPAM_THRESHOLD) {
+                                emit postGeneralMain(server, "<<Entered Flood Mode (message spam detected)>>");
+                            }
+                            gameBuf.clear();
+                            return;
+                        }
+
                         id[0] = *++bptr;
                         id[1] = *++bptr;
                         id[2] = *++bptr;
@@ -435,30 +459,7 @@ void Connection::gameEvent()
                         *mptr = '\0';
                         msg->sender = server->lookupUser(id);
                         msg->view = this;
-
-                        nowTime = time(NULL);
-
-                        if(nowTime - lastTime == 0) {
-                            spamCount++;
-                        }
-                        else {
-                            if(spamCount >= 10) {
-                                emit postGeneralMain(server, "<<Leaving Flood Mode>>");
-                            }
-                            spamCount = 0;
-                        }
-
-                        if(spamCount < 10) {
-                            emit postMessage(msg);
-                        }
-                        else {
-                            if(spamCount == 10) {
-                                emit postGeneralMain(server, "<<Entered Flood Mode (message spam detected)>>");
-                            }
-                        }
-
-                        lastTime = nowTime;
-                        break;
+                        emit postMessage(msg);
                     }
             }
             else {
@@ -473,6 +474,7 @@ void Connection::gameEvent()
                     }
                 }
             }
+            qDebug() << gameBuf;
             gameBuf.clear();
         }
     }
