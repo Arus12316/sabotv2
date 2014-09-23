@@ -442,6 +442,9 @@ void Connection::gameEvent()
                             spamCount++;
                         }
                         else {
+                            if(spamCount >= 10) {
+                                emit postGeneralMain(server, "<<Leaving Flood Mode>>");
+                            }
                             spamCount = 0;
                         }
 
@@ -449,7 +452,9 @@ void Connection::gameEvent()
                             emit postMessage(msg);
                         }
                         else {
-                            qDebug() << "Entering flood mode";
+                            if(spamCount == 10) {
+                                emit postGeneralMain(server, "<<Entered Flood Mode (message spam detected)>>");
+                            }
                         }
 
                         lastTime = nowTime;

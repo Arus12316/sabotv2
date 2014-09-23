@@ -2,7 +2,7 @@
 #include "ui_raid.h"
 #include "mainwindow.h"
 #include "connection.h"
-#include <qDebug>
+#include <QDebug>
 #include <algorithm>
 
 #define CHARSET_SIZE 27
@@ -20,7 +20,7 @@ Raid::Raid(QWidget *parent) :
     connect(this, SIGNAL(accepted()), &raidSched, SLOT(start()));
     connect(&raidSched, SIGNAL(timeout()), this, SLOT(executeRaid()));
 
-    mainwindow = (MainWindow *)parent;
+    mainwindow = static_cast<MainWindow *>(parent);
     raidSched.setInterval(500);
 }
 
