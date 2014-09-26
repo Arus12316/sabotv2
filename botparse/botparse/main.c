@@ -14,7 +14,7 @@ int main(int argc, const char *argv[])
     char *src;
     errlist_s *err;
 
-    eval("x + y + 32.324432+hello32+32hello");
+    eval("x + y + 3.23e+3.2");
     
     return 0;
     src = readsrc(testcase1f);

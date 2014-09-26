@@ -94,11 +94,11 @@ tok_s *lex(char *src)
                 src++;
                 break;
             case '(':
-                mktok(&curr, "(", CALCTOK_EXPON, CALCATT_DEFAULT);
+                mktok(&curr, "(", CALCTOK_OPENPAREN, CALCATT_DEFAULT);
                 src++;
                 break;
             case ')':
-                mktok(&curr, ")", CALCTOK_EXPON, CALCATT_DEFAULT);
+                mktok(&curr, ")", CALCTOK_CLOSEPAREN, CALCATT_DEFAULT);
                 src++;
                 break;
             default:
@@ -129,7 +129,25 @@ tok_s *lex(char *src)
                     }
                     if(*src == 'e' || *src == 'E') {
                         src++;
-                        while(isdigit(*src) || *src == '.');
+                        gotdec = false;
+                        if(*src == '+' || *src == '-')
+                            src++;
+                        while(true) {
+                            if(isdigit(*src)) {
+                                src++;
+                            }
+                            else if(*src == '.') {
+                                src++;
+                                if(gotdec) {
+                                    fprintf(stderr, "Lexical Error: Improperly formed number in exponent\n");
+                                    break;
+                                }
+                                gotdec = true;
+                            }
+                            else {
+                                break;
+                            }
+                        }
                     }
                     
                     bck = *src;
