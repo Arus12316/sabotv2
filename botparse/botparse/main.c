@@ -1,4 +1,5 @@
 #include "parse.h"
+#include "calc.h"
 #include <stdio.h>
 #include "general.h"
 #include <assert.h>
@@ -13,6 +14,9 @@ int main(int argc, const char *argv[])
     char *src;
     errlist_s *err;
 
+    eval("x + y + 32.324432+hello32+32hello");
+    
+    return 0;
     src = readsrc(testcase1f);
     
     err = parse(src);

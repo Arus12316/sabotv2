@@ -845,7 +845,7 @@ tok_s *mtok(tokchunk_s **list, uint16_t line, char *lexeme, size_t len, uint8_t 
     l->tok[size].line = line;
     l->size++;
     
-    return &l->tok[size];;
+    return &l->tok[size];
 }
 
 bool trykeyword(tokchunk_s **list, tok_s **prev, uint16_t line, char *str)
