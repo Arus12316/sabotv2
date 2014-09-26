@@ -34,7 +34,7 @@ public:
     char *username;
     char *password;
     class User *user;
-    
+
     /* General ACK 0 */
     static const char ackX0[];
 

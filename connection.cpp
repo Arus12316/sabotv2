@@ -309,8 +309,8 @@ void Connection::gameEvent()
     User *u;
     char id[4];
     time_t nowTime;
-    message_s *msg;
-    enum {SPAM_THRESHOLD = 10};
+    message_s *msg, *rep;
+    enum {SPAM_THRESHOLD = 30, MIN_TIME_MS = 0};
 
     while(sock->getChar(&c)) {
 
@@ -390,6 +390,8 @@ void Connection::gameEvent()
                         u->isSelf = false;
                         emit newUser(u);
 
+                        win->db.logUser(u);
+
                         //force synchronization
                         win->lock.lock();
                         win->cond.wait(&win->lock);
@@ -418,8 +420,9 @@ void Connection::gameEvent()
                     case 'M':
                         nowTime = time(NULL);
 
-                        if(nowTime - lastTime <= 1) {
-                            spamCount++;
+                        if(nowTime - lastTime <= MIN_TIME_MS) {
+                            if(spamCount <= SPAM_THRESHOLD)
+                                spamCount++;
                         }
                         else {
                             if(spamCount >= SPAM_THRESHOLD) {
@@ -428,7 +431,7 @@ void Connection::gameEvent()
                             if(spamCount > SPAM_THRESHOLD - 3)
                                 spamCount = SPAM_THRESHOLD - 3;
                             else if(spamCount) {
-                                spamCount--;
+                                spamCount = 0;
                             }
                         }
                         lastTime = nowTime;
@@ -455,7 +458,6 @@ void Connection::gameEvent()
                                 break;
                             }
                         }
-
                         *mptr = '\0';
                         msg->sender = server->lookupUser(id);
                         msg->view = this;

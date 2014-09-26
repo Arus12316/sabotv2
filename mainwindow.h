@@ -1,6 +1,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "database.h"
 #include <QMainWindow>
 #include <QTabWidget>
 #include <QMutex>
@@ -32,6 +33,7 @@ class MainWindow : public QMainWindow
 public:
     QMutex lock;
     QWaitCondition cond;
+    Database db;
     class Server *currServer;
 
     explicit MainWindow(QWidget *parent = 0);

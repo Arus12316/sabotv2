@@ -867,9 +867,6 @@ inline void InvMixColumns(aesblock_s *state)
     }
 }
 
-
-
-
 aesblock_s *newblock(aes_digest_s **d, size_t *bufsize)
 {
     (*d)->size += AES_BLOCK_BYTELEN;
@@ -891,7 +888,6 @@ void print_block(aesblock_s *bl)
         putchar('\n');
     }
     putchar('\n');
-    
 }
 
 void print_aesdigest(aes_digest_s *digest)

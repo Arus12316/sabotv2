@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT += core gui network testlib
+QT += core gui network testlib sql
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 TARGET = sabotv2
@@ -20,9 +20,9 @@ regex.c \
 createaccount.cpp \
 crypt.c \
 general.c \
-database.cpp \
 raid.cpp \
-    proxyscan.cpp
+    proxyscan.cpp \
+    database.cpp
 
 HEADERS += mainwindow.h \
 connection.h \
@@ -33,9 +33,10 @@ regex.h \
 createaccount.h \
 crypt.h \
 general.h \
-database.h \
 raid.h \
-    proxyscan.h
+    proxyscan.h \
+    database.h \
+    schema.h
 
 FORMS += mainwindow.ui \
 loginmultiusers.ui \
