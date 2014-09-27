@@ -22,7 +22,8 @@ crypt.c \
 general.c \
 raid.cpp \
     proxyscan.cpp \
-    database.cpp
+    database.cpp \
+    calc.c
 
 HEADERS += mainwindow.h \
 connection.h \
@@ -36,7 +37,8 @@ general.h \
 raid.h \
     proxyscan.h \
     database.h \
-    schema.h
+    schema.h \
+    calc.h
 
 FORMS += mainwindow.ui \
 loginmultiusers.ui \

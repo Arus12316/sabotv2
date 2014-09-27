@@ -43,6 +43,7 @@ struct tok_s {
 static tok_s *lex(char *src);
 static void mktok(tok_s **list, char *lex, ttype_e type, ttatt_e);
 static void print_tok(tok_s *tok);
+static void free_tok(tok_s *tok);
 
 /*
  
@@ -64,7 +65,10 @@ static void print_tok(tok_s *tok);
  
  
  */
-static void p_start(tok_s **tok);
+
+static int status;
+
+static calcres_s p_start(tok_s **tok);
 static double p_expression(tok_s **tok);
 static void p_expression_(tok_s **tok, double *accum);
 static double p_term(tok_s **tok);
@@ -73,16 +77,20 @@ static double p_subterm(tok_s **tok);
 static double p_subterm_(tok_s **tok);
 static double p_factor(tok_s **tok);
 
-void eval(char *exp)
+calcres_s eval(char *exp)
 {
     tok_s *list, *start;
+    calcres_s res;
     
     char *bck = alloc(strlen(exp));
     strcpy(bck, exp);
     
     list = lex(bck);
     start = list->next;
-    p_start(&start);
+    res = p_start(&start);
+    free_tok(list);
+    free(bck);
+    return res;
 }
 
 tok_s *lex(char *src)
@@ -151,6 +159,7 @@ tok_s *lex(char *src)
                     if(*src == '.') {
                         if(gotdec) {
                             fprintf(stderr, "Lexical Error: Improperly formed number\n");
+                            status = 1;
                         }
                         else {
                             while(isdigit(*++src));
@@ -169,6 +178,7 @@ tok_s *lex(char *src)
                                 src++;
                                 if(gotdec) {
                                     fprintf(stderr, "Lexical Error: Improperly formed number in exponent\n");
+                                    status = 1;
                                     break;
                                 }
                                 gotdec = true;
@@ -176,9 +186,11 @@ tok_s *lex(char *src)
                             else {
                                 if(*(src - 1) == '.' && !isdigit((*src - 2))) {
                                     fprintf(stderr, "Lexical Error: Improperly formed number in exponent\n");
+                                    status = 1;
                                 }
                                 else if(*(src - 1) == '-' || *(src - 1) == '+') {
                                     fprintf(stderr, "Lexical Error: Improperly formed number in exponent\n");
+                                    status = 1;
                                 }
                                 break;
                             }
@@ -192,6 +204,7 @@ tok_s *lex(char *src)
                 }
                 else {
                     fprintf(stderr, "Lexical Error: Unknown Symbol %c\n", *src);
+                    status = 1;
                     src++;
                 }
                 break;
@@ -226,9 +239,21 @@ void print_tok(tok_s *tok)
     }
 }
 
-void p_start(tok_s **tok)
+void free_tok(tok_s *tok)
+{
+    tok_s *bck;
+    
+    while(tok) {
+        bck = tok->next;
+        free(tok);
+        tok = bck;
+    }
+}
+
+calcres_s p_start(tok_s **tok)
 {
     double result;
+    calcres_s cres;
     tok_s *t = TOK();
     
     if(t->type != CALCTOK_EOF) {
@@ -240,9 +265,16 @@ void p_start(tok_s **tok)
         }
         else {
             fprintf(stderr, "Syntax Error: Expected EOF but got %s\n", t->lex);
+            status = 1;
         }
-        
     }
+    else {
+        result = 0;
+    }
+    cres.status = status;
+    cres.val = result;
+    result = 0;
+    return cres;
 }
 
 double p_expression(tok_s **tok)
@@ -347,6 +379,7 @@ double p_factor(tok_s **tok)
             }
             else {
                 fprintf(stderr, "Syntax Error: Expected ) but got %s\n", t->lex);
+                status = 1;
                 NEXTTOK();
             }
             return exp;
@@ -360,6 +393,7 @@ double p_factor(tok_s **tok)
             break;
         default:
             fprintf(stderr, "Syntax Error: Expected number, identifier, (, +, or -, but got %s\n", t->lex);
+            status = 1;
             NEXTTOK();
             return 0;
     }

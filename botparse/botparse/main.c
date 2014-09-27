@@ -14,7 +14,7 @@ int main(int argc, const char *argv[])
     char *src;
     errlist_s *err;
 
-    eval("1 plus 1");
+    eval("(-2)^3.32");
     
     return 0;
     src = readsrc(testcase1f);

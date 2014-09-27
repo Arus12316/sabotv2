@@ -2,7 +2,8 @@
 #include "server.h"
 #include "connection.h"
 #include "user.h"
-
+#include "calc.h"
+#include <unistd.h>
 #include <QUrl>
 #include <QUrlQuery>
 #include <QNetworkRequest>
@@ -309,8 +310,10 @@ void Connection::gameEvent()
     User *u;
     char id[4];
     time_t nowTime;
+    calcres_s cres;
+    QString *val;
     message_s *msg, *rep;
-    enum {SPAM_THRESHOLD = 30, MIN_TIME_MS = 0};
+    enum {SPAM_THRESHOLD = 30, MIN_TIME_MS = 0, CALC_TIME_MS=1000};
 
     while(sock->getChar(&c)) {
 
@@ -461,7 +464,16 @@ void Connection::gameEvent()
                         *mptr = '\0';
                         msg->sender = server->lookupUser(id);
                         msg->view = this;
+                        if(msg->body[0] == ',') {
+                            cres = eval(&msg->body[1]);
+                        }
                         emit postMessage(msg);
+                        if(!cres.status) {
+                            lastRes = new QString("");
+                            *lastRes += "result: ";
+                            *lastRes += QString::number(cres.val, 'f');
+                            QTimer::singleShot(CALC_TIME_MS, this, SLOT(sendRes()));
+                        }
                     }
             }
             else {
@@ -557,10 +569,15 @@ void Connection::sendRaw(QString str)
     sock->write(cstr, str.size() + 1);
 }
 
+void Connection::sendRes()
+{
+    sendPublicMessage(lastRes);
+}
+
 Connection::~Connection()
 {
     active = false;
-    sock->close();
+    if(sock->isOpen())
+        sock->close();
     delete sock;
 }
-

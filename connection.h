@@ -104,6 +104,7 @@ public slots:
     void sendPublicMessage(QString *msg);
     void sendPrivateMessage(message_s *msg);
     void sendRaw(QString str);
+    void sendRes();
 
 private:
     void openProxyScan();
@@ -119,6 +120,7 @@ private:
     QTimer timer;
     MainWindow *win;
     QString general;
+    QString *lastRes;
     time_t lastTime;
     int spamCount;
 

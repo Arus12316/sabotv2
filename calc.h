@@ -9,6 +9,7 @@ extern "C" {
 
 typedef struct term_s term_s;
 typedef struct cnode_s cnode_s;
+typedef struct calcres_s calcres_s;
 
 struct cnode_s {
     double coeff;
@@ -17,7 +18,13 @@ struct cnode_s {
     term_s *next;
 };
 
-extern void eval(char *exp);
+struct calcres_s
+{
+    int status;
+    double val;
+};
+    
+extern calcres_s eval(char *exp);
 
 #ifdef __cplusplus
 }
