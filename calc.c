@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <math.h>
+#include <complex.h>
 
 #define TOK() (*tok)
 #define NEXTTOK() (*tok = (*tok)->next)
@@ -278,7 +279,7 @@ calcres_s p_start(tok_s **tok)
     }
     cres.status = status;
     cres.val = result;
-    result = 0;
+    status = 0;
     return cres;
 }
 
