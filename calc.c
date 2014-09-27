@@ -61,8 +61,13 @@ static void free_tok(tok_s *tok);
  
  <subterm'> -> expon <factor> <subterm'> | ε
  
- <factor> -> num | ident | ( <expression> ) | addop <factor>
+ <factor> -> num | ident <func> | ( <expression> ) | addop <factor>
  
+ <func> -> (<paramlist>) | ε
+ 
+ <paramlist> -> <expression> <paramlist'> | ε
+ 
+ <paramlist'> -> , <expression>
  
  */
 
@@ -368,7 +373,48 @@ double p_factor(tok_s **tok)
             NEXTTOK();
             return atof(bck->lex);
         case CALCTOK_IDENT:
+            bck = t;
             NEXTTOK();
+            t = TOK();
+            if(t->type == CALCTOK_OPENPAREN) {
+                NEXTTOK();
+                exp = p_expression(tok);
+                t = TOK();
+                if(t->type != CALCTOK_CLOSEPAREN) {
+                    fprintf(stderr, "Syntax Error: Expected ) but got %s\n", t->lex);
+                }
+                NEXTTOK();
+                if(!strcmp(bck->lex, "sin")) {
+                    return sin(exp);
+                }
+                else if(!strcmp(bck->lex, "cos")) {
+                    return cos(exp);
+                }
+                else if(!strcmp(bck->lex, "tan")) {
+                    return tan(exp);
+                }
+                else if(!strcmp(bck->lex, "arcsin")) {
+                    return asin(exp);
+                }
+                else if(!strcmp(bck->lex, "arccos")) {
+                    return acos(exp);
+                }
+                else if(!strcmp(bck->lex, "arctan")) {
+                    return atan(exp);
+                }
+                else if(!strcmp(bck->lex, "log")) {
+                    return log10(exp);
+                }
+                else if(!strcmp(bck->lex, "ln")) {
+                    return log(exp);
+                }
+                else if(!strcmp(bck->lex, "lg")) {
+                    return log2(exp);
+                }
+                
+                
+                
+            }
             return 0;
         case CALCTOK_OPENPAREN:
             NEXTTOK();

@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
     proxy.setHostName("121.9.210.197");
     proxy.setPort(1080);
 
-    QNetworkProxy::setApplicationProxy(proxy);
+   // QNetworkProxy::setApplicationProxy(proxy);
 
     regex_s *regex = compile_regex("ab?aa");
 
