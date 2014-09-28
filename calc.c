@@ -412,9 +412,6 @@ double p_factor(tok_s **tok)
                 else if(!strcmp(bck->lex, "lg")) {
                     return log2(exp);
                 }
-                
-                
-                
             }
             return 0;
         case CALCTOK_OPENPAREN:

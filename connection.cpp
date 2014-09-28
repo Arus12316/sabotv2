@@ -313,7 +313,7 @@ void Connection::gameEvent()
     calcres_s cres;
     QString *val;
     message_s *msg, *rep;
-    enum {SPAM_THRESHOLD = 30, MIN_TIME_MS = 0, CALC_TIME_MS=1000};
+    enum {SPAM_THRESHOLD = 30, MIN_TIME_MS = 0, CALC_TIME_MS=1500};
 
     while(sock->getChar(&c)) {
 
@@ -464,6 +464,7 @@ void Connection::gameEvent()
                         *mptr = '\0';
                         msg->sender = server->lookupUser(id);
                         msg->view = this;
+                        cres.status = -1;
                         if(msg->body[0] == ',') {
                             cres = eval(&msg->body[1]);
                         }
