@@ -360,6 +360,19 @@
        <string>Scan Proxy List</string>
       </property>
      </widget>
+     <widget class="QCheckBox" name="autoReconnect">
+      <property name="geometry">
+       <rect>
+        <x>750</x>
+        <y>470</y>
+        <width>171</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Auto-Reconnect on DC</string>
+      </property>
+     </widget>
     </widget>
    </widget>
   </widget>

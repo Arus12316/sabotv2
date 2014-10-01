@@ -7,6 +7,8 @@
 User::User(QObject *parent) :
     QObject(parent)
 {
+    this->isSelf = false;
+    this->selfEntry = NULL;
     color.setRgb(0, 0, 0, 255);
 
     id[0] = '0';
@@ -18,23 +20,31 @@ User::User(QObject *parent) :
 
 User::User(Connection *conn, QObject *parent)
 {
+    this->isSelf = false;
+    this->selfEntry = NULL;
     this->conn = conn;
 }
 
 User::User(const char *buf, QObject *parent)
 {
+    this->isSelf = false;
+    this->selfEntry = NULL;
     this->conn = NULL;
     parseData(buf);
 }
 
 User::User(Connection *conn, const char *buf, QObject *parent)
 {
+    this->isSelf = false;
+    this->selfEntry = NULL;
     this->conn = conn;
     parseData(buf);
 }
 
 User::User(Connection *conn, const char *name, bool isdummy, QObject *parent)
 {
+    this->isSelf = false;
+    this->selfEntry = NULL;
 
     id[0] = '1';
     id[1] = '0';

@@ -276,6 +276,7 @@ calcres_s p_start(tok_s **tok)
     }
     else {
         result = 0;
+        status = 1;
     }
     cres.status = status;
     cres.val = result;

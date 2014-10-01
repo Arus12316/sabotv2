@@ -7,14 +7,15 @@
 #include <QDebug>
 
 Database::Database(QObject *parent) :
-    QObject(parent)
+    QObject(parent),
+    db(QSqlDatabase::addDatabase("QSQLITE", "sabot.db")),
+    checkUser(db),
+    insertUser(db)
 {
     QFile f;
     QString query;
     QSqlQuery q;
     const char *ptr;
-
-    db = QSqlDatabase::addDatabase("QSQLITE", "sabot.db");
 
     f.setFileName("sabot.db");
     if(!f.exists()) {
@@ -34,11 +35,14 @@ Database::Database(QObject *parent) :
         }
     }
 
-    checkUser = QSqlQuery(db);
-    insertUser = QSqlQuery(db);
+    checkUser.clear();
+
+    foreach(QString s, db.tables()) {
+        qDebug() << s;
+    }
 
     if(!checkUser.prepare("SELECT id FROM sabot.user WHERE name=?;")) {
-        qDebug() << "Error: " << db.lastError().text();
+        qDebug() << "Error: " << checkUser.lastError().text();
     }
     if(!insertUser.prepare("INSERT INTO sabot.user(name) VALUES(?);")) {
         qDebug() << "Error: " << db.lastError().text();

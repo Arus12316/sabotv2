@@ -51,6 +51,7 @@ public:
     class QPushButton *getPmButton();
     class QLabel *getCurrUserLabel();
     class QLineEdit *getInputRaw();
+    bool autoReconnectIsChecked();
     void postMessage();
     int currServerIndex();
     void newTab(class Server *server);

@@ -134,6 +134,9 @@ void Connection::sendMessage(const char msg[])
     size_t mlen = strlen(msg);
     char buf[256];    
 
+    printf("this is %p, sock is %p\n", this, sock);
+    fflush(stdout);
+
     if(mlen >= 256)
         perror("message to long");
     else {
@@ -316,7 +319,6 @@ void Connection::gameEvent()
     enum {SPAM_THRESHOLD = 30, MIN_TIME_MS = 0, CALC_TIME_MS=1500};
 
     while(sock->getChar(&c)) {
-
         gameBuf += c;
 
         if(!c) {
@@ -393,7 +395,7 @@ void Connection::gameEvent()
                         u->isSelf = false;
                         emit newUser(u);
 
-                        win->db.logUser(u);
+                       // win->db.logUser(u);
 
                         //force synchronization
                         win->lock.lock();
@@ -510,14 +512,12 @@ void Connection::userConnected()
 void Connection::userDisconnected()
 {
     QString msg("[ ");
-
     msg += username;
     msg += " disconnected ]";
     qDebug() << msg <<  endl;
     emit postGeneralMain(this->server, msg);
-
     emit loginRecover(this);
-    exit(0);
+    thread.exit(0);
 }
 
 

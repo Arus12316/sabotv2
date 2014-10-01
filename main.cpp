@@ -19,14 +19,12 @@ int main(int argc, char *argv[])
     for(int i = 0; i < N_GAMESERVERS; i++) {
         Server::servers[i] = new Server(i, NULL);
     }
-
-    //61.147.67.2:9125
-
+//149.135.46.30:26806
     proxy.setType(QNetworkProxy::Socks5Proxy);
-    proxy.setHostName("121.9.210.197");
-    proxy.setPort(1080);
+    proxy.setHostName("149.135.46.30");
+    proxy.setPort(26806);
 
-   //QNetworkProxy::setApplicationProxy(proxy);
+    QNetworkProxy::setApplicationProxy(proxy);
 
     regex_s *regex = compile_regex("ab?aa");
 
