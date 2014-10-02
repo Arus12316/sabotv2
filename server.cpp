@@ -123,7 +123,6 @@ void Server::deleteUser(const char *key)
         }
         last = rec;
         rec = rec->next;
-        i++;
     }
 }
 

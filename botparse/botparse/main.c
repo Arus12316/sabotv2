@@ -13,8 +13,11 @@ int main(int argc, const char *argv[])
 {
     char *src;
     errlist_s *err;
-
-    eval("(-2)^3.32");
+    calcres_s res;
+    
+    res = eval("343 mod 33");
+    
+    printf("%f\n", res.val);
     
     return 0;
     src = readsrc(testcase1f);

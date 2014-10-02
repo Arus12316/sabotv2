@@ -28,6 +28,7 @@ typedef enum {
     CALCATT_DEFAULT,
     CALCATT_MULT,
     CALCATT_DIV,
+    CALCATT_MOD,
     CALCATT_ADD,
     CALCATT_SUB
 }
@@ -47,7 +48,7 @@ static void print_tok(tok_s *tok);
 static void free_tok(tok_s *tok);
 
 /*
- 
+
  <start> -> <expression> | ε
  
  <expression> -> <term> <expression'>
@@ -56,7 +57,9 @@ static void free_tok(tok_s *tok);
  
  <term> -> <subterm> <term'>
  
- <term'> -> mulop <subterm> <term'> | ε
+ <term'> -> mulop <subterm> <term'> | ( <expression>) <parenfollow> | ε
+
+ <parenfollow> -> <term> | <term'>
  
  <subterm> -> <factor> <subterm'>
  
@@ -79,6 +82,7 @@ static double p_expression(tok_s **tok);
 static void p_expression_(tok_s **tok, double *accum);
 static double p_term(tok_s **tok);
 static void p_term_(tok_s **tok, double *accum);
+static void p_parenfollow(tok_s **tok, double *accum);
 static double p_subterm(tok_s **tok);
 static double p_subterm_(tok_s **tok);
 static double p_factor(tok_s **tok);
@@ -152,6 +156,15 @@ tok_s *lex(char *src)
                     *src = '\0';
                     if(!strcasecmp(bptr, "plus")) {
                         mktok(&curr, "+", CALCTOK_ADDOP, CALCATT_ADD);
+                    }
+                    else if(!strcasecmp(bptr, "pi")) {
+                        mktok(&curr, "3.14159265359", CALCTOK_NUM, CALCATT_DEFAULT);
+                    }
+                    else if(!strcmp(bptr, "e")) {
+                        mktok(&curr, "2.718281828", CALCTOK_NUM, CALCATT_DEFAULT);
+                    }
+                    else if(!strcmp(bptr, "mod")) {
+                        mktok(&curr, "mod", CALCTOK_MULOP, CALCATT_MOD);
                     }
                     else {
                         mktok(&curr, bptr, CALCTOK_IDENT, CALCATT_DEFAULT);
@@ -324,6 +337,7 @@ double p_term(tok_s **tok)
 void p_term_(tok_s **tok, double *accum)
 {
     double subterm;
+    long long iterm;
     tok_s *t = TOK(), *bck;
     
     if(t->type == CALCTOK_MULOP) {
@@ -333,10 +347,47 @@ void p_term_(tok_s **tok, double *accum)
         if(bck->att == CALCATT_MULT) {
             *accum *= subterm;
         }
+        else if(bck->att == CALCATT_MOD) {
+            iterm = (long long)*accum;
+            iterm %= (long long)subterm;
+            *accum = iterm;
+        }
         else {
             *accum /= subterm;
         }
         p_term_(tok, accum);
+    }
+    else if(t->type == CALCTOK_OPENPAREN) {
+        NEXTTOK();
+        subterm = p_expression(tok);
+        t = TOK();
+        if(t->type == CALCTOK_CLOSEPAREN) {
+            NEXTTOK();
+            *accum *= subterm;
+            p_parenfollow(tok, accum);
+        }
+        else {
+            fprintf(stderr, "Syntax Error: Expected ) but got %s\n", t->lex);
+        }
+    }
+}
+
+void p_parenfollow(tok_s **tok, double *accum)
+{
+    tok_s *t = TOK();
+    double term;
+    
+    switch(t->type) {
+        case CALCTOK_NUM:
+        case CALCTOK_IDENT:
+        case CALCTOK_OPENPAREN:
+        case CALCTOK_ADDOP:
+            term = p_term(tok);
+            *accum *= term;
+            break;
+        default:
+            p_term_(tok, accum);
+            break;
     }
 }
 
@@ -412,6 +463,9 @@ double p_factor(tok_s **tok)
                 }
                 else if(!strcmp(bck->lex, "lg")) {
                     return log2(exp);
+                }
+                else if(!strcmp(bck->lex, "sqrt")) {
+                    return sqrt(exp);
                 }
             }
             return 0;
