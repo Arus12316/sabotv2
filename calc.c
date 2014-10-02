@@ -6,15 +6,22 @@
 #include <stdbool.h>
 #include <math.h>
 #include <complex.h>
+#include <stdarg.h>
 
-#define TOK() (*tok)
-#define NEXTTOK() (*tok = (*tok)->next)
+#define TOK() (ti->curr)
+#define NEXTTOK() (ti->curr = ti->curr->next)
 
 #define TC(C) TCC(C)
 #define TCC(C) #C
 
+#define ERR(f,...) err(ti, f, __VA_ARGS__)
 
 typedef struct tok_s tok_s;
+typedef struct tokiter_s tokiter_s;
+typedef struct opnode_s opnode_s;
+typedef struct numnode_s numnode_s;
+typedef struct idnode_s idnode_s;
+typedef struct node_s node_s;
 
 typedef enum {
     CALCTOK_MULOP,
@@ -46,10 +53,11 @@ struct tok_s {
     tok_s *next;
 };
 
-typedef struct opnode_s opnode_s;
-typedef struct numnode_s numnode_s;
-typedef struct idnode_s idnode_s;
-typedef struct node_s node_s;
+struct tokiter_s
+{
+    tok_s *curr;
+    bool issuccess;
+};
 
 struct opnode_s
 {
@@ -85,7 +93,7 @@ struct node_s {
     };
 };
 
-static tok_s *lex(char *src);
+static tok_s *lex(tokiter_s *ti, char *src);
 static void mktok(tok_s **list, char *lex, ttype_e type, ttatt_e);
 static void print_tok(tok_s *tok);
 static void free_tok(tok_s *tok);
@@ -118,35 +126,36 @@ static void free_tok(tok_s *tok);
  
  */
 
-static int status;
+static calcres_s p_start(tokiter_s *ti);
+static double p_expression(tokiter_s *ti);
+static void p_expression_(tokiter_s *ti, double *accum);
+static double p_term(tokiter_s *ti);
+static void p_term_(tokiter_s *ti, double *accum);
+static void p_parenfollow(tokiter_s *ti, double *accum);
+static double p_subterm(tokiter_s *ti);
+static double p_subterm_(tokiter_s *ti);
+static double p_factor(tokiter_s *ti);
 
-static calcres_s p_start(tok_s **tok);
-static double p_expression(tok_s **tok);
-static void p_expression_(tok_s **tok, double *accum);
-static double p_term(tok_s **tok);
-static void p_term_(tok_s **tok, double *accum);
-static void p_parenfollow(tok_s **tok, double *accum);
-static double p_subterm(tok_s **tok);
-static double p_subterm_(tok_s **tok);
-static double p_factor(tok_s **tok);
+static void err(tokiter_s *ti, const char *f, ...);
 
 calcres_s eval(char *exp)
 {
-    tok_s *list, *start;
+    tok_s *list;
+    tokiter_s ti;
     calcres_s res;
 
     char *bck = alloc(strlen(exp));
     strcpy(bck, exp);
     
-    list = lex(bck);
-    start = list->next;
-    res = p_start(&start);
+    ti.issuccess = true;
+    list = lex(&ti, bck);
+    res = p_start(&ti);
     free_tok(list);
     free(bck);
     return res;
 }
 
-tok_s *lex(char *src)
+tok_s *lex(tokiter_s *ti, char *src)
 {
     bool gotdec;
     char *bptr, bck;
@@ -221,7 +230,6 @@ tok_s *lex(char *src)
                     if(*src == '.') {
                         if(gotdec) {
                             fprintf(stderr, "Lexical Error: Improperly formed number\n");
-                            status = 1;
                         }
                         else {
                             while(isdigit(*++src));
@@ -239,20 +247,17 @@ tok_s *lex(char *src)
                             else if(*src == '.') {
                                 src++;
                                 if(gotdec) {
-                                    fprintf(stderr, "Lexical Error: Improperly formed number in exponent\n");
-                                    status = 1;
+                                    ERR("Lexical Error: Improperly formed number in exponent at %c\n", *src);
                                     break;
                                 }
                                 gotdec = true;
                             }
                             else {
                                 if(*(src - 1) == '.' && !isdigit((*src - 2))) {
-                                    fprintf(stderr, "Lexical Error: Improperly formed number in exponent\n");
-                                    status = 1;
+                                    ERR("Lexical Error: Improperly formed number in exponent at %c\n", *(src - 1));
                                 }
                                 else if(*(src - 1) == '-' || *(src - 1) == '+') {
-                                    fprintf(stderr, "Lexical Error: Improperly formed number in exponent\n");
-                                    status = 1;
+                                    ERR("Lexical Error: Improperly formed number in exponent at %c\n", *(src - 1));
                                 }
                                 break;
                             }
@@ -265,14 +270,14 @@ tok_s *lex(char *src)
                     *src = bck;
                 }
                 else {
-                    fprintf(stderr, "Lexical Error: Unknown Symbol %c\n", *src);
-                    status = 1;
+                    ERR("Lexical Error: Unknown Symbol %c\n", *src);
                     src++;
                 }
                 break;
         }
     }
     mktok(&curr, "EOF", CALCTOK_EOF, CALCATT_DEFAULT);
+    ti->curr = head->next;
     return head;
 }
 
@@ -313,44 +318,42 @@ void free_tok(tok_s *tok)
     }
 }
 
-calcres_s p_start(tok_s **tok)
+calcres_s p_start(tokiter_s *ti)
 {
     double result;
     calcres_s cres;
     tok_s *t = TOK();
     
     if(t->type != CALCTOK_EOF) {
-        result = p_expression(tok);
+        result = p_expression(ti);
         t = TOK();
         if(t->type == CALCTOK_EOF) {
-            printf("parse success!\nresult: %f\n", result);
-            
+            if(ti->issuccess)
+                printf("parse success!\nresult: %f\n", result);
         }
         else {
-            fprintf(stderr, "Syntax Error: Expected EOF but got %s\n", t->lex);
-            status = 1;
+            ERR("Syntax Error: Expected EOF but got %s\n", t->lex);
         }
     }
     else {
         result = 0;
-        status = 1;
+        ti->issuccess = false;
     }
-    cres.status = status;
+    cres.status = !ti->issuccess;
     cres.val = result;
-    status = 0;
     return cres;
 }
 
-double p_expression(tok_s **tok)
+double p_expression(tokiter_s *ti)
 {
     double accum;
     
-    accum = p_term(tok);
-    p_expression_(tok, &accum);
+    accum = p_term(ti);
+    p_expression_(ti, &accum);
     return accum;
 }
 
-void p_expression_(tok_s **tok, double *accum)
+void p_expression_(tokiter_s *ti, double *accum)
 {
     double term;
     tok_s *t = TOK(), *bck;
@@ -358,27 +361,27 @@ void p_expression_(tok_s **tok, double *accum)
     if(t->type == CALCTOK_ADDOP) {
         bck = t;
         NEXTTOK();
-        term = p_term(tok);
+        term = p_term(ti);
         if(bck->att == CALCATT_ADD) {
             *accum += term;
         }
         else {
             *accum -= term;
         }
-        p_expression_(tok, accum);
+        p_expression_(ti, accum);
     }
 }
 
-double p_term(tok_s **tok)
+double p_term(tokiter_s *ti)
 {
     double accum;
     
-    accum = p_subterm(tok);
-    p_term_(tok, &accum);
+    accum = p_subterm(ti);
+    p_term_(ti, &accum);
     return accum;
 }
 
-void p_term_(tok_s **tok, double *accum)
+void p_term_(tokiter_s *ti, double *accum)
 {
     double subterm;
     long long iterm;
@@ -387,7 +390,7 @@ void p_term_(tok_s **tok, double *accum)
     if(t->type == CALCTOK_MULOP) {
         bck = t;
         NEXTTOK();
-        subterm = p_subterm(tok);
+        subterm = p_subterm(ti);
         if(bck->att == CALCATT_MULT) {
             *accum *= subterm;
         }
@@ -399,24 +402,24 @@ void p_term_(tok_s **tok, double *accum)
         else {
             *accum /= subterm;
         }
-        p_term_(tok, accum);
+        p_term_(ti, accum);
     }
     else if(t->type == CALCTOK_OPENPAREN) {
         NEXTTOK();
-        subterm = p_expression(tok);
+        subterm = p_expression(ti);
         t = TOK();
         if(t->type == CALCTOK_CLOSEPAREN) {
             NEXTTOK();
             *accum *= subterm;
-            p_parenfollow(tok, accum);
+            p_parenfollow(ti, accum);
         }
         else {
-            fprintf(stderr, "Syntax Error: Expected ) but got %s\n", t->lex);
+            ERR("Syntax Error: Expected ) but got %s\n", t->lex);
         }
     }
 }
 
-void p_parenfollow(tok_s **tok, double *accum)
+void p_parenfollow(tokiter_s *ti, double *accum)
 {
     tok_s *t = TOK();
     double term;
@@ -426,39 +429,39 @@ void p_parenfollow(tok_s **tok, double *accum)
         case CALCTOK_IDENT:
         case CALCTOK_OPENPAREN:
         case CALCTOK_ADDOP:
-            term = p_term(tok);
+            term = p_term(ti);
             *accum *= term;
             break;
         default:
-            p_term_(tok, accum);
+            p_term_(ti, accum);
             break;
     }
 }
 
-double p_subterm(tok_s **tok)
+double p_subterm(tokiter_s *ti)
 {
     double accum, subterm_;
     
-    accum = p_factor(tok);
-    subterm_ = p_subterm_(tok);
+    accum = p_factor(ti);
+    subterm_ = p_subterm_(ti);
     return pow(accum, subterm_);
 }
 
-double p_subterm_(tok_s **tok)
+double p_subterm_(tokiter_s *ti)
 {
     double factor, subterm_;
     tok_s *t = TOK();
     
     if(t->type == CALCTOK_EXPON) {
         NEXTTOK();
-        factor = p_factor(tok);
-        subterm_ = p_subterm_(tok);
+        factor = p_factor(ti);
+        subterm_ = p_subterm_(ti);
         return pow(factor, subterm_);
     }
     return 1;
 }
 
-double p_factor(tok_s **tok)
+double p_factor(tokiter_s *ti)
 {
     int mult;
     double exp;
@@ -475,10 +478,10 @@ double p_factor(tok_s **tok)
             t = TOK();
             if(t->type == CALCTOK_OPENPAREN) {
                 NEXTTOK();
-                exp = p_expression(tok);
+                exp = p_expression(ti);
                 t = TOK();
                 if(t->type != CALCTOK_CLOSEPAREN) {
-                    fprintf(stderr, "Syntax Error: Expected ) but got %s\n", t->lex);
+                    ERR("Syntax Error: Expected ) but got %s\n", t->lex);
                 }
                 NEXTTOK();
                 if(!strcmp(bck->lex, "sin")) {
@@ -515,15 +518,13 @@ double p_factor(tok_s **tok)
             return 0;
         case CALCTOK_OPENPAREN:
             NEXTTOK();
-            exp = p_expression(tok);
+            exp = p_expression(ti);
             t = TOK();
             if(t->type == CALCTOK_CLOSEPAREN) {
                 NEXTTOK();
             }
             else {
-                fprintf(stderr, "Syntax Error: Expected ) but got %s\n", t->lex);
-                status = 1;
-                NEXTTOK();
+                ERR("Syntax Error: Expected ) but got %s\n", t->lex);
             }
             return exp;
         case CALCTOK_ADDOP:
@@ -532,13 +533,20 @@ double p_factor(tok_s **tok)
             else
                 mult = 1;
             NEXTTOK();
-            return mult*p_factor(tok);
+            return mult*p_factor(ti);
             break;
         default:
-            fprintf(stderr, "Syntax Error: Expected number, identifier, (, +, or -, but got %s\n", t->lex);
-            status = 1;
-            NEXTTOK();
+            ERR("Syntax Error: Expected number, identifier, (, +, or -, but got %s\n", t->lex);
             return 0;
     }
 }
 
+void err(tokiter_s *ti, const char *f, ...)
+{
+    va_list args;
+    va_start(args, f);
+    vfprintf(stderr, f, args);
+    va_end(args);
+
+    ti->issuccess = false;
+}
