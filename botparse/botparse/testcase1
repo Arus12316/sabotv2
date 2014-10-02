@@ -54,8 +54,6 @@ class bob : tom {
     ~_() {
     }
 
-
-
     var a : int
 
     - var a : int

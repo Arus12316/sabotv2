@@ -10,6 +10,10 @@
 #define TOK() (*tok)
 #define NEXTTOK() (*tok = (*tok)->next)
 
+#define TC(C) TCC(C)
+#define TCC(C) #C
+
+
 typedef struct tok_s tok_s;
 
 typedef enum {
@@ -40,6 +44,45 @@ struct tok_s {
     ttype_e type;
     ttatt_e att;
     tok_s *next;
+};
+
+typedef struct opnode_s opnode_s;
+typedef struct numnode_s numnode_s;
+typedef struct idnode_s idnode_s;
+typedef struct node_s node_s;
+
+struct opnode_s
+{
+    tok_s *t;
+    union {
+        struct {
+            node_s *l, *r;
+        };
+        node_s *c;
+    };
+};
+
+struct numnode_s
+{
+    double val;
+};
+
+struct idnode_s
+{
+    tok_s *t;
+};
+
+struct node_s {
+    enum {
+        NTYPE_OP,
+        NTYPE_NUM,
+        NTYPE_ID
+    } type;
+    union {
+        opnode_s op;
+        numnode_s num;
+        idnode_s ident;
+    };
 };
 
 static tok_s *lex(char *src);
@@ -91,7 +134,7 @@ calcres_s eval(char *exp)
 {
     tok_s *list, *start;
     calcres_s res;
-    
+
     char *bck = alloc(strlen(exp));
     strcpy(bck, exp);
     
@@ -158,10 +201,10 @@ tok_s *lex(char *src)
                         mktok(&curr, "+", CALCTOK_ADDOP, CALCATT_ADD);
                     }
                     else if(!strcasecmp(bptr, "pi")) {
-                        mktok(&curr, "3.14159265359", CALCTOK_NUM, CALCATT_DEFAULT);
+                        mktok(&curr, TC(M_PI), CALCTOK_NUM, CALCATT_DEFAULT);
                     }
                     else if(!strcmp(bptr, "e")) {
-                        mktok(&curr, "2.718281828", CALCTOK_NUM, CALCATT_DEFAULT);
+                        mktok(&curr, TC(M_E), CALCTOK_NUM, CALCATT_DEFAULT);
                     }
                     else if(!strcmp(bptr, "mod")) {
                         mktok(&curr, "mod", CALCTOK_MULOP, CALCATT_MOD);

@@ -15,7 +15,7 @@ int main(int argc, const char *argv[])
     errlist_s *err;
     calcres_s res;
     
-    res = eval("343 mod 33");
+    res = eval("e");
     
     printf("%f\n", res.val);
     
