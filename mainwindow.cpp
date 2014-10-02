@@ -27,6 +27,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->password, SIGNAL(returnPressed()), this, SLOT(loginButtonPressed()));
     connect(ui->createAccountButton, SIGNAL(clicked()), this, SLOT(createAccount()));
     connect(ui->proxyScanButton, SIGNAL(pressed()), this, SLOT(openProxyScan()));
+    connect(ui->selfUserList, SIGNAL(currentItemChanged(QListWidgetItem*,QListWidgetItem*)), this, SLOT(selfUserListItemChanged(QListWidgetItem*,QListWidgetItem*)));
 
     connect(ui->raidButton, SIGNAL(pressed()), this, SLOT(raid()));
 
@@ -93,6 +94,12 @@ QLineEdit *MainWindow::getInputRaw()
 {
     return ui->inputRaw;
 }
+
+QLineEdit *MainWindow::getPmAutoReply()
+{
+    return ui->autoReply;
+}
+
 
 bool MainWindow::autoReconnectIsChecked()
 {
@@ -169,6 +176,9 @@ void MainWindow::newUser(User *u)
 void MainWindow::newSelf(class User *u)
 {
     Server *server = u->conn->server;
+    static int bob;
+
+    qDebug() << "Called newSelf";
 
     QVariant *data = new QVariant(QVariant::fromValue<Connection *>(u->conn));
     QListWidgetItem *item = new QListWidgetItem();
@@ -178,9 +188,9 @@ void MainWindow::newSelf(class User *u)
 
     ui->selfUserList->addItem(item);
     u->selfEntry = item;
-    if(server->master == u->conn) {
+    if(server->master == u->conn && !bob) {
+        bob = 1;
         ui->selfUserList->setCurrentRow(0);
-        connect(ui->selfUserList, SIGNAL(currentItemChanged(QListWidgetItem*,QListWidgetItem*)), this, SLOT(selfUserListItemChanged(QListWidgetItem*,QListWidgetItem*)));
         connect(server->messageInput, SIGNAL(returnPressed()), this, SLOT(preparePublicMessage()));
         connect(server->sendButton, SIGNAL(clicked()), this, SLOT(preparePublicMessage()));
         connect(server->pmButton, SIGNAL(clicked()), this, SLOT(preparePrivateMessage()));
@@ -218,16 +228,36 @@ void MainWindow::newTab(Server *server)
 
 void MainWindow::postMessage(message_s *msg)
 {
+    message_s *reply;
+    std::string stdrep;
+    const char *crep;
+    QString autoReply, original;
     QString post("<");
+    //time_t t = time(NULL);
 
     post += msg->sender->name;
     if(msg->type == '9' || msg->type == 'P') {
-        if(msg->type == 'P')
+        if(msg->type == 'P') {
+            original = ui->autoReply->text();
+            if(original.length()) {
+                reply = new message_s;
+                reply->type = 'P';
+                reply->receiver = msg->sender;
+                autoReply = original.replace('&', msg->body);
+                stdrep = autoReply.toStdString();
+                crep = stdrep.c_str();
+                strcpy(reply->body, crep);
+                qDebug() << "Sending Response: " << reply->body;
+                emit sendPrivateMessage(reply);
+            }
+
             post += " : [Private]";
+        }
         post += "> ";
         post += msg->body;
         msg->sender->conn->server->messageView->addItem(post);
         msg->sender->conn->server->messageView->scrollToBottom();
+
     }
     else {
         post += " : ";
@@ -237,6 +267,8 @@ void MainWindow::postMessage(message_s *msg)
         msg->sender->conn->server->miscView->addItem(post);
         msg->sender->conn->server->miscView->scrollToBottom();
     }
+    //qDebug() << "time: " << time(NULL) - t;
+
     delete msg;
 }
 
@@ -274,9 +306,11 @@ void MainWindow::userDisconnected(User *u)
 void MainWindow::selfUserListItemChanged(QListWidgetItem *curr, QListWidgetItem *prev)
 {
     Connection *connPrev, *connCurr;
-    qDebug() << "Changed! " << endl;
+
+    qDebug() << "Called selfUserListItemChanged";
 
     if(curr != NULL && prev != NULL) {
+        qDebug() << "curr and prev are not null";
         QVariant dataCurr = curr->data(Qt::UserRole);
         QVariant dataPrev = prev->data(Qt::UserRole);
         connPrev = dataPrev.value<Connection *>();
@@ -292,26 +326,25 @@ void MainWindow::selfUserListItemChanged(QListWidgetItem *curr, QListWidgetItem 
 
         ui->currUserLabel->setText(curr->text());
     }
-    else if(curr != NULL) {
-        QVariant dataCurr = curr->data(Qt::UserRole);
-        connCurr = dataCurr.value<Connection *>();
-
-        connect(this, SIGNAL(sendPublicMessage(QString *)), connCurr, SLOT(sendPublicMessage(QString *)));
-        connect(this, SIGNAL(sendPrivateMessage(message_s *)), connCurr, SLOT(sendPrivateMessage(message_s *)));
-        connect(this, SIGNAL(sendRawMessage(QString)), connCurr, SLOT(sendRaw(QString)));
-        currServer->currConn = conn;
-        ui->currUserLabel->setText(curr->text());
-    }
     else if(prev != NULL) {
-
+        qDebug() << "prev is not null";
         QVariant dataPrev = prev->data(Qt::UserRole);
         connPrev = dataPrev.value<Connection *>();
 
-        connect(this, SIGNAL(sendPublicMessage(QString *)), connPrev, SLOT(sendPublicMessage(QString *)));
-        connect(this, SIGNAL(sendPrivateMessage(message_s *)), connPrev, SLOT(sendPrivateMessage(message_s *)));
-        connect(this, SIGNAL(sendRawMessage(QString)), connPrev, SLOT(sendRaw(QString)));
+        disconnect(this, SIGNAL(sendPublicMessage(QString *)), connPrev, SLOT(sendPublicMessage(QString *)));
+        disconnect(this, SIGNAL(sendPrivateMessage(message_s *)), connPrev, SLOT(sendPrivateMessage(message_s *)));
+        disconnect(this, SIGNAL(sendRawMessage(QString)), connPrev, SLOT(sendRaw(QString)));
+        //currServer->currConn = NULL;
+    }
+    else if(curr != NULL) {
+        /*qDebug() << "Curr is not null";
+        QVariant dataCurr = curr->data(Qt::UserRole);
+        connCurr = dataCurr.value<Connection *>();
+
         currServer->currConn = conn;
-        ui->currUserLabel->setText(prev->text());
+        connect(this, SIGNAL(sendPublicMessage(QString *)), connCurr, SLOT(sendPublicMessage(QString *)));
+        connect(this, SIGNAL(sendPrivateMessage(message_s *)), connCurr, SLOT(sendPrivateMessage(message_s *)));
+        connect(this, SIGNAL(sendRawMessage(QString)), connCurr, SLOT(sendRaw(QString)));*/
     }
 }
 
@@ -413,6 +446,7 @@ void MainWindow::loginRecover(Connection *last)
 {
     int serverIndex;
     Connection *rec;
+    char oldName[32], oldPass[32];
     QString recMsg = "[ Attempting to Recover Connection for: ";
 
     recMsg += last->username;
@@ -432,12 +466,15 @@ void MainWindow::loginRecover(Connection *last)
         ui->userList->clear();
     }
     last->server->master = NULL;
+    strcpy(oldName, last->username);
+    strcpy(oldPass, last->password);
+
+    delete last;
 
     rec = new Connection(serverIndex, this, NULL);
     conn = rec;
     currServer = rec->server;
-    rec->login(last->username, last->password);
-    delete last;
+    rec->login(oldName, oldPass);
 }
 
 void MainWindow::openProxyScan()

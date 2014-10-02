@@ -123,6 +123,7 @@ void Server::deleteUser(const char *key)
         }
         last = rec;
         rec = rec->next;
+        i++;
     }
 }
 
@@ -131,8 +132,9 @@ User *Server::lookupUser(const char *key)
     hash_s *rec = utable[hashUid(key)];
 
     while(rec) {
-        if(!strcmp(rec->user->id, key))
+        if(!strcmp(rec->user->id, key)) {
             return rec->user;
+        }
         rec = rec->next;
     }
     qDebug() << "Error: Tried to look up " << key;

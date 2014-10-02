@@ -8,6 +8,7 @@
 #include <QUrlQuery>
 #include <QNetworkRequest>
 #include <QByteArray>
+#include <QLineEdit>
 #include <QNetworkAccessManager>
 
 #define SOCK_BUFSIZE 256
@@ -270,6 +271,8 @@ void Connection::sessionInit()
             emit newUser(user);
             emit newSelf(user);
 
+            qDebug() << "hello 1!";
+
             sock->write(finishLogin, sizeof finishLogin);
 
             lastTime = time(NULL);
@@ -285,6 +288,7 @@ void Connection::sessionInit()
             user->isSelf = true;
             emit newUser(user);
             emit newSelf(user);
+            qDebug() << "hello 2!";
 
             sock->write(ackX0, sizeof ackX0);
             sock->write(ackX2, sizeof ackX2);
@@ -316,7 +320,7 @@ void Connection::gameEvent()
     calcres_s cres;
     QString *val;
     message_s *msg, *rep;
-    enum {SPAM_THRESHOLD = 30, MIN_TIME_MS = 0, CALC_TIME_MS=1500};
+    enum {SPAM_THRESHOLD = 30, MIN_TIME_MS = 1, CALC_TIME_MS=1500};
 
     while(sock->getChar(&c)) {
         gameBuf += c;
@@ -560,6 +564,8 @@ void Connection::sendPrivateMessage(message_s *msg)
 
     strcpy(msgbuf+6, msg->body);
     sock->write(msgbuf, strlen(msgbuf) + 1);
+
+    delete msg;
 }
 
 void Connection::sendRaw(QString str)
