@@ -307,6 +307,7 @@ void free_tok(tok_s *tok)
     
     while(tok) {
         bck = tok->next;
+        free(tok->lex);
         free(tok);
         tok = bck;
     }

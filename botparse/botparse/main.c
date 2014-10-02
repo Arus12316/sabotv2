@@ -15,9 +15,7 @@ int main(int argc, const char *argv[])
     errlist_s *err;
     calcres_s res;
     
-    res = eval("e");
-    
-    printf("%f\n", res.val);
+    res = eval("(2)(2)(2)*2(2)(2)(2)/2(2)");
     
     return 0;
     src = readsrc(testcase1f);
