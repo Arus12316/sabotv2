@@ -139,7 +139,6 @@ static double p_expression(tokiter_s *ti);
 static void p_expression_(tokiter_s *ti, double *accum);
 static double p_term(tokiter_s *ti);
 static void p_term_(tokiter_s *ti, double *accum);
-static void p_parenfollow(tokiter_s *ti, double *accum);
 static double p_subterm(tokiter_s *ti);
 static double p_subterm_(tokiter_s *ti);
 static double p_factor(tokiter_s *ti);
@@ -419,25 +418,6 @@ void p_term_(tokiter_s *ti, double *accum)
             *accum /= subterm;
         }
         p_term_(ti, accum);
-    }
-}
-
-void p_parenfollow(tokiter_s *ti, double *accum)
-{
-    tok_s *t = TOK();
-    double term;
-    
-    switch(t->type) {
-        case CALCTOK_NUM:
-        case CALCTOK_IDENT:
-        case CALCTOK_OPENPAREN:
-        case CALCTOK_ADDOP:
-            term = p_term(ti);
-            *accum *= term;
-            break;
-        default:
-            p_term_(ti, accum);
-            break;
     }
 }
 
