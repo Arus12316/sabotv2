@@ -476,9 +476,10 @@ void Connection::gameEvent()
                         }
                         emit postMessage(msg);
                         if(!cres.status) {
-                            lastRes = new QString("");
-                            *lastRes += "result: ";
-                            *lastRes += QString::number(cres.val, 'f');
+                            QString *resStr = new QString("");
+                            *resStr += "result: ";
+                            *resStr += QString::number(cres.val, 'f');
+                            resQueue.enqueue(resStr);
                             QTimer::singleShot(CALC_TIME_MS, this, SLOT(sendRes()));
                         }
                     }
@@ -578,7 +579,10 @@ void Connection::sendRaw(QString str)
 
 void Connection::sendRes()
 {    
-    sendPublicMessage(lastRes);
+    if(resQueue.size()) {
+        QString *res = resQueue.dequeue();
+        sendPublicMessage(res);
+    }
 }
 
 Connection::~Connection()

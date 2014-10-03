@@ -9,6 +9,7 @@
 #include <QMutex>
 #include <QTcpSocket>
 #include <QNetworkProxy>
+#include <QQueue>
 
 #define MAX_MSGLEN 148
 
@@ -120,7 +121,7 @@ private:
     QTimer timer;
     MainWindow *win;
     QString general;
-    QString *lastRes;
+    QQueue<QString *> resQueue;
     time_t lastTime;
     int spamCount;
 
