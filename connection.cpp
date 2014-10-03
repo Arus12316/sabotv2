@@ -579,7 +579,10 @@ void Connection::sendRaw(QString str)
 
 void Connection::sendRes()
 {
-    sendPublicMessage(lastRes);
+    if(resQueue.size()) {
+        QString *res = resQueue.dequeue();
+        sendPublicMessage(res);
+    }
 }
 
 Connection::~Connection()
