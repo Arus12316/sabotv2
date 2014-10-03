@@ -9,7 +9,7 @@
 #include <stdarg.h>
 
 #define TOK() (ti->curr)
-#define NEXTTOK() (ti->curr = ti->curr->next)
+#define NEXTTOK() (puts(ti->curr->next->lex), ti->curr = ti->curr->next)
 
 #define TC(C) TCC(C)
 #define TCC(C) #C
@@ -45,6 +45,12 @@ typedef enum {
 }
 ttatt_e;
 
+typedef enum {
+    NTYPE_OP,
+    NTYPE_NUM,
+    NTYPE_ID
+}
+ntype_e;
 
 struct tok_s {
     char *lex;
@@ -61,6 +67,7 @@ struct tokiter_s
 
 struct opnode_s
 {
+    int weight;
     tok_s *t;
     union {
         struct {
@@ -81,16 +88,13 @@ struct idnode_s
 };
 
 struct node_s {
-    enum {
-        NTYPE_OP,
-        NTYPE_NUM,
-        NTYPE_ID
-    } type;
+    ntype_e type;
     union {
         opnode_s op;
         numnode_s num;
         idnode_s ident;
     };
+    node_s *p;
 };
 
 static tok_s *lex(tokiter_s *ti, char *src);
@@ -108,17 +112,21 @@ static void free_tok(tok_s *tok);
  
  <term> -> <subterm> <term'>
  
- <term'> -> mulop <subterm> <term'> | ( <expression>) <parenfollow> | ε
-
- <parenfollow> -> <term> | <term'>
+ <term'> -> mulop <subterm> <term'> | ε
+ 
+ <optident> -> ident | ε
  
  <subterm> -> <factor> <subterm'>
  
  <subterm'> -> expon <factor> <subterm'> | ε
  
- <factor> -> num | ident <func> | ( <expression> ) | addop <factor>
+ <factor> -> num | ident <func> | ( <expression> ) <optfactor> | addop <factor>
  
- <func> -> (<paramlist>) | ε
+ <optfactor> -> <factor> | ε
+ 
+ <numfollow> -> <factor> ~excluding num
+ 
+ <func> -> (<expression>) <optfactor> | ε
  
  <paramlist> -> <expression> <paramlist'> | ε
  
@@ -135,6 +143,9 @@ static void p_parenfollow(tokiter_s *ti, double *accum);
 static double p_subterm(tokiter_s *ti);
 static double p_subterm_(tokiter_s *ti);
 static double p_factor(tokiter_s *ti);
+static void p_optfactor(tokiter_s *ti, double *accum);
+
+static node_s *node_s_(ntype_e type);
 
 static void err(tokiter_s *ti, const char *f, ...);
 
@@ -310,6 +321,9 @@ void free_tok(tok_s *tok)
 {
     tok_s *bck;
     
+    bck = tok;
+    tok = tok->next;
+    free(bck);
     while(tok) {
         bck = tok->next;
         free(tok->lex);
@@ -357,7 +371,7 @@ void p_expression_(tokiter_s *ti, double *accum)
 {
     double term;
     tok_s *t = TOK(), *bck;
-    
+
     if(t->type == CALCTOK_ADDOP) {
         bck = t;
         NEXTTOK();
@@ -376,6 +390,8 @@ double p_term(tokiter_s *ti)
 {
     double accum;
     
+    puts("in term");
+    
     accum = p_subterm(ti);
     p_term_(ti, &accum);
     return accum;
@@ -383,7 +399,7 @@ double p_term(tokiter_s *ti)
 
 void p_term_(tokiter_s *ti, double *accum)
 {
-    double subterm;
+    double subterm, exp;
     long long iterm;
     tok_s *t = TOK(), *bck;
     
@@ -403,19 +419,6 @@ void p_term_(tokiter_s *ti, double *accum)
             *accum /= subterm;
         }
         p_term_(ti, accum);
-    }
-    else if(t->type == CALCTOK_OPENPAREN) {
-        NEXTTOK();
-        subterm = p_expression(ti);
-        t = TOK();
-        if(t->type == CALCTOK_CLOSEPAREN) {
-            NEXTTOK();
-            *accum *= subterm;
-            p_parenfollow(ti, accum);
-        }
-        else {
-            ERR("Syntax Error: Expected ) but got %s\n", t->lex);
-        }
     }
 }
 
@@ -451,7 +454,7 @@ double p_subterm_(tokiter_s *ti)
 {
     double factor, subterm_;
     tok_s *t = TOK();
-    
+
     if(t->type == CALCTOK_EXPON) {
         NEXTTOK();
         factor = p_factor(ti);
@@ -464,69 +467,87 @@ double p_subterm_(tokiter_s *ti)
 double p_factor(tokiter_s *ti)
 {
     int mult;
-    double exp;
+    double val, valf;
     tok_s *t = TOK(), *bck;
+    node_s *n;
     
     switch(t->type) {
         case CALCTOK_NUM:
             bck = t;
-            NEXTTOK();
-            return atof(bck->lex);
+            t = NEXTTOK();
+            val = atof(bck->lex);
+            n = node_s_(NTYPE_NUM);
+            n->num.val = val;
+            switch(t->type) {
+                case CALCTOK_IDENT:
+                case CALCTOK_OPENPAREN:
+                    valf = p_factor(ti);
+                    val *= valf;
+                    break;
+                default:
+                    break;
+            }
+            return val;
         case CALCTOK_IDENT:
             bck = t;
             NEXTTOK();
             t = TOK();
             if(t->type == CALCTOK_OPENPAREN) {
                 NEXTTOK();
-                exp = p_expression(ti);
+                val = p_expression(ti);
                 t = TOK();
                 if(t->type != CALCTOK_CLOSEPAREN) {
                     ERR("Syntax Error: Expected ) but got %s\n", t->lex);
                 }
                 NEXTTOK();
                 if(!strcmp(bck->lex, "sin")) {
-                    return sin(exp);
+                    val = sin(val);
                 }
                 else if(!strcmp(bck->lex, "cos")) {
-                    return cos(exp);
+                    val = cos(val);
                 }
                 else if(!strcmp(bck->lex, "tan")) {
-                    return tan(exp);
+                    val = tan(val);
                 }
                 else if(!strcmp(bck->lex, "arcsin")) {
-                    return asin(exp);
+                    val = asin(val);
                 }
                 else if(!strcmp(bck->lex, "arccos")) {
-                    return acos(exp);
+                    val = acos(val);
                 }
                 else if(!strcmp(bck->lex, "arctan")) {
-                    return atan(exp);
+                    val = atan(val);
                 }
                 else if(!strcmp(bck->lex, "log")) {
-                    return log10(exp);
+                    val = log10(val);
                 }
                 else if(!strcmp(bck->lex, "ln")) {
-                    return log(exp);
+                    val = log(val);
                 }
                 else if(!strcmp(bck->lex, "lg")) {
-                    return log2(exp);
+                    val = log2(val);
                 }
                 else if(!strcmp(bck->lex, "sqrt")) {
-                    return sqrt(exp);
+                    val = sqrt(val);
                 }
+                p_optfactor(ti, &val);
             }
-            return 0;
+            else {
+                val = 0;
+            }
+            return val;
         case CALCTOK_OPENPAREN:
             NEXTTOK();
-            exp = p_expression(ti);
+            val = p_expression(ti);
             t = TOK();
             if(t->type == CALCTOK_CLOSEPAREN) {
                 NEXTTOK();
+                p_optfactor(ti, &val);
             }
             else {
                 ERR("Syntax Error: Expected ) but got %s\n", t->lex);
             }
-            return exp;
+            return val;
         case CALCTOK_ADDOP:
             if(t->att == CALCATT_SUB)
                 mult = -1;
@@ -539,6 +560,32 @@ double p_factor(tokiter_s *ti)
             ERR("Syntax Error: Expected number, identifier, (, +, or -, but got %s\n", t->lex);
             return 0;
     }
+}
+
+void p_optfactor(tokiter_s *ti, double *accum)
+{
+    double val;
+    tok_s *t = TOK();
+    
+    switch (t->type) {
+        case CALCTOK_NUM:
+        case CALCTOK_IDENT:
+        case CALCTOK_OPENPAREN:
+            val = p_factor(ti);
+            *accum *= val;
+            break;
+        default:
+            break;
+    }
+}
+
+node_s *node_s_(ntype_e type)
+{
+    node_s *n;
+    
+    n = allocz(sizeof *n);
+    n->type = type;
+    return n;
 }
 
 void err(tokiter_s *ti, const char *f, ...)
