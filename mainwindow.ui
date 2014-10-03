@@ -396,6 +396,22 @@
        <string>Auto PM Reply</string>
       </property>
      </widget>
+     <widget class="QCheckBox" name="calculatorOn">
+      <property name="geometry">
+       <rect>
+        <x>1160</x>
+        <y>400</y>
+        <width>121</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Calculator On</string>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+     </widget>
     </widget>
    </widget>
   </widget>

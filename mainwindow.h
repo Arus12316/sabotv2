@@ -52,6 +52,7 @@ public:
     class QLabel *getCurrUserLabel();
     class QLineEdit *getInputRaw();
     class QLineEdit *getPmAutoReply();
+    bool calculatorOn();
     bool autoReconnectIsChecked();
     void postMessage();
     int currServerIndex();

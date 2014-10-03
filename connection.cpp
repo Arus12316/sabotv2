@@ -471,7 +471,7 @@ void Connection::gameEvent()
                         msg->sender = server->lookupUser(id);
                         msg->view = this;
                         cres.status = -1;
-                        if(msg->body[0] == ',') {
+                        if(msg->body[0] == ',' && win->calculatorOn()) {
                             cres = eval(&msg->body[1]);
                         }
                         emit postMessage(msg);

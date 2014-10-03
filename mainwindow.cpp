@@ -100,6 +100,10 @@ QLineEdit *MainWindow::getPmAutoReply()
     return ui->autoReply;
 }
 
+bool MainWindow::calculatorOn()
+{
+    return ui->calculatorOn->isChecked();
+}
 
 bool MainWindow::autoReconnectIsChecked()
 {
@@ -246,7 +250,7 @@ void MainWindow::postMessage(message_s *msg)
                 autoReply = original.replace('&', msg->body);
                 stdrep = autoReply.toStdString();
                 crep = stdrep.c_str();
-                strcpy(reply->body, crep);
+                strncpy(reply->body, crep, MAX_MSGLEN-1);
                 qDebug() << "Sending Response: " << reply->body;
                 emit sendPrivateMessage(reply);
             }
