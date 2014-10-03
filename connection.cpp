@@ -577,7 +577,7 @@ void Connection::sendRaw(QString str)
 }
 
 void Connection::sendRes()
-{
+{    
     sendPublicMessage(lastRes);
 }
 

@@ -52,6 +52,16 @@ typedef enum {
 }
 ntype_e;
 
+typedef enum {
+    OP_ADD,
+    OP_SUB,
+    OP_MULT,
+    OP_DIV,
+    OP_MOD,
+    OP_EXP
+}
+op_e;
+
 struct tok_s {
     char *lex;
     ttype_e type;
@@ -68,7 +78,7 @@ struct tokiter_s
 struct opnode_s
 {
     int weight;
-    tok_s *t;
+    op_e val;
     union {
         struct {
             node_s *l, *r;
@@ -141,7 +151,7 @@ static double p_term(tokiter_s *ti);
 static void p_term_(tokiter_s *ti, double *accum);
 static double p_subterm(tokiter_s *ti);
 static double p_subterm_(tokiter_s *ti);
-static double p_factor(tokiter_s *ti);
+static node_s *p_factor(tokiter_s *ti);
 static void p_optfactor(tokiter_s *ti, double *accum);
 
 static node_s *node_s_(ntype_e type);
@@ -389,8 +399,6 @@ double p_term(tokiter_s *ti)
 {
     double accum;
     
-    puts("in term");
-    
     accum = p_subterm(ti);
     p_term_(ti, &accum);
     return accum;
@@ -444,30 +452,48 @@ double p_subterm_(tokiter_s *ti)
     return 1;
 }
 
-double p_factor(tokiter_s *ti)
+node_s *p_factor(tokiter_s *ti)
 {
     int mult;
     double val, valf;
     tok_s *t = TOK(), *bck;
-    node_s *n;
+    node_s *res, *p, *l, *r;
     
     switch(t->type) {
         case CALCTOK_NUM:
             bck = t;
             t = NEXTTOK();
             val = atof(bck->lex);
-            n = node_s_(NTYPE_NUM);
-            n->num.val = val;
-            switch(t->type) {
-                case CALCTOK_IDENT:
-                case CALCTOK_OPENPAREN:
-                    valf = p_factor(ti);
-                    val *= valf;
-                    break;
-                default:
-                    break;
+            if(t->type == CALCTOK_IDENT || t->type == CALCTOK_OPENPAREN) {
+                r = p_factor(ti);
+                if(r->type == NTYPE_NUM) {
+                    r->num.val *= val;
+                    res = r;
+                }
+                else if(r->type == NTYPE_ID) {
+                    p = node_s_(NTYPE_OP);
+                    p->op.val = OP_MULT;
+                    
+                    if(val == 0.0) {
+                        
+                    }
+                    else {
+                        
+                    }
+                    l = node_s_(NTYPE_NUM);
+                    l->num.val = val;
+
+                    p->op.l = n;
+                    p->op.r = nn;
+                    n->p = p;
+                    nn->p = p;
+                }
             }
-            return val;
+            else {
+                n = node_s_(NTYPE_NUM);
+                n->num.val = val;
+            }
+            return n;
         case CALCTOK_IDENT:
             bck = t;
             NEXTTOK();
@@ -551,7 +577,7 @@ void p_optfactor(tokiter_s *ti, double *accum)
         case CALCTOK_NUM:
         case CALCTOK_IDENT:
         case CALCTOK_OPENPAREN:
-            val = p_factor(ti);
+            val = p_factor(ti)->num.val;
             *accum *= val;
             break;
         default:
