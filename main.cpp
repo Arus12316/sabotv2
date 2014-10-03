@@ -19,10 +19,10 @@ int main(int argc, char *argv[])
     for(int i = 0; i < N_GAMESERVERS; i++) {
         Server::servers[i] = new Server(i, NULL);
     }
-//89.44.109.163:57407
+//202.154.102.12:38944
     proxy.setType(QNetworkProxy::Socks5Proxy);
-    proxy.setHostName("89.44.109.163");
-    proxy.setPort(57407);
+    proxy.setHostName("202.154.102.12");
+    proxy.setPort(38944);
 
     QNetworkProxy::setApplicationProxy(proxy);
 
