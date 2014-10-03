@@ -58,7 +58,18 @@ typedef enum {
     OP_MULT,
     OP_DIV,
     OP_MOD,
-    OP_EXP
+    OP_EXP,
+    OP_SIN,
+    OP_COS,
+    OP_TAN,
+    OP_ARCSIN,
+    OP_ARCCOS,
+    OP_ARCTAN,
+    OP_LOG,
+    OP_LN,
+    OP_LG,
+    OP_SQRT,
+    OP_NEGATE
 }
 op_e;
 
@@ -145,14 +156,14 @@ static void free_tok(tok_s *tok);
  */
 
 static calcres_s p_start(tokiter_s *ti);
-static double p_expression(tokiter_s *ti);
+static node_s *p_expression(tokiter_s *ti);
 static void p_expression_(tokiter_s *ti, double *accum);
 static double p_term(tokiter_s *ti);
 static void p_term_(tokiter_s *ti, double *accum);
 static double p_subterm(tokiter_s *ti);
 static double p_subterm_(tokiter_s *ti);
 static node_s *p_factor(tokiter_s *ti);
-static void p_optfactor(tokiter_s *ti, double *accum);
+static void p_optfactor(tokiter_s *ti, node_s **accum);
 
 static node_s *node_s_(ntype_e type);
 
@@ -367,7 +378,7 @@ calcres_s p_start(tokiter_s *ti)
     return cres;
 }
 
-double p_expression(tokiter_s *ti)
+node_s *p_expression(tokiter_s *ti)
 {
     double accum;
     
@@ -455,9 +466,9 @@ double p_subterm_(tokiter_s *ti)
 node_s *p_factor(tokiter_s *ti)
 {
     int mult;
-    double val, valf;
+    double val;
     tok_s *t = TOK(), *bck;
-    node_s *res, *p, *l, *r;
+    node_s *res, *p, *l, *r, *c;
     
     switch(t->type) {
         case CALCTOK_NUM:
@@ -466,109 +477,227 @@ node_s *p_factor(tokiter_s *ti)
             val = atof(bck->lex);
             if(t->type == CALCTOK_IDENT || t->type == CALCTOK_OPENPAREN) {
                 r = p_factor(ti);
-                if(r->type == NTYPE_NUM) {
-                    r->num.val *= val;
-                    res = r;
+                if(val == 0.0) {
+                    res = node_s_(NTYPE_NUM);
+                    res->num.val = val;
                 }
-                else if(r->type == NTYPE_ID) {
-                    p = node_s_(NTYPE_OP);
-                    p->op.val = OP_MULT;
-                    
-                    if(val == 0.0) {
-                        
+                else {
+                    if(r->type == NTYPE_NUM) {
+                        r->num.val *= val;
+                        res = r;
                     }
                     else {
+                        p = node_s_(NTYPE_OP);
+                        p->op.val = OP_MULT;
                         
+                        l = node_s_(NTYPE_NUM);
+                        l->num.val = val;
+                     
+                        p->op.l = l;
+                        l->p = p;
+                        p->op.r = r;
+                        r->p = p;
+                        res = p;
                     }
-                    l = node_s_(NTYPE_NUM);
-                    l->num.val = val;
-
-                    p->op.l = n;
-                    p->op.r = nn;
-                    n->p = p;
-                    nn->p = p;
                 }
             }
             else {
-                n = node_s_(NTYPE_NUM);
-                n->num.val = val;
+                res = node_s_(NTYPE_NUM);
+                res->num.val = val;
             }
-            return n;
+            return res;
         case CALCTOK_IDENT:
             bck = t;
             NEXTTOK();
             t = TOK();
             if(t->type == CALCTOK_OPENPAREN) {
                 NEXTTOK();
-                val = p_expression(ti);
+                c = p_expression(ti);
                 t = TOK();
                 if(t->type != CALCTOK_CLOSEPAREN) {
                     ERR("Syntax Error: Expected ) but got %s\n", t->lex);
                 }
                 NEXTTOK();
                 if(!strcmp(bck->lex, "sin")) {
-                    val = sin(val);
+                    if(c->type == NTYPE_NUM) {
+                        c->num.val = sin(c->num.val);
+                        res = c;
+                    }
+                    else {
+                        p = node_s_(NTYPE_OP);
+                        p->op.val = OP_SIN;
+                        p->op.c = c;
+                        c->p = p;
+                        res = p;
+                    }
                 }
                 else if(!strcmp(bck->lex, "cos")) {
-                    val = cos(val);
+                    if(c->type == NTYPE_NUM) {
+                        c->num.val = cos(c->num.val);
+                        res = c;
+                    }
+                    else {
+                        p = node_s_(NTYPE_OP);
+                        p->op.val = OP_COS;
+                        p->op.c = c;
+                        c->p = p;
+                        res = p;
+                    }
                 }
                 else if(!strcmp(bck->lex, "tan")) {
-                    val = tan(val);
+                    if(c->type == NTYPE_NUM) {
+                        c->num.val = tan(c->num.val);
+                        res = c;
+                    }
+                    else {
+                        p = node_s_(NTYPE_OP);
+                        p->op.val = OP_TAN;
+                        p->op.c = c;
+                        c->p = p;
+                        res = p;
+                    }
                 }
                 else if(!strcmp(bck->lex, "arcsin")) {
-                    val = asin(val);
+                    if(c->type == NTYPE_NUM) {
+                        c->num.val = asin(c->num.val);
+                        res = c;
+                    }
+                    else {
+                        p = node_s_(NTYPE_OP);
+                        p->op.val = OP_ARCSIN;
+                        p->op.c = c;
+                        c->p = p;
+                        res = p;
+                    }
                 }
                 else if(!strcmp(bck->lex, "arccos")) {
-                    val = acos(val);
+                    if(c->type == NTYPE_NUM) {
+                        c->num.val = acos(c->num.val);
+                        res = c;
+                    }
+                    else {
+                        p = node_s_(NTYPE_OP);
+                        p->op.val = OP_ARCCOS;
+                        p->op.c = c;
+                        c->p = p;
+                        res = p;
+                    }
                 }
                 else if(!strcmp(bck->lex, "arctan")) {
-                    val = atan(val);
+                    if(c->type == NTYPE_NUM) {
+                        c->num.val = atan(c->num.val);
+                        res = c;
+                    }
+                    else {
+                        p = node_s_(NTYPE_OP);
+                        p->op.val = OP_ARCTAN;
+                        p->op.c = c;
+                        c->p = p;
+                        res = p;
+                    }
                 }
                 else if(!strcmp(bck->lex, "log")) {
-                    val = log10(val);
+                    if(c->type == NTYPE_NUM) {
+                        c->num.val = log10(c->num.val);
+                        res = c;
+                    }
+                    else {
+                        p = node_s_(NTYPE_OP);
+                        p->op.val = OP_LOG;
+                        p->op.c = c;
+                        c->p = p;
+                        res = p;
+                    }
                 }
                 else if(!strcmp(bck->lex, "ln")) {
-                    val = log(val);
+                    if(c->type == NTYPE_NUM) {
+                        c->num.val = log(c->num.val);
+                        res = c;
+                    }
+                    else {
+                        p = node_s_(NTYPE_OP);
+                        p->op.val = OP_LN;
+                        p->op.c = c;
+                        c->p = p;
+                        res = p;
+                    }
                 }
                 else if(!strcmp(bck->lex, "lg")) {
-                    val = log2(val);
+                    if(c->type == NTYPE_NUM) {
+                        c->num.val = log2(c->num.val);
+                        res = c;
+                    }
+                    else {
+                        p = node_s_(NTYPE_OP);
+                        p->op.val = OP_LG;
+                        p->op.c = c;
+                        c->p = p;
+                        res = p;
+                    }
                 }
                 else if(!strcmp(bck->lex, "sqrt")) {
-                    val = sqrt(val);
+                    if(c->type == NTYPE_NUM) {
+                        c->num.val = sqrt(c->num.val);
+                        res = c;
+                    }
+                    else {
+                        p = node_s_(NTYPE_OP);
+                        p->op.val = OP_SQRT;
+                        p->op.c = c;
+                        c->p = p;
+                        res = p;
+                    }
                 }
-                p_optfactor(ti, &val);
+                p_optfactor(ti, &res);
             }
             else {
-                val = 0;
+                res = node_s_(NTYPE_ID);
+                res->ident.t = bck;
             }
-            return val;
+            return res;
         case CALCTOK_OPENPAREN:
             NEXTTOK();
-            val = p_expression(ti);
+            res = p_expression(ti);
             t = TOK();
             if(t->type == CALCTOK_CLOSEPAREN) {
                 NEXTTOK();
-                p_optfactor(ti, &val);
+                p_optfactor(ti, &res);
             }
             else {
                 ERR("Syntax Error: Expected ) but got %s\n", t->lex);
             }
-            return val;
+            return res;
         case CALCTOK_ADDOP:
             if(t->att == CALCATT_SUB)
                 mult = -1;
             else
                 mult = 1;
             NEXTTOK();
-            return mult*p_factor(ti);
-            break;
+            c = p_factor(ti);
+            if(mult == -1) {
+                if(c->type == NTYPE_NUM) {
+                    c->num.val = -c->num.val;
+                    res = c;
+                }
+                else {
+                    p = node_s_(NTYPE_OP);
+                    p->op.val = OP_NEGATE;
+                    p->op.c = c;
+                    c->p = p;
+                    res = p;
+                }
+            }
+            else {
+                res = c;
+            }
+            return res;
         default:
             ERR("Syntax Error: Expected number, identifier, (, +, or -, but got %s\n", t->lex);
             return 0;
     }
 }
 
-void p_optfactor(tokiter_s *ti, double *accum)
+void p_optfactor(tokiter_s *ti, node_s **accum)
 {
     double val;
     tok_s *t = TOK();
