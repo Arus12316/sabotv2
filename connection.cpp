@@ -320,7 +320,7 @@ void Connection::gameEvent()
     calcres_s cres;
     QString *val;
     message_s *msg, *rep;
-    enum {SPAM_THRESHOLD = 30, MIN_TIME_MS = 1, CALC_TIME_MS=1500};
+    enum {SPAM_THRESHOLD = 30, MIN_TIME_MS = 0, CALC_TIME_MS=1500};
 
     while(sock->getChar(&c)) {
         gameBuf += c;

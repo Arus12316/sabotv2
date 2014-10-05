@@ -6,7 +6,6 @@ CreateAccount::CreateAccount(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::CreateAccount)
 {
-
     connect(this, SIGNAL(accepted()), this, SLOT(createAccount()));
 
     ui->setupUi(this);
@@ -14,7 +13,6 @@ CreateAccount::CreateAccount(QWidget *parent) :
 
 void CreateAccount::createAccount()
 {
-
     QString username = ui->inputUsername->text(),
             password = ui->inputPassword->text();
     std::string stdusr = username.toStdString(),
@@ -23,7 +21,6 @@ void CreateAccount::createAccount()
                 *cpass = stdpss.c_str();
 
     Connection::createAccount(cuser, cpass);
-
     ui->inputUsername->clear();
     ui->inputPassword->clear();
 }

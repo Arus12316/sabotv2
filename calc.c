@@ -172,7 +172,7 @@ tok_s *lex(tokiter_s *ti, char *src)
     tok_s *head, *curr;
     
     curr = head = alloc(sizeof *head);
-    
+
     while(*src) {
         switch(*src) {
             case ' ':
@@ -239,7 +239,7 @@ tok_s *lex(tokiter_s *ti, char *src)
                     while(isdigit(*++src));
                     if(*src == '.') {
                         if(gotdec) {
-                            fprintf(stderr, "Lexical Error: Improperly formed number\n");
+                            ERR("Lexical Error: Improperly formed number at %c\n", '.');
                         }
                         else {
                             while(isdigit(*++src));
@@ -319,7 +319,7 @@ void print_tok(tok_s *tok)
 void free_tok(tok_s *tok)
 {
     tok_s *bck;
-    
+
     bck = tok;
     tok = tok->next;
     free(bck);
@@ -456,6 +456,7 @@ double p_factor(tokiter_s *ti)
             bck = t;
             t = NEXTTOK();
             val = atof(bck->lex);
+
             n = node_s_(NTYPE_NUM);
             n->num.val = val;
             switch(t->type) {
@@ -562,7 +563,7 @@ void p_optfactor(tokiter_s *ti, double *accum)
 node_s *node_s_(ntype_e type)
 {
     node_s *n;
-    
+
     n = allocz(sizeof *n);
     n->type = type;
     return n;

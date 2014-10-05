@@ -161,7 +161,6 @@ void MainWindow::newUser(User *u)
     item->setBackground(u->color);
     item->setText(name);
     ui->userList->addItem(item);
-
     u->conn->server->insertUser(u);
 
     msg = new QString('<');
