@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define INIT_BSIZE 512
-
 buf_s *bufinit(void)
 {
     buf_s *b;
@@ -39,6 +37,20 @@ void bufaddstr(buf_s *b, char *str, size_t len)
     }
     strcpy(&b->buf[b->size - len], str);
 }
+
+void bufadddouble(buf_s *b, double val)
+{
+    int n;
+    char buf[512];
+    
+    n = sprintf(buf, "%f", val);
+    while(buf[--n] == '0')
+        buf[n] = '\0';
+    if(buf[n] == '.')
+        buf[n] = '\0';
+    bufaddstr(b, buf, strlen(buf));
+}
+
 
 void buf_trim(buf_s *b)
 {

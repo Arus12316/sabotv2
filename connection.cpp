@@ -478,9 +478,10 @@ void Connection::gameEvent()
                         if(!cres.status) {
                             QString *resStr = new QString("");
                             *resStr += "result: ";
-                            *resStr += QString::number(cres.val, 'f');
+                            *resStr += cres.val;
                             resQueue.enqueue(resStr);
                             QTimer::singleShot(CALC_TIME_MS, this, SLOT(sendRes()));
+                            free(cres.val);
                         }
                     }
             }
