@@ -260,7 +260,7 @@ tok_s *lex(tokiter_s *ti, char *src)
                     while(isdigit(*++src));
                     if(*src == '.') {
                         if(gotdec) {
-                            fprintf(stderr, "Lexical Error: Improperly formed number\n");
+                            ERR("Lexical Error: Improperly formed number at %c\n", '.');
                         }
                         else {
                             while(isdigit(*++src));
@@ -701,12 +701,13 @@ void p_optfactor(tokiter_s *ti, node_s **accum)
 {
     double val;
     tok_s *t = TOK();
+    node_s *factor;
     
     switch (t->type) {
         case CALCTOK_NUM:
         case CALCTOK_IDENT:
         case CALCTOK_OPENPAREN:
-            val = p_factor(ti)->num.val;
+            factor = p_factor(ti);
             *accum *= val;
             break;
         default:
