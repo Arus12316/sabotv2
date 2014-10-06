@@ -21,7 +21,7 @@ struct cnode_s {
 struct calcres_s
 {
     int status;
-    double val;
+    char *val;
 };
     
 extern calcres_s eval(char *exp);

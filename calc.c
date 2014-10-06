@@ -89,6 +89,7 @@ struct tokiter_s
 struct opnode_s
 {
     int weight;
+    bool paren;
     op_e val;
     union {
         struct {
@@ -157,17 +158,20 @@ static void free_tok(tok_s *tok);
 
 static calcres_s p_start(tokiter_s *ti);
 static node_s *p_expression(tokiter_s *ti);
-static void p_expression_(tokiter_s *ti, double *accum);
-static double p_term(tokiter_s *ti);
-static void p_term_(tokiter_s *ti, double *accum);
-static double p_subterm(tokiter_s *ti);
-static double p_subterm_(tokiter_s *ti);
+static void p_expression_(tokiter_s *ti, node_s **acc);
+static node_s *p_term(tokiter_s *ti);
+static void p_term_(tokiter_s *ti, node_s **acc);
+static node_s *p_subterm(tokiter_s *ti);
+static node_s *p_subterm_(tokiter_s *ti);
 static node_s *p_factor(tokiter_s *ti);
 static void p_optfactor(tokiter_s *ti, node_s **accum);
 
 static node_s *node_s_(ntype_e type);
 
 static void err(tokiter_s *ti, const char *f, ...);
+
+static char *tostring(node_s *root);
+static void tostring_(node_s *root, buf_s *buf);
 
 calcres_s eval(char *exp)
 {
@@ -354,7 +358,7 @@ void free_tok(tok_s *tok)
 
 calcres_s p_start(tokiter_s *ti)
 {
-    double result;
+    node_s *result;
     calcres_s cres;
     tok_s *t = TOK();
     
@@ -363,104 +367,186 @@ calcres_s p_start(tokiter_s *ti)
         t = TOK();
         if(t->type == CALCTOK_EOF) {
             if(ti->issuccess)
-                printf("parse success!\nresult: %f\n", result);
+                printf("parse success!\nresult: %p\n", result);
         }
         else {
             ERR("Syntax Error: Expected EOF but got %s\n", t->lex);
         }
     }
     else {
-        result = 0;
+        result = NULL;
         ti->issuccess = false;
     }
     cres.status = !ti->issuccess;
-    cres.val = result;
+    putchar('\n');
+    cres.val = tostring(result);
     return cres;
 }
 
 node_s *p_expression(tokiter_s *ti)
 {
-    double accum;
+    node_s *acc;
     
-    accum = p_term(ti);
-    p_expression_(ti, &accum);
-    return accum;
+    acc = p_term(ti);
+    p_expression_(ti, &acc);
+    if(acc->type == NTYPE_OP) {
+        acc->op.paren = true;
+    }
+    return acc;
 }
 
-void p_expression_(tokiter_s *ti, double *accum)
+void p_expression_(tokiter_s *ti, node_s **acc)
 {
-    double term;
+    node_s *term, *ac, *p, **branch;
     tok_s *t = TOK(), *bck;
 
     if(t->type == CALCTOK_ADDOP) {
         bck = t;
+        ac = *acc;
         NEXTTOK();
         term = p_term(ti);
-        if(bck->att == CALCATT_ADD) {
-            *accum += term;
+        if(term->type == NTYPE_NUM && ac->type == NTYPE_NUM) {
+            if(bck->att == CALCATT_ADD) {
+                ac->num.val += term->num.val;
+            }
+            else {
+                ac->num.val -= term->num.val;
+            }
+            free(term);
+            branch = acc;
         }
         else {
-            *accum -= term;
+            p = node_s_(NTYPE_OP);
+            if(bck->att == CALCATT_ADD) {
+                p->op.val = OP_ADD;
+            }
+            else {
+                p->op.val = OP_SUB;
+            }
+            p->op.l = ac;
+            p->op.r = term;
+            ac->p = p;
+            term->p = p;
+            *acc = p;
+            branch = &p->op.r;
         }
-        p_expression_(ti, accum);
+        p_expression_(ti, branch);
     }
 }
 
-double p_term(tokiter_s *ti)
+node_s *p_term(tokiter_s *ti)
 {
-    double accum;
+    node_s *acc;
     
-    accum = p_subterm(ti);
-    p_term_(ti, &accum);
-    return accum;
+    acc = p_subterm(ti);
+    p_term_(ti, &acc);
+    return acc;
 }
 
-void p_term_(tokiter_s *ti, double *accum)
+void p_term_(tokiter_s *ti, node_s **acc)
 {
-    double subterm, exp;
+    node_s *sub, *ac, *p, **branch;
     long long iterm;
     tok_s *t = TOK(), *bck;
     
     if(t->type == CALCTOK_MULOP) {
         bck = t;
+        ac = *acc;
         NEXTTOK();
-        subterm = p_subterm(ti);
-        if(bck->att == CALCATT_MULT) {
-            *accum *= subterm;
-        }
-        else if(bck->att == CALCATT_MOD) {
-            iterm = (long long)*accum;
-            iterm %= (long long)subterm;
-            *accum = iterm;
+        sub = p_subterm(ti);
+        if(sub->type == NTYPE_NUM && ac->type == NTYPE_NUM) {
+            if(bck->att == CALCATT_MULT) {
+                ac->num.val *= sub->num.val;
+            }
+            else if(bck->att == CALCATT_DIV) {
+                ac->num.val /= sub->num.val;
+            }
+            else {
+                
+                iterm = (long long)ac->num.val;
+                iterm %= (long long)sub->num.val;
+                ac->num.val = iterm;
+            }
+            free(sub);
+            branch = acc;
         }
         else {
-            *accum /= subterm;
+            p = node_s_(NTYPE_OP);
+            if(bck->att == CALCATT_MULT) {
+                p->op.val = OP_MULT;
+            }
+            else if(bck->att == CALCATT_DIV) {
+                p->op.val = OP_DIV;
+            }
+            else {
+                p->op.val = OP_MOD;
+            }
+            p->op.l = ac;
+            p->op.r = sub;
+            ac->p = p;
+            sub->p = p;
+            *acc = p;
+            branch = &p->op.r;
         }
-        p_term_(ti, accum);
+        p_term_(ti, branch);
     }
 }
 
-double p_subterm(tokiter_s *ti)
+node_s *p_subterm(tokiter_s *ti)
 {
-    double accum, subterm_;
+    node_s *fac, *sub, *p;
     
-    accum = p_factor(ti);
-    subterm_ = p_subterm_(ti);
-    return pow(accum, subterm_);
+    fac = p_factor(ti);
+    sub = p_subterm_(ti);
+    if(sub) {
+        if(fac->type == NTYPE_NUM && sub->type == NTYPE_NUM) {
+            fac->num.val = pow(fac->num.val, sub->num.val);
+            free(sub);
+            return fac;
+        }
+        else {
+            p = node_s_(NTYPE_OP);
+            p->op.val = OP_EXP;
+            p->op.l = fac;
+            p->op.r = sub;
+            fac->p = p;
+            sub->p = p;
+            return p;
+        }
+    }
+    else {
+        return fac;
+    }
 }
 
-double p_subterm_(tokiter_s *ti)
+node_s *p_subterm_(tokiter_s *ti)
 {
-    double factor, subterm_;
+    node_s *fac, *sub, *p;
     tok_s *t = TOK();
 
     if(t->type == CALCTOK_EXPON) {
         NEXTTOK();
-        factor = p_factor(ti);
-        subterm_ = p_subterm_(ti);
-        return pow(factor, subterm_);
+        fac = p_factor(ti);
+        sub = p_subterm_(ti);
+        if(sub) {
+            if(fac->type == NTYPE_NUM && sub->type == NTYPE_NUM) {
+                fac->num.val = pow(fac->num.val, sub->num.val);
+                free(sub);
+                return fac;
+            }
+            else {
+                p = node_s_(NTYPE_OP);
+                p->op.val = OP_EXP;
+                p->op.l = fac;
+                p->op.r = sub;
+                fac->p = p;
+                sub->p = p;
+                return p;
+            }
+        }
+        return fac;
     }
-    return 1;
+    return NULL;
 }
 
 node_s *p_factor(tokiter_s *ti)
@@ -699,16 +785,28 @@ node_s *p_factor(tokiter_s *ti)
 
 void p_optfactor(tokiter_s *ti, node_s **accum)
 {
-    double val;
     tok_s *t = TOK();
-    node_s *factor;
+    node_s *factor, *p, *acc;
     
     switch (t->type) {
         case CALCTOK_NUM:
         case CALCTOK_IDENT:
         case CALCTOK_OPENPAREN:
             factor = p_factor(ti);
-            *accum *= val;
+            acc = *accum;
+            if(acc->type == NTYPE_NUM && factor->type == NTYPE_NUM) {
+                acc->num.val *= factor->num.val;
+                free(factor);
+            }
+            else {
+                p = node_s_(NTYPE_OP);
+                p->op.val = OP_MULT;
+                p->op.l = acc;
+                p->op.r = factor;
+                acc->p = p;
+                factor->p = p;
+                *accum = p;
+            }
             break;
         default:
             break;
@@ -733,3 +831,146 @@ void err(tokiter_s *ti, const char *f, ...)
 
     ti->issuccess = false;
 }
+
+char *tostring(node_s *root)
+{
+    buf_s buf;
+    
+    buf.bsize = INIT_BSIZE;
+    buf.buf = alloc(INIT_BSIZE);
+    
+    tostring_(root, &buf);
+    bufaddc(&buf, '\0');
+    return buf.buf;
+}
+
+
+void tostring_(node_s *root, buf_s *buf)
+{
+    if(root->type == NTYPE_NUM) {
+        bufadddouble(buf, root->num.val);
+    }
+    else if(root->type == NTYPE_ID) {
+        bufaddstr(buf, root->ident.t->lex, strlen(root->ident.t->lex));
+    }
+    else {
+        switch(root->op.val) {
+            case OP_ADD:
+                if(root->op.l->type == NTYPE_OP && root->op.l->op.paren) {
+                    bufaddc(buf, '(');
+                    tostring_(root->op.l, buf);
+                    bufaddc(buf, ')');
+                }
+                else {
+                    tostring_(root->op.l, buf);
+                }
+                bufaddstr(buf, " plus ", sizeof(" plus ") - 1);
+                if(root->op.r->type == NTYPE_OP && root->op.r->op.paren) {
+                    bufaddc(buf, '(');
+                    tostring_(root->op.r, buf);
+                    bufaddc(buf, ')');
+                }
+                else {
+                    tostring_(root->op.r, buf);
+                }
+                break;
+            case OP_SUB:
+                if(root->op.l->type == NTYPE_OP && root->op.l->op.paren) {
+                    bufaddc(buf, '(');
+                    tostring_(root->op.l, buf);
+                    bufaddc(buf, ')');
+                }
+                else {
+                    tostring_(root->op.l, buf);
+                }
+                bufaddstr(buf, " - ", sizeof(" - ") - 1);
+                if(root->op.r->type == NTYPE_OP && root->op.r->op.paren) {
+                    bufaddc(buf, '(');
+                    tostring_(root->op.r, buf);
+                    bufaddc(buf, ')');
+                }
+                else {
+                    tostring_(root->op.r, buf);
+                }
+                break;
+            case OP_MULT:
+                tostring_(root->op.l, buf);
+                tostring_(root->op.r, buf);
+                break;
+            case OP_DIV:
+                tostring_(root->op.l, buf);
+                bufaddc(buf, '/');
+                tostring_(root->op.r, buf);
+                break;
+            case OP_MOD:
+                bufaddc(buf, '(');
+                tostring_(root->op.l, buf);
+                bufaddstr(buf, " mod ", sizeof(" mod ") - 1);
+                tostring_(root->op.r, buf);
+                bufaddc(buf, ')');
+                break;
+            case OP_EXP:
+                tostring_(root->op.l, buf);
+                bufaddc(buf, '^');
+                tostring_(root->op.r, buf);
+                break;
+            case OP_SIN:
+                bufaddstr(buf, "sin(", sizeof("sin(") - 1);
+                tostring_(root->op.c, buf);
+                bufaddc(buf, ')');
+                break;
+            case OP_COS:
+                bufaddstr(buf, "cos(", sizeof("cos(") - 1);
+                tostring_(root->op.c, buf);
+                bufaddc(buf, ')');
+                break;
+            case OP_TAN:
+                bufaddstr(buf, "tan(", sizeof("tan(") - 1);
+                tostring_(root->op.c, buf);
+                bufaddc(buf, ')');
+                break;
+            case OP_ARCSIN:
+                bufaddstr(buf, "arcsin(", sizeof("arcsin(") - 1);
+                tostring_(root->op.c, buf);
+                bufaddc(buf, ')');
+                break;
+            case OP_ARCCOS:
+                bufaddstr(buf, "arccos(", sizeof("arccos(") - 1);
+                tostring_(root->op.c, buf);
+                bufaddc(buf, ')');
+                break;
+            case OP_ARCTAN:
+                bufaddstr(buf, "arctan(", sizeof("arctan(") - 1);
+                tostring_(root->op.c, buf);
+                bufaddc(buf, ')');
+                break;
+            case OP_LOG:
+                bufaddstr(buf, "log(", sizeof("log(") - 1);
+                tostring_(root->op.c, buf);
+                bufaddc(buf, ')');
+                break;
+            case OP_LN:
+                bufaddstr(buf, "ln(", sizeof("ln(") - 1);
+                tostring_(root->op.c, buf);
+                bufaddc(buf, ')');
+                break;
+            case OP_LG:
+                bufaddstr(buf, "lg(", sizeof("lg(") - 1);
+                tostring_(root->op.c, buf);
+                bufaddc(buf, ')');
+                break;
+            case OP_SQRT:
+                bufaddstr(buf, "sqrt(", sizeof("sqrt(") - 1);
+                tostring_(root->op.c, buf);
+                bufaddc(buf, ')');
+                break;
+            case OP_NEGATE:
+                bufaddc(buf, '-');
+                tostring_(root->op.c, buf);
+                break;
+            default:
+                break;
+        }
+    }
+}
+
