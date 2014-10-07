@@ -15,7 +15,7 @@ int main(int argc, const char *argv[])
     errlist_s *err;
     calcres_s res;
     
-    res = eval("3x^y^z^2^3-(x - 4 - 3 - y)+sqrt(4)^4 plus x");
+    res = eval("4^4");
     printf("result: %s\n", res.val);
     return 0;
     src = readsrc(testcase1f);

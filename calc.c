@@ -381,7 +381,6 @@ calcres_s p_start(tokiter_s *ti)
         ti->issuccess = false;
     }
     cres.status = !ti->issuccess;
-    putchar('\n');
     cres.val = tostring(result);
     return cres;
 }
@@ -426,6 +425,11 @@ void p_expression_(tokiter_s *ti, node_s **acc)
             else {
                 p->op.val = OP_SUB;
             }
+
+            if(treeeq(term, ac)) {
+                puts("Equal!");
+            }
+            
             p->op.l = ac;
             p->op.r = term;
             ac->p = p;
@@ -891,6 +895,7 @@ char *tostring(node_s *root)
 {
     buf_s buf;
     
+    buf.size = 0;
     buf.bsize = INIT_BSIZE;
     buf.buf = alloc(INIT_BSIZE);
     
