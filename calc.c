@@ -166,6 +166,9 @@ static node_s *p_subterm_(tokiter_s *ti);
 static node_s *p_factor(tokiter_s *ti);
 static void p_optfactor(tokiter_s *ti, node_s **accum);
 
+static bool treeeq(node_s *r1, node_s *r2);
+static bool isbinop(op_e op);
+
 static node_s *node_s_(ntype_e type);
 
 static void err(tokiter_s *ti, const char *f, ...);
@@ -810,6 +813,58 @@ void p_optfactor(tokiter_s *ti, node_s **accum)
             break;
         default:
             break;
+    }
+}
+
+bool treeeq(node_s *r1, node_s *r2)
+{
+    if(r1->type != r2->type) {
+        return false;
+    }
+    else {
+        if(r1->type == NTYPE_OP) {
+            if(r1->op.val != r2->op.val) {
+                return false;
+            }
+            else {
+                if(isbinop(r1->op.val)) {
+                    return treeeq(r1->op.l, r2->op.l) && treeeq(r1->op.r, r2->op.r);
+                }
+                else {
+                    return treeeq(r1->op.c, r2->op.c);
+                }
+            }
+        }
+        else if(r1->type == NTYPE_ID) {
+            if(strcmp(r1->ident.t->lex, r2->ident.t->lex)) {
+                return false;
+            }
+            else {
+                return true;
+            }
+        }
+        else {
+            if(r1->num.val != r2->num.val) {
+                return false;
+            }
+            else {
+                return true;
+            }
+        }
+    }
+}
+
+bool isbinop(op_e op)
+{
+    switch(op) {
+        case OP_ADD:
+        case OP_SUB:
+        case OP_MULT:
+        case OP_DIV:
+        case OP_MOD:
+            return true;
+        default:
+            return false;
     }
 }
 

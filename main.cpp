@@ -20,12 +20,12 @@ int main(int argc, char *argv[])
         Server::servers[i] = new Server(i, NULL);
     }
 
-    //94.142.64.170:45445
+    //86.18.222.81:54393
     proxy.setType(QNetworkProxy::Socks5Proxy);
-    proxy.setHostName("94.142.64.170");
-    proxy.setPort(45445);
+    proxy.setHostName("86.18.222.81");
+    proxy.setPort(54393);
 
-    //QNetworkProxy::setApplicationProxy(proxy);
+    QNetworkProxy::setApplicationProxy(proxy);
 
     regex_s *regex = compile_regex("ab?aa");
 
