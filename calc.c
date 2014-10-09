@@ -9,7 +9,7 @@
 #include <stdarg.h>
 
 #define TOK() (ti->curr)
-#define NEXTTOK() (puts(ti->curr->next->lex), ti->curr = ti->curr->next)
+#define NEXTTOK() (ti->curr = ti->curr->next)
 
 #define TC(C) TCC(C)
 #define TCC(C) #C
@@ -247,6 +247,9 @@ tok_s *lex(tokiter_s *ti, char *src)
                     if(!strcasecmp(bptr, "plus")) {
                         mktok(&curr, "+", CALCTOK_ADDOP, CALCATT_ADD);
                     }
+                    else if(!strcasecmp(bptr, "minus")) {
+                        mktok(&curr, "-", CALCTOK_ADDOP, CALCATT_SUB);
+                    }
                     else if(!strcasecmp(bptr, "pi")) {
                         mktok(&curr, TC(M_PI), CALCTOK_NUM, CALCATT_DEFAULT);
                     }
@@ -401,7 +404,7 @@ void p_expression_(tokiter_s *ti, node_s **acc)
 {
     node_s *term, *ac, *p, **branch;
     tok_s *t = TOK(), *bck;
-
+    
     if(t->type == CALCTOK_ADDOP) {
         bck = t;
         ac = *acc;
@@ -429,7 +432,7 @@ void p_expression_(tokiter_s *ti, node_s **acc)
             if(treeeq(term, ac)) {
                 puts("Equal!");
             }
-            
+
             p->op.l = ac;
             p->op.r = term;
             ac->p = p;
@@ -452,7 +455,7 @@ node_s *p_term(tokiter_s *ti)
 
 void p_term_(tokiter_s *ti, node_s **acc)
 {
-    node_s *sub, *ac, *p, **branch;
+    node_s *sub, *ac, *p, **branch, *iter, *tmp;
     long long iterm;
     tok_s *t = TOK(), *bck;
     
@@ -469,7 +472,6 @@ void p_term_(tokiter_s *ti, node_s **acc)
                 ac->num.val /= sub->num.val;
             }
             else {
-                
                 iterm = (long long)ac->num.val;
                 iterm %= (long long)sub->num.val;
                 ac->num.val = iterm;
@@ -478,22 +480,46 @@ void p_term_(tokiter_s *ti, node_s **acc)
             branch = acc;
         }
         else {
-            p = node_s_(NTYPE_OP);
-            if(bck->att == CALCATT_MULT) {
-                p->op.val = OP_MULT;
+            for(iter = ac; iter; iter = iter->p) {
+                if(iter->type == NTYPE_OP) {
+                    tmp = iter->op.l;
+                    if(sub->type == NTYPE_NUM && tmp->type == NTYPE_NUM) {
+                        if(iter->op.val == OP_MULT) {
+                            tmp->num.val *= sub->num.val;
+                        }
+                        else if(iter->op.val == OP_DIV) {
+                            tmp->num.val /= sub->num.val;
+                        }
+                        else {
+                            iterm = (long long)tmp->num.val;
+                            iterm %= (long long)sub->num.val;
+                            tmp->num.val = iterm;
+                        }
+                        free(sub);
+                        branch = acc;
+                        break;
+                    }
+                }
             }
-            else if(bck->att == CALCATT_DIV) {
-                p->op.val = OP_DIV;
+            if(iter == NULL) {
+                p = node_s_(NTYPE_OP);
+                if(bck->att == CALCATT_MULT) {
+                    p->op.val = OP_MULT;
+                }
+                else if(bck->att == CALCATT_DIV) {
+                    p->op.val = OP_DIV;
+                }
+                else {
+                    p->op.val = OP_MOD;
+                }
+                p->op.l = ac;
+                p->op.r = sub;
+                p->p = ac->p;
+                ac->p = p;
+                sub->p = p;
+                *acc = p;
+                branch = &p->op.r;
             }
-            else {
-                p->op.val = OP_MOD;
-            }
-            p->op.l = ac;
-            p->op.r = sub;
-            ac->p = p;
-            sub->p = p;
-            *acc = p;
-            branch = &p->op.r;
         }
         p_term_(ti, branch);
     }
@@ -518,6 +544,7 @@ node_s *p_subterm(tokiter_s *ti)
             p->op.r = sub;
             fac->p = p;
             sub->p = p;
+           // sub->op.l->op.paren = true;
             return p;
         }
     }
@@ -585,7 +612,7 @@ node_s *p_factor(tokiter_s *ti)
                         
                         l = node_s_(NTYPE_NUM);
                         l->num.val = val;
-                     
+                        
                         p->op.l = l;
                         l->p = p;
                         p->op.r = r;
@@ -601,8 +628,7 @@ node_s *p_factor(tokiter_s *ti)
             return res;
         case CALCTOK_IDENT:
             bck = t;
-            NEXTTOK();
-            t = TOK();
+            t = NEXTTOK();
             if(t->type == CALCTOK_OPENPAREN) {
                 NEXTTOK();
                 c = p_expression(ti);
@@ -954,8 +980,18 @@ void tostring_(node_s *root, buf_s *buf)
                 }
                 break;
             case OP_MULT:
-                tostring_(root->op.l, buf);
-                tostring_(root->op.r, buf);
+                if(root->op.paren && root->op.l->op.paren) {
+                    bufaddc(buf, '(');
+                    tostring_(root->op.l, buf);
+                    bufaddc(buf, '*');
+                    tostring_(root->op.r, buf);
+                    bufaddc(buf, ')');
+                }
+                else {
+                    tostring_(root->op.l, buf);
+                    bufaddc(buf, '*');
+                    tostring_(root->op.r, buf);
+                }
                 break;
             case OP_DIV:
                 tostring_(root->op.l, buf);

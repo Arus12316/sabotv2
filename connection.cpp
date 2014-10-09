@@ -399,7 +399,7 @@ void Connection::gameEvent()
                         u->isSelf = false;
                         emit newUser(u);
 
-                       // win->db.logUser(u);
+                        win->db.logUser(u);
 
                         //force synchronization
                         win->lock.lock();
@@ -417,7 +417,7 @@ void Connection::gameEvent()
 
                         emit userDisconnected(u);
 
-                      //  findUser(findBuf);
+                        //findUser(findBuf);
 
                         //force synchronization
                         win->lock.lock();
@@ -525,7 +525,6 @@ void Connection::userDisconnected()
     emit loginRecover(this);
     thread.exit(0);
 }
-
 
 void Connection::errorConnection(QAbstractSocket::SocketError error)
 {

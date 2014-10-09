@@ -14,7 +14,7 @@
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
-    db(this),
+    db(),
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
@@ -156,7 +156,7 @@ void MainWindow::newUser(User *u)
         name += ' ';
     }
     else
-        name += "     ";
+        name += "   ";
     name += u->name;
     item->setBackground(u->color);
     item->setText(name);
@@ -236,6 +236,7 @@ void MainWindow::postMessage(message_s *msg)
     const char *crep;
     QString autoReply, original;
     QString post("<");
+    char *name;
     //time_t t = time(NULL);
 
     post += msg->sender->name;
@@ -246,7 +247,8 @@ void MainWindow::postMessage(message_s *msg)
                 reply = new message_s;
                 reply->type = 'P';
                 reply->receiver = msg->sender;
-                autoReply = original.replace('&', msg->body);
+                autoReply = original.replace('%', msg->body);
+                autoReply = autoReply.replace('&', msg->sender->name);
                 stdrep = autoReply.toStdString();
                 crep = stdrep.c_str();
                 strncpy(reply->body, crep, MAX_MSGLEN-1);

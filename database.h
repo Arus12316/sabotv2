@@ -4,20 +4,20 @@
 #include <QObject>
 #include <QSqlQuery>
 #include <QSqlDatabase>
+#include <QThread>
 
 
 class Database : public QObject
 {
     Q_OBJECT
 public:
-    explicit Database(QObject *parent = 0);
-
-    void logUser(class User *u);
-
+    explicit Database();
 
 signals:
+    void logUser(class User *user);
 
-public slots:
+private slots:
+    void logUserSlot(class User *u);
 
 private:
 
@@ -26,6 +26,7 @@ private:
     QSqlDatabase db;
     QSqlQuery checkUser;
     QSqlQuery insertUser;
+    QThread thread;
 
 };
 
