@@ -29,6 +29,7 @@ typedef enum {
     CALCTOK_IDENT,
     CALCTOK_NUM,
     CALCTOK_EXPON,
+    CALCTOK_FACTORIAL,
     CALCTOK_OPENPAREN,
     CALCTOK_CLOSEPAREN,
     CALCTOK_EOF
@@ -69,7 +70,8 @@ typedef enum {
     OP_LN,
     OP_LG,
     OP_SQRT,
-    OP_NEGATE
+    OP_NEGATE,
+    OP_FACTORIAL
 }
 op_e;
 
@@ -101,7 +103,7 @@ struct opnode_s
 
 struct numnode_s
 {
-    double val;
+    complex double val;
 };
 
 struct idnode_s
@@ -117,6 +119,13 @@ struct node_s {
         idnode_s ident;
     };
     node_s *p;
+};
+
+static tok_s errtok = {
+    .lex = "err",
+    .type = CALCTOK_IDENT,
+    .att = CALCATT_DEFAULT,
+    .next = NULL
 };
 
 static tok_s *lex(tokiter_s *ti, char *src);
@@ -238,6 +247,10 @@ tok_s *lex(tokiter_s *ti, char *src)
                 mktok(&curr, ")", CALCTOK_CLOSEPAREN, CALCATT_DEFAULT);
                 src++;
                 break;
+            /*case '!':
+                mktok(&curr, ")", CALCTOK_FACTORIAL, CALCATT_DEFAULT);
+                src++;
+                break;*/
             default:
                 if(isalpha(*src) || *src == '-') {
                     bptr = src;
@@ -533,7 +546,7 @@ node_s *p_subterm(tokiter_s *ti)
     sub = p_subterm_(ti);
     if(sub) {
         if(fac->type == NTYPE_NUM && sub->type == NTYPE_NUM) {
-            fac->num.val = pow(fac->num.val, sub->num.val);
+            fac->num.val = cpow(fac->num.val, sub->num.val);
             free(sub);
             return fac;
         }
@@ -544,7 +557,6 @@ node_s *p_subterm(tokiter_s *ti)
             p->op.r = sub;
             fac->p = p;
             sub->p = p;
-           // sub->op.l->op.paren = true;
             return p;
         }
     }
@@ -564,7 +576,7 @@ node_s *p_subterm_(tokiter_s *ti)
         sub = p_subterm_(ti);
         if(sub) {
             if(fac->type == NTYPE_NUM && sub->type == NTYPE_NUM) {
-                fac->num.val = pow(fac->num.val, sub->num.val);
+                fac->num.val = cpow(fac->num.val, sub->num.val);
                 free(sub);
                 return fac;
             }
@@ -586,7 +598,7 @@ node_s *p_subterm_(tokiter_s *ti)
 node_s *p_factor(tokiter_s *ti)
 {
     int mult;
-    double val;
+    complex double val;
     tok_s *t = TOK(), *bck;
     node_s *res, *p, *l, *r, *c;
     
@@ -594,7 +606,7 @@ node_s *p_factor(tokiter_s *ti)
         case CALCTOK_NUM:
             bck = t;
             t = NEXTTOK();
-            val = atof(bck->lex);
+            val = strtod(bck->lex, NULL);
             if(t->type == CALCTOK_IDENT || t->type == CALCTOK_OPENPAREN) {
                 r = p_factor(ti);
                 if(val == 0.0) {
@@ -639,7 +651,7 @@ node_s *p_factor(tokiter_s *ti)
                 NEXTTOK();
                 if(!strcmp(bck->lex, "sin")) {
                     if(c->type == NTYPE_NUM) {
-                        c->num.val = sin(c->num.val);
+                        c->num.val = csin(c->num.val);
                         res = c;
                     }
                     else {
@@ -652,7 +664,7 @@ node_s *p_factor(tokiter_s *ti)
                 }
                 else if(!strcmp(bck->lex, "cos")) {
                     if(c->type == NTYPE_NUM) {
-                        c->num.val = cos(c->num.val);
+                        c->num.val = ccos(c->num.val);
                         res = c;
                     }
                     else {
@@ -665,7 +677,7 @@ node_s *p_factor(tokiter_s *ti)
                 }
                 else if(!strcmp(bck->lex, "tan")) {
                     if(c->type == NTYPE_NUM) {
-                        c->num.val = tan(c->num.val);
+                        c->num.val = ctan(c->num.val);
                         res = c;
                     }
                     else {
@@ -678,7 +690,7 @@ node_s *p_factor(tokiter_s *ti)
                 }
                 else if(!strcmp(bck->lex, "arcsin")) {
                     if(c->type == NTYPE_NUM) {
-                        c->num.val = asin(c->num.val);
+                        c->num.val = casin(c->num.val);
                         res = c;
                     }
                     else {
@@ -691,7 +703,7 @@ node_s *p_factor(tokiter_s *ti)
                 }
                 else if(!strcmp(bck->lex, "arccos")) {
                     if(c->type == NTYPE_NUM) {
-                        c->num.val = acos(c->num.val);
+                        c->num.val = cacos(c->num.val);
                         res = c;
                     }
                     else {
@@ -704,7 +716,7 @@ node_s *p_factor(tokiter_s *ti)
                 }
                 else if(!strcmp(bck->lex, "arctan")) {
                     if(c->type == NTYPE_NUM) {
-                        c->num.val = atan(c->num.val);
+                        c->num.val = catan(c->num.val);
                         res = c;
                     }
                     else {
@@ -717,7 +729,7 @@ node_s *p_factor(tokiter_s *ti)
                 }
                 else if(!strcmp(bck->lex, "log")) {
                     if(c->type == NTYPE_NUM) {
-                        c->num.val = log10(c->num.val);
+                        c->num.val = clog(c->num.val)/clog(10);
                         res = c;
                     }
                     else {
@@ -730,7 +742,7 @@ node_s *p_factor(tokiter_s *ti)
                 }
                 else if(!strcmp(bck->lex, "ln")) {
                     if(c->type == NTYPE_NUM) {
-                        c->num.val = log(c->num.val);
+                        c->num.val = clog(c->num.val);
                         res = c;
                     }
                     else {
@@ -743,7 +755,7 @@ node_s *p_factor(tokiter_s *ti)
                 }
                 else if(!strcmp(bck->lex, "lg")) {
                     if(c->type == NTYPE_NUM) {
-                        c->num.val = log2(c->num.val);
+                        c->num.val = clog(c->num.val)/clog(2.0);
                         res = c;
                     }
                     else {
@@ -756,7 +768,11 @@ node_s *p_factor(tokiter_s *ti)
                 }
                 else if(!strcmp(bck->lex, "sqrt")) {
                     if(c->type == NTYPE_NUM) {
-                        c->num.val = sqrt(c->num.val);
+                        printf("complex: %f + %f\n", creal(c->num.val), cimag(c->num.val));
+
+                        c->num.val = csqrt(c->num.val);
+                        printf("complex: %f + %f\n", creal(c->num.val), cimag(c->num.val));
+
                         res = c;
                     }
                     else {
@@ -767,11 +783,37 @@ node_s *p_factor(tokiter_s *ti)
                         res = p;
                     }
                 }
+                else if(!strcmp(bck->lex, "i")) {
+                    p = node_s_(NTYPE_OP);
+                    p->op.val = OP_MULT;
+                    p->op.l = node_s_(NTYPE_NUM);
+                    p->op.l->num.val = csqrt(-1);
+                    p->op.l->p = p;
+                    p->op.r = c;
+                    p->op.r->p = p;
+                    res = p;
+                }
+                else {
+                    p = node_s_(NTYPE_OP);
+                    p->op.val = OP_MULT;
+                    p->op.l = node_s_(NTYPE_ID);
+                    p->op.l->ident.t = bck;
+                    p->op.l->p = p;
+                    p->op.r = c;
+                    p->op.r->p = p;
+                    res = p;
+                }
                 p_optfactor(ti, &res);
             }
             else {
-                res = node_s_(NTYPE_ID);
-                res->ident.t = bck;
+                if(strcmp(bck->lex, "i")) {
+                    res = node_s_(NTYPE_ID);
+                    res->ident.t = bck;
+                }
+                else {
+                    res = node_s_(NTYPE_NUM);
+                    res->num.val = csqrt(-1);
+                }
             }
             return res;
         case CALCTOK_OPENPAREN:
@@ -794,8 +836,8 @@ node_s *p_factor(tokiter_s *ti)
             NEXTTOK();
             c = p_factor(ti);
             if(mult == -1) {
-                if(c->type == NTYPE_NUM) {
-                    c->num.val = -c->num.val;
+                if(c->type == NTYPE_NUM) { 
+                    c->num.val = -1*c->num.val;
                     res = c;
                 }
                 else {
@@ -812,7 +854,9 @@ node_s *p_factor(tokiter_s *ti)
             return res;
         default:
             ERR("Syntax Error: Expected number, identifier, (, +, or -, but got %s\n", t->lex);
-            return 0;
+            p = node_s_(NTYPE_ID);
+            p->ident.t = &errtok;
+            return p;
     }
 }
 
@@ -821,7 +865,7 @@ void p_optfactor(tokiter_s *ti, node_s **accum)
     tok_s *t = TOK();
     node_s *factor, *p, *acc;
     
-    switch (t->type) {
+    switch(t->type) {
         case CALCTOK_NUM:
         case CALCTOK_IDENT:
         case CALCTOK_OPENPAREN:
@@ -913,7 +957,7 @@ void err(tokiter_s *ti, const char *f, ...)
     va_start(args, f);
     vfprintf(stderr, f, args);
     va_end(args);
-
+    
     ti->issuccess = false;
 }
 
@@ -921,20 +965,22 @@ char *tostring(node_s *root)
 {
     buf_s buf;
     
-    buf.size = 0;
-    buf.bsize = INIT_BSIZE;
-    buf.buf = alloc(INIT_BSIZE);
-    
-    tostring_(root, &buf);
-    bufaddc(&buf, '\0');
-    return buf.buf;
+    if(root) {
+        buf.size = 0;
+        buf.bsize = INIT_BSIZE;
+        buf.buf = alloc(INIT_BSIZE);
+        tostring_(root, &buf);
+        bufaddc(&buf, '\0');
+        return buf.buf;
+    }
+    return NULL;
 }
 
 
 void tostring_(node_s *root, buf_s *buf)
 {
     if(root->type == NTYPE_NUM) {
-        bufadddouble(buf, root->num.val);
+        bufaddcomplex(buf, root->num.val);
     }
     else if(root->type == NTYPE_ID) {
         bufaddstr(buf, root->ident.t->lex, strlen(root->ident.t->lex));

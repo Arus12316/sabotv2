@@ -329,7 +329,7 @@ void Connection::gameEvent()
             n = gameBuf.size();
             bptr = gameBuf.data();
 
-            if(server->master == this) {                
+            if(server->master == this) {
                 switch(*bptr) {
                     case '0':
                         switch(*++bptr) {
@@ -399,7 +399,7 @@ void Connection::gameEvent()
                         u->isSelf = false;
                         emit newUser(u);
 
-                        win->db.logUser(u);
+                        //win->db.logUser(u);
 
                         //force synchronization
                         win->lock.lock();

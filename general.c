@@ -52,6 +52,48 @@ void bufadddouble(buf_s *b, double val)
 }
 
 
+void bufaddcomplex(buf_s *b, complex double val)
+{
+    double i, r;
+    
+    r = creal(val);    
+    if(EQ0((i = cimag(val)))) {
+        bufadddouble(b, r);
+    }
+    else {
+        if(!EQ0(r)) {
+            bufaddc(b, '(');
+            bufadddouble(b, r);
+            if(i > 0)
+                bufaddstr(b, " plus ", sizeof(" plus ")-1);
+            if(EQ1(i)) {
+                bufaddc(b, 'i');
+            }
+            else if(EQN1(i)) {
+                bufaddstr(b, "-i", sizeof("-1")-1);
+            }
+            else {
+                bufadddouble(b, i);
+                bufaddc(b, 'i');
+            }
+            bufaddc(b, ')');
+        }
+        else {
+            if(EQ1(i)) {
+                bufaddc(b, 'i');
+            }
+            else if(EQN1(i)) {
+                bufaddstr(b, "-i", sizeof("-1")-1);
+            }
+            else {
+                bufadddouble(b, i);
+                bufaddc(b, 'i');
+            }
+        }
+    }
+}
+
+
 void buf_trim(buf_s *b)
 {
     b->bsize = b->size;

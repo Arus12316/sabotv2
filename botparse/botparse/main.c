@@ -15,7 +15,7 @@ int main(int argc, const char *argv[])
     errlist_s *err;
     calcres_s res;
     
-    res = eval("10^(100*x*x*3*2)");
+    res = eval("sqrt(-1)");
     printf("result: %s\n", res.val);
     return 0;
     src = readsrc(testcase1f);
@@ -30,7 +30,7 @@ int main(int argc, const char *argv[])
 }
 
 
-char *readsrc(char *file)
+char *readsrc(char *file) 
 {
     int c;
     int size = 0;
