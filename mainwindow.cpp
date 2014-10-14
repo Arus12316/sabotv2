@@ -10,7 +10,7 @@
 #include <QTabWidget>
 #include <QListWidget>
 #include <QListWidgetItem>
-
+#include <QScrollBar>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -145,6 +145,8 @@ void MainWindow::newUser(User *u)
     QString name, *msg;
     QListWidgetItem *item;
 
+    time_t t = time(NULL);
+
     item = new QListWidgetItem;
     u->listEntry = item;
     data = new QVariant(QVariant::fromValue<User *>(u));
@@ -174,6 +176,8 @@ void MainWindow::newUser(User *u)
     lock.lock();
     cond.wakeOne();
     lock.unlock();
+
+    qDebug() << "Diff: " << time(NULL) - t;
 }
 
 void MainWindow::newSelf(class User *u)
@@ -236,11 +240,14 @@ void MainWindow::postMessage(message_s *msg)
     const char *crep;
     QString autoReply, original;
     QString post("<");
-    char *name;
+    QListWidget *list;
+    QScrollBar *scroll;
     //time_t t = time(NULL);
 
     post += msg->sender->name;
     if(msg->type == '9' || msg->type == 'P') {
+        list = msg->sender->conn->server->messageView;
+        scroll = list->verticalScrollBar();
         if(msg->type == 'P') {
             original = ui->autoReply->text();
             if(original.length()) {
@@ -260,17 +267,22 @@ void MainWindow::postMessage(message_s *msg)
         }
         post += "> ";
         post += msg->body;
-        msg->sender->conn->server->messageView->addItem(post);
-        msg->sender->conn->server->messageView->scrollToBottom();
 
+        list->addItem(post);
+        if(scroll->maximum() == scroll->sliderPosition())
+            list->scrollToBottom();
     }
     else {
         post += " : ";
         post += msg->type;
         post += "> ";
         post += msg->body;
-        msg->sender->conn->server->miscView->addItem(post);
-        msg->sender->conn->server->miscView->scrollToBottom();
+        list = msg->sender->conn->server->miscView;
+        scroll = list->verticalScrollBar();
+        list->addItem(post);
+        if(scroll->maximum() == scroll->sliderPosition())
+            list->scrollToBottom();
+
     }
     //qDebug() << "time: " << time(NULL) - t;
 

@@ -1255,6 +1255,9 @@
       </property>
      </widget>
      <widget class="QCheckBox" name="calculatorOn">
+      <property name="enabled">
+       <bool>true</bool>
+      </property>
       <property name="geometry">
        <rect>
         <x>1160</x>
@@ -1267,7 +1270,7 @@
        <string>Calculator On</string>
       </property>
       <property name="checked">
-       <bool>true</bool>
+       <bool>false</bool>
       </property>
      </widget>
     </widget>

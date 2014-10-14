@@ -6,34 +6,18 @@ let omg : (() -> real) -> real := @(a){
     a()
 }
 
-
 g := @(a, b) {
     return @() {
         return @() {
-            {a, b}
+
         }
     }
 }
 
-
+var c := [1, 2, 3, 4, [3], [3]]
 
 var bob : (a : int[]) -> real[] := @(){
-    return 4;
-    return 4
-
-    return 32
-    return 2
-
-    34
-    56
-    43
-    return 1
-    return 3;    32
-    32
-    12
-
-    return 32
-}s
+}
 
 struct bob {
     a : int, 
@@ -44,7 +28,6 @@ struct bob {
 class bob : tom {
     
     _() {
-
     }
 
     ~_() {

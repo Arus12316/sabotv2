@@ -7,17 +7,34 @@
 char testcase1f[] = "/Users/jhamm/sabotv2/botparse/botparse/testcase1";
 
 
+char *calctestcase[] = {
+    "1 plus 1 plus 32",
+    "33^33",
+    ",..,.,..,.,.,.,.,..,,..,,..,,.()))())))()",
+    "(((((((((((33^(32)))"
+    ")33+32",
+    "!!!,,,,..230987409237480",
+    "..././/..//***",
+    "(1 + 1)^(1+1)*(33^33^3^44^(1^4 plus 5^3^2^(8+1)))*32*(1-cos(cos(cos(tanh(32*e*pi))*pi)pi))e",
+    "cos(pi)e*cos(pi)"
+};
+
 char *readsrc(char *file);
 
 int main(int argc, const char *argv[])
 {
+    int i;
     char *src;
     errlist_s *err;
     calcres_s res;
     
-    res = eval("sqrt(-1)");
-    printf("result: %s\n", res.val);
-    return 0;
+   /*
+    for(i = 0; i < sizeof(calctestcase)/sizeof(*calctestcase); i++) {
+        res = eval(calctestcase[i]);
+        printf("result: %s\n\n", res.val);
+    }
+    
+    return 0;*/
     src = readsrc(testcase1f);
     
     err = parse(src);

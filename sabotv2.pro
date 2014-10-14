@@ -47,3 +47,8 @@ raid.ui \
 proxyscan.ui
 
 CONFIG += c++11
+
+QMAKE_CFLAGS -= -O
+QMAKE_CFLAGS -= -O1
+QMAKE_CFLAGS -= -O2
+QMAKE_CFLAGS *= -O3

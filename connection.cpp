@@ -322,6 +322,7 @@ void Connection::gameEvent()
     message_s *msg, *rep;
     enum {SPAM_THRESHOLD = 30, MIN_TIME_MS = 0, CALC_TIME_MS=1500};
 
+    sock->setSocketOption(QAbstractSocket::LowDelayOption, 1);
     while(sock->getChar(&c)) {
         gameBuf += c;
 
@@ -480,8 +481,12 @@ void Connection::gameEvent()
                             *resStr += "result: ";
                             *resStr += cres.val;
                             resQueue.enqueue(resStr);
-                            QTimer::singleShot(CALC_TIME_MS, this, SLOT(sendRes()));
+                            if(msg->sender == this->user)
+                                QTimer::singleShot(CALC_TIME_MS, this, SLOT(sendRes()));
+                            else
+                                QTimer::singleShot(0, this, SLOT(sendRes()));
                             free(cres.val);
+
                         }
                     }
             }
@@ -507,6 +512,7 @@ void Connection::keepAlive()
 {
     sock->write(ackX0, sizeof ackX0);
     sock->write(ackX2, sizeof ackX2);
+    //sock->is
 }
 
 void Connection::userConnected()

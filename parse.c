@@ -37,7 +37,7 @@
                 |
                 regex
                 |
-                { <arrayinit> }
+                [ <arrayinit> ]
                 |
                 <structliteral>
                 |
@@ -75,8 +75,6 @@
  <control> ->	while <expression> <controlsuffix>
                 |
                 for id <- <expression> <controlsuffix>
-                |
-                listener(<optarglist>) <controlsuffix>
                 |
                 do <controlsuffix> while <expression>
  
@@ -192,7 +190,6 @@ enum {
     TOKTYPE_VARARG,
     TOKTYPE_WHILE,
     TOKTYPE_FOR,
-    TOKTYPE_LISTENER,
     TOKTYPE_VAR,
     TOKTYPE_LET,
     TOKTYPE_VOID,
@@ -312,7 +309,6 @@ keywords[] = {
     {"switch", TOKTYPE_SWITCH},
     {"case", TOKTYPE_CASE},
     {"default", TOKTYPE_DEFAULT},
-    {"listener", TOKTYPE_LISTENER},
     {"var", TOKTYPE_VAR},
     {"let", TOKTYPE_LET},
     {"void", TOKTYPE_VOID},
@@ -952,14 +948,13 @@ void p_statementlist(tokiter_s *ti, node_s *root, node_s *last)
         case TOKTYPE_VAR:
         case TOKTYPE_LET:
         case TOKTYPE_ENUM:
-        case TOKTYPE_LISTENER:
         case TOKTYPE_SWITCH:
         case TOKTYPE_FOR:
         case TOKTYPE_WHILE:
         case TOKTYPE_DO:
         case TOKTYPE_IF:
         case TOKTYPE_ADDOP:
-        case TOKTYPE_OPENBRACE:
+        case TOKTYPE_OPENBRACKET:
         case TOKTYPE_LAMBDA:
         case TOKTYPE_REGEX:
         case TOKTYPE_CHAR:
@@ -1064,7 +1059,7 @@ node_s *p_statement(tokiter_s *ti)
         case TOKTYPE_STRING:
         case TOKTYPE_REGEX:
         case TOKTYPE_LAMBDA:
-        case TOKTYPE_OPENBRACE:
+        case TOKTYPE_OPENBRACKET:
         case TOKTYPE_STRUCTLITERAL:
         case TOKTYPE_MAPLITERAL:
         case TOKTYPE_ADDOP:
@@ -1073,7 +1068,6 @@ node_s *p_statement(tokiter_s *ti)
         case TOKTYPE_WHILE:
         case TOKTYPE_DO:
         case TOKTYPE_FOR:
-        case TOKTYPE_LISTENER:
             statement =  p_control(ti);
             statement->branch_complete = false;
             return statement;
@@ -1167,7 +1161,7 @@ node_s *p_optexpression(tokiter_s *ti)
         case TOKTYPE_STRING:
         case TOKTYPE_REGEX:
         case TOKTYPE_LAMBDA:
-        case TOKTYPE_OPENBRACE:
+        case TOKTYPE_OPENBRACKET:
         case TOKTYPE_STRUCTLITERAL:
         case TOKTYPE_MAPLITERAL:
         case TOKTYPE_ADDOP:
@@ -1467,7 +1461,7 @@ node_s *p_factor_(tokiter_s *ti)
             n->ctype = NULL;
             n->tok = t;
             break;
-        case TOKTYPE_OPENBRACE:
+        case TOKTYPE_OPENBRACKET:
             n = MAKENODE();
             n->ntype = TYPE_NODE;
             n->tok = t;
@@ -1477,11 +1471,11 @@ node_s *p_factor_(tokiter_s *ti)
             nexttok(ti);
             p_arrayinit(ti, n);
             t = tok(ti);
-            if(t->type == TOKTYPE_CLOSEBRACE) {
+            if(t->type == TOKTYPE_CLOSEBRACKET) {
                 nexttok(ti);
             }
             else {
-                ERR("Syntax Error: Expected } but got");
+                ERR("Syntax Error: Expected ] but got");
                 synerr_rec(ti);
             }
             break;
@@ -1617,6 +1611,7 @@ void p_arrayinit(tokiter_s *ti, node_s *root)
         case TOKTYPE_OPENPAREN:
         case TOKTYPE_NUM:
         case TOKTYPE_IDENT:
+        case TOKTYPE_OPENBRACKET:
             exp = p_expression(ti);
             if(root->stype == TYPE_NODE) {
                 root->stype = exp->stype;
@@ -1683,6 +1678,7 @@ void p_initializerlist(tokiter_s *ti, node_s *root)
         case TOKTYPE_OPENPAREN:
         case TOKTYPE_NUM:
         case TOKTYPE_IDENT:
+        case TOKTYPE_OPENBRACKET:
             p = MAKENODE();
             p->ntype = TYPE_NODE;
             p->tok = t;
@@ -1779,6 +1775,7 @@ void p_maplist(tokiter_s *ti, node_s *root)
         case TOKTYPE_NUM:
         case TOKTYPE_DOT:
         case TOKTYPE_IDENT:
+        case TOKTYPE_OPENBRACKET:
             n = MAKENODE();
             n->ntype = TYPE_NODE;
             n->tok = t;
@@ -1823,51 +1820,50 @@ node_s *p_lambda(tokiter_s *ti)
     
     t = nexttok(ti);
     
+    PUSHSCOPE();
+
     if(t->type == TOKTYPE_OPENPAREN) {
         nexttok(ti);
-        PUSHSCOPE();
         param = p_optparamlist(ti);
         lambda->ctype = param;
         t = tok(ti);
-        if(t->type == TOKTYPE_CLOSEPAREN) {
+        if(t->type == TOKTYPE_CLOSEPAREN)
             t = nexttok(ti);
-            if(t->type == TOKTYPE_OPENBRACE) {
-                nexttok(ti);
-                addchild(lambda, param);
-                addchild(lambda, body);
-                p_statementlist(ti, body, NULL);
-                
-                t = tok(ti);
-                if(t->type == TOKTYPE_CLOSEBRACE) {
-                    nexttok(ti);
-                }
-                else {
-                    //syntax error
-                    ERR("Syntax Error: Expected }");
-                    synerr_rec(ti);
-                }
-            }
-            else {
-                lambda = NULL;
-                //syntax error
-                ERR("Syntax Error: Expected {");
-                synerr_rec(ti);
-            }
-        }
         else {
             lambda = NULL;
             //syntax error
             ERR("Syntax Error: Expected )");
             synerr_rec(ti);
         }
-        POPSCOPE();
+    }
+    else {
+        param = MAKENODE();
+        param->ntype = TYPE_NODE;
+    }
+    
+    if(t->type == TOKTYPE_OPENBRACE) {
+        nexttok(ti);
+        addchild(lambda, param);
+        addchild(lambda, body);
+        p_statementlist(ti, body, NULL);
+        
+        t = tok(ti);
+        if(t->type == TOKTYPE_CLOSEBRACE) {
+            nexttok(ti);
+        }
+        else {
+            //syntax error
+            ERR("Syntax Error: Expected }");
+            synerr_rec(ti);
+        }
     }
     else {
         lambda = NULL;
         //syntax error
-        ERR("Syntax Error: Expected (");
+        ERR("Syntax Error: Expected {");
         synerr_rec(ti);
     }
+    POPSCOPE();
     return lambda;
 }
 
@@ -1998,53 +1994,6 @@ node_s *p_control(tokiter_s *ti)
                 control = NULL;
                 //syntax error
                 ERR("Syntax Error: Expected identifier");
-                synerr_rec(ti);
-            }
-            break;
-        case TOKTYPE_LISTENER:
-            t = nexttok(ti);
-            if(t->type == TOKTYPE_OPENPAREN) {
-                nexttok(ti);
-                arg = p_optarglist(ti);
-                t = tok(ti);
-                if(t->type == TOKTYPE_CLOSEPAREN) {
-                    t = nexttok(ti);
-                    if(t->type == TOKTYPE_OPENBRACE) {
-                        nexttok(ti);
-                        addchild(control, op);
-                        addchild(control, arg);
-                        addchild(control, suffix);
-                        PUSHSCOPE();
-                        p_statementlist(ti, suffix, NULL);
-                        POPSCOPE();
-                        t =tok(ti);
-                        if(t->type == TOKTYPE_CLOSEBRACE) {
-                            nexttok(ti);
-                        }
-                        else {
-                            //syntax error
-                            ERR("Syntax Error: Expected )");
-                            synerr_rec(ti);
-                        }
-                    }
-                    else {
-                        control = NULL;
-                        //syntax error
-                        ERR("Syntax Error: Expected {");
-                        synerr_rec(ti);
-                    }
-                }
-                else {
-                    control = NULL;
-                    //syntax error
-                    ERR("Syntax Error: Expected )");
-                    synerr_rec(ti);
-                }
-            }
-            else {
-                control = NULL;
-                //syntax error
-                ERR("Syntax Error: Expected (");
                 synerr_rec(ti);
             }
             break;
@@ -2216,7 +2165,7 @@ void p_caselist(tokiter_s *ti, node_s *root)
 {
     node_s *exp, *arg, *op, *cadef;
     tok_s *t = tok(ti);
-    
+        
     if(t->type == TOKTYPE_CASE) {
         nexttok(ti);
         

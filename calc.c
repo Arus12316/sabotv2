@@ -66,6 +66,9 @@ typedef enum {
     OP_ARCSIN,
     OP_ARCCOS,
     OP_ARCTAN,
+    OP_SINH,
+    OP_COSH,
+    OP_TANH,
     OP_LOG,
     OP_LN,
     OP_LG,
@@ -175,8 +178,11 @@ static node_s *p_subterm_(tokiter_s *ti);
 static node_s *p_factor(tokiter_s *ti);
 static void p_optfactor(tokiter_s *ti, node_s **accum);
 
+static inline node_s *evalfunc(tok_s *t, node_s *arg);
 static bool treeeq(node_s *r1, node_s *r2);
 static bool isbinop(op_e op);
+
+//static node_s **mult(node_s *n1, node_s *n2, ttatt_e att);
 
 static node_s *node_s_(ntype_e type);
 
@@ -534,6 +540,7 @@ void p_term_(tokiter_s *ti, node_s **acc)
                 branch = &p->op.r;
             }
         }
+        //branch = mult(*acc, sub, bck->att);
         p_term_(ti, branch);
     }
 }
@@ -649,160 +656,7 @@ node_s *p_factor(tokiter_s *ti)
                     ERR("Syntax Error: Expected ) but got %s\n", t->lex);
                 }
                 NEXTTOK();
-                if(!strcmp(bck->lex, "sin")) {
-                    if(c->type == NTYPE_NUM) {
-                        c->num.val = csin(c->num.val);
-                        res = c;
-                    }
-                    else {
-                        p = node_s_(NTYPE_OP);
-                        p->op.val = OP_SIN;
-                        p->op.c = c;
-                        c->p = p;
-                        res = p;
-                    }
-                }
-                else if(!strcmp(bck->lex, "cos")) {
-                    if(c->type == NTYPE_NUM) {
-                        c->num.val = ccos(c->num.val);
-                        res = c;
-                    }
-                    else {
-                        p = node_s_(NTYPE_OP);
-                        p->op.val = OP_COS;
-                        p->op.c = c;
-                        c->p = p;
-                        res = p;
-                    }
-                }
-                else if(!strcmp(bck->lex, "tan")) {
-                    if(c->type == NTYPE_NUM) {
-                        c->num.val = ctan(c->num.val);
-                        res = c;
-                    }
-                    else {
-                        p = node_s_(NTYPE_OP);
-                        p->op.val = OP_TAN;
-                        p->op.c = c;
-                        c->p = p;
-                        res = p;
-                    }
-                }
-                else if(!strcmp(bck->lex, "arcsin")) {
-                    if(c->type == NTYPE_NUM) {
-                        c->num.val = casin(c->num.val);
-                        res = c;
-                    }
-                    else {
-                        p = node_s_(NTYPE_OP);
-                        p->op.val = OP_ARCSIN;
-                        p->op.c = c;
-                        c->p = p;
-                        res = p;
-                    }
-                }
-                else if(!strcmp(bck->lex, "arccos")) {
-                    if(c->type == NTYPE_NUM) {
-                        c->num.val = cacos(c->num.val);
-                        res = c;
-                    }
-                    else {
-                        p = node_s_(NTYPE_OP);
-                        p->op.val = OP_ARCCOS;
-                        p->op.c = c;
-                        c->p = p;
-                        res = p;
-                    }
-                }
-                else if(!strcmp(bck->lex, "arctan")) {
-                    if(c->type == NTYPE_NUM) {
-                        c->num.val = catan(c->num.val);
-                        res = c;
-                    }
-                    else {
-                        p = node_s_(NTYPE_OP);
-                        p->op.val = OP_ARCTAN;
-                        p->op.c = c;
-                        c->p = p;
-                        res = p;
-                    }
-                }
-                else if(!strcmp(bck->lex, "log")) {
-                    if(c->type == NTYPE_NUM) {
-                        c->num.val = clog(c->num.val)/clog(10);
-                        res = c;
-                    }
-                    else {
-                        p = node_s_(NTYPE_OP);
-                        p->op.val = OP_LOG;
-                        p->op.c = c;
-                        c->p = p;
-                        res = p;
-                    }
-                }
-                else if(!strcmp(bck->lex, "ln")) {
-                    if(c->type == NTYPE_NUM) {
-                        c->num.val = clog(c->num.val);
-                        res = c;
-                    }
-                    else {
-                        p = node_s_(NTYPE_OP);
-                        p->op.val = OP_LN;
-                        p->op.c = c;
-                        c->p = p;
-                        res = p;
-                    }
-                }
-                else if(!strcmp(bck->lex, "lg")) {
-                    if(c->type == NTYPE_NUM) {
-                        c->num.val = clog(c->num.val)/clog(2.0);
-                        res = c;
-                    }
-                    else {
-                        p = node_s_(NTYPE_OP);
-                        p->op.val = OP_LG;
-                        p->op.c = c;
-                        c->p = p;
-                        res = p;
-                    }
-                }
-                else if(!strcmp(bck->lex, "sqrt")) {
-                    if(c->type == NTYPE_NUM) {
-                        printf("complex: %f + %f\n", creal(c->num.val), cimag(c->num.val));
-
-                        c->num.val = csqrt(c->num.val);
-                        printf("complex: %f + %f\n", creal(c->num.val), cimag(c->num.val));
-
-                        res = c;
-                    }
-                    else {
-                        p = node_s_(NTYPE_OP);
-                        p->op.val = OP_SQRT;
-                        p->op.c = c;
-                        c->p = p;
-                        res = p;
-                    }
-                }
-                else if(!strcmp(bck->lex, "i")) {
-                    p = node_s_(NTYPE_OP);
-                    p->op.val = OP_MULT;
-                    p->op.l = node_s_(NTYPE_NUM);
-                    p->op.l->num.val = csqrt(-1);
-                    p->op.l->p = p;
-                    p->op.r = c;
-                    p->op.r->p = p;
-                    res = p;
-                }
-                else {
-                    p = node_s_(NTYPE_OP);
-                    p->op.val = OP_MULT;
-                    p->op.l = node_s_(NTYPE_ID);
-                    p->op.l->ident.t = bck;
-                    p->op.l->p = p;
-                    p->op.r = c;
-                    p->op.r->p = p;
-                    res = p;
-                }
+                res = evalfunc(bck, c);
                 p_optfactor(ti, &res);
             }
             else {
@@ -836,7 +690,7 @@ node_s *p_factor(tokiter_s *ti)
             NEXTTOK();
             c = p_factor(ti);
             if(mult == -1) {
-                if(c->type == NTYPE_NUM) { 
+                if(c->type == NTYPE_NUM) {
                     c->num.val = -1*c->num.val;
                     res = c;
                 }
@@ -890,6 +744,202 @@ void p_optfactor(tokiter_s *ti, node_s **accum)
     }
 }
 
+inline node_s *evalfunc(tok_s *t, node_s *c)
+{
+    node_s *p, *res;
+    
+    if(!strcmp(t->lex, "sin")) {
+        if(c->type == NTYPE_NUM) {
+            c->num.val = csin(c->num.val);
+            res = c;
+        }
+        else {
+            p = node_s_(NTYPE_OP);
+            p->op.val = OP_SIN;
+            p->op.c = c;
+            c->p = p;
+            res = p;
+        }
+    }
+    else if(!strcmp(t->lex, "cos")) {
+        if(c->type == NTYPE_NUM) {
+            c->num.val = ccos(c->num.val);
+            res = c;
+        }
+        else {
+            p = node_s_(NTYPE_OP);
+            p->op.val = OP_COS;
+            p->op.c = c;
+            c->p = p;
+            res = p;
+        }
+    }
+    else if(!strcmp(t->lex, "tan")) {
+        if(c->type == NTYPE_NUM) {
+            c->num.val = ctan(c->num.val);
+            res = c;
+        }
+        else {
+            p = node_s_(NTYPE_OP);
+            p->op.val = OP_TAN;
+            p->op.c = c;
+            c->p = p;
+            res = p;
+        }
+    }
+    else if(!strcmp(t->lex, "arcsin")) {
+        if(c->type == NTYPE_NUM) {
+            c->num.val = casin(c->num.val);
+            res = c;
+        }
+        else {
+            p = node_s_(NTYPE_OP);
+            p->op.val = OP_ARCSIN;
+            p->op.c = c;
+            c->p = p;
+            res = p;
+        }
+    }
+    else if(!strcmp(t->lex, "arccos")) {
+        if(c->type == NTYPE_NUM) {
+            c->num.val = cacos(c->num.val);
+            res = c;
+        }
+        else {
+            p = node_s_(NTYPE_OP);
+            p->op.val = OP_ARCCOS;
+            p->op.c = c;
+            c->p = p;
+            res = p;
+        }
+    }
+    else if(!strcmp(t->lex, "arctan")) {
+        if(c->type == NTYPE_NUM) {
+            c->num.val = catan(c->num.val);
+            res = c;
+        }
+        else {
+            p = node_s_(NTYPE_OP);
+            p->op.val = OP_ARCTAN;
+            p->op.c = c;
+            c->p = p;
+            res = p;
+        }
+    }
+    else if(!strcmp(t->lex, "sinh")) {
+        if(c->type == NTYPE_NUM) {
+            c->num.val = csinh(c->num.val);
+            res = c;
+        }
+        else {
+            p = node_s_(NTYPE_OP);
+            p->op.val = OP_SINH;
+            p->op.c = c;
+            c->p = p;
+            res = p;
+        }
+    }
+    else if(!strcmp(t->lex, "cosh")) {
+        if(c->type == NTYPE_NUM) {
+            c->num.val = ccosh(c->num.val);
+            res = c;
+        }
+        else {
+            p = node_s_(NTYPE_OP);
+            p->op.val = OP_COSH;
+            p->op.c = c;
+            c->p = p;
+            res = p;
+        }
+    }
+    else if(!strcmp(t->lex, "tanh")) {
+        if(c->type == NTYPE_NUM) {
+            c->num.val = ctanh(c->num.val);
+            res = c;
+        }
+        else {
+            p = node_s_(NTYPE_OP);
+            p->op.val = OP_TANH;
+            p->op.c = c;
+            c->p = p;
+            res = p;
+        }
+    }
+    else if(!strcmp(t->lex, "log")) {
+        if(c->type == NTYPE_NUM) {
+            c->num.val = clog(c->num.val)/clog(10.0);
+            res = c;
+        }
+        else {
+            p = node_s_(NTYPE_OP);
+            p->op.val = OP_LOG;
+            p->op.c = c;
+            c->p = p;
+            res = p;
+        }
+    }
+    else if(!strcmp(t->lex, "ln")) {
+        if(c->type == NTYPE_NUM) {
+            c->num.val = clog(c->num.val);
+            res = c;
+        }
+        else {
+            p = node_s_(NTYPE_OP);
+            p->op.val = OP_LN;
+            p->op.c = c;
+            c->p = p;
+            res = p;
+        }
+    }
+    else if(!strcmp(t->lex, "lg")) {
+        if(c->type == NTYPE_NUM) {
+            c->num.val = clog(c->num.val)/clog(2.0);
+            res = c;
+        }
+        else {
+            p = node_s_(NTYPE_OP);
+            p->op.val = OP_LG;
+            p->op.c = c;
+            c->p = p;
+            res = p;
+        }
+    }
+    else if(!strcmp(t->lex, "sqrt")) {
+        if(c->type == NTYPE_NUM) {
+            c->num.val = csqrt(c->num.val);
+            res = c;
+        }
+        else {
+            p = node_s_(NTYPE_OP);
+            p->op.val = OP_SQRT;
+            p->op.c = c;
+            c->p = p;
+            res = p;
+        }
+    }
+    else if(!strcmp(t->lex, "i")) {
+        p = node_s_(NTYPE_OP);
+        p->op.val = OP_MULT;
+        p->op.l = node_s_(NTYPE_NUM);
+        p->op.l->num.val = csqrt(-1);
+        p->op.l->p = p;
+        p->op.r = c;
+        p->op.r->p = p;
+        res = p;
+    }
+    else {
+        p = node_s_(NTYPE_OP);
+        p->op.val = OP_MULT;
+        p->op.l = node_s_(NTYPE_ID);
+        p->op.l->ident.t = t;
+        p->op.l->p = p;
+        p->op.r = c;
+        p->op.r->p = p;
+        res = p;
+    }
+    return res;
+}
+
 bool treeeq(node_s *r1, node_s *r2)
 {
     if(r1->type != r2->type) {
@@ -941,6 +991,49 @@ bool isbinop(op_e op)
             return false;
     }
 }
+/*
+node_s **mult(node_s **acc, node_s *n2, ttatt_e att)
+{
+    long long iterm;
+    node_s *i, *l, *p, *n1 = *acc;
+    
+    if(n1->type == NTYPE_NUM && n2->type == NTYPE_NUM) {
+        switch(att) {
+            case CALCATT_MULT:
+                n1->num.val *= n2->num.val;
+                break;
+            case CALCATT_DIV:
+                n1->num.val /= n2->num.val;
+                break;
+            case CALCATT_MOD:
+                iterm = (long long)n1->num.val;
+                iterm %= (long long)n2->num.val;
+                n1->num.val = iterm;
+                break;
+            default:
+                break;
+        }
+        free(n2);
+        return acc;
+    }
+    else {
+        for(i = n1; i; i = i->p) {
+            if(i->type == NTYPE_OP) {
+                l = i->op.l;
+                if(treeeq(l, n2)) {
+                    
+                }
+                else if(l->type == NTYPE_OP && l->op.val == OP_EXP) {
+                    l = l->op.l;
+                    if(treeeq(l, n2)) {
+                        printf("yay");
+                    }
+                }
+            }
+        }
+    }
+}*/
+
 
 node_s *node_s_(ntype_e type)
 {
@@ -957,7 +1050,7 @@ void err(tokiter_s *ti, const char *f, ...)
     va_start(args, f);
     vfprintf(stderr, f, args);
     va_end(args);
-    
+
     ti->issuccess = false;
 }
 
@@ -1083,6 +1176,21 @@ void tostring_(node_s *root, buf_s *buf)
                 break;
             case OP_ARCTAN:
                 bufaddstr(buf, "arctan(", sizeof("arctan(") - 1);
+                tostring_(root->op.c, buf);
+                bufaddc(buf, ')');
+                break;
+            case OP_SINH:
+                bufaddstr(buf, "sinh(", sizeof("sinh(") - 1);
+                tostring_(root->op.c, buf);
+                bufaddc(buf, ')');
+                break;
+            case OP_COSH:
+                bufaddstr(buf, "cosh(", sizeof("cosh(") - 1);
+                tostring_(root->op.c, buf);
+                bufaddc(buf, ')');
+                break;
+            case OP_TANH:
+                bufaddstr(buf, "tanh(", sizeof("tanh(") - 1);
                 tostring_(root->op.c, buf);
                 bufaddc(buf, ')');
                 break;
