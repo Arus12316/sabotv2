@@ -67,7 +67,7 @@ signals:
 public slots:
     void loginButtonPressed();
     void newUser(class User *);
-    void newSelf(class User *);
+    void newSelf(class UserSelf *);
     void postMessage(struct message_s *);
     void userDisconnected(class User *);
 

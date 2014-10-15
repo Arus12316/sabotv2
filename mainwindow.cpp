@@ -180,7 +180,7 @@ void MainWindow::newUser(User *u)
     qDebug() << "Diff: " << time(NULL) - t;
 }
 
-void MainWindow::newSelf(class User *u)
+void MainWindow::newSelf(UserSelf *u)
 {
     Server *server = u->conn->server;
     static int bob;
@@ -300,11 +300,6 @@ void MainWindow::userDisconnected(User *u)
     QString *msg = new QString("<");
 
     qDebug() << endl << u->name << " : " << u->id << " disconnected." << endl;
-
-    delete u->listEntry;
-    if(u->self) {
-        delete u->selfEntry;
-    }
 
     *msg += u->name;
     *msg += ':';

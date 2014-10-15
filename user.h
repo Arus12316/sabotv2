@@ -34,7 +34,6 @@ public:
     Connection *conn;
     SelfData *self;
     class QListWidgetItem *listEntry;
-    class QListWidgetItem *selfEntry;
 
     User(Connection *conn, QObject *parent = 0);
     User(const char *buf, QObject *parent = 0);
@@ -43,14 +42,27 @@ public:
 
     explicit User(QObject *parent = 0);
 
-    ~User();
-
+    virtual ~User();
 signals:
 
 public slots:
 
 private:
     void parseData(const char *data);
+};
+
+class UserSelf : public User {
+
+public:
+    char hasLabpass;
+    int daysToExpire;
+    char ticketWaiting;
+    int zqkPmT;
+    class QListWidgetItem *selfEntry;
+
+    UserSelf(Connection *conn, const char *data, QObject *parent = 0);
+    UserSelf(Connection *conn, const char *name, bool isdummy, QObject *parent = 0);
+    ~UserSelf();
 };
 
 #endif // USER_H

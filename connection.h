@@ -80,7 +80,7 @@ signals:
     void signalConnected();
 
     void newUser(class User *);
-    void newSelf(class User *);
+    void newSelf(class UserSelf *);
 
     void postMessage(message_s *msg);
     void userDisconnected(class User *);

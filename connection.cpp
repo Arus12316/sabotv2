@@ -74,7 +74,7 @@ Connection::Connection(int server, MainWindow *win, QObject *parent) :
 
     connect(&thread, SIGNAL(started()), this, SLOT(sessionInit()));
     connect(this, SIGNAL(newUser(User *)), win, SLOT(newUser(User *)));
-    connect(this, SIGNAL(newSelf(User *)), win, SLOT(newSelf(User *)));
+    connect(this, SIGNAL(newSelf(UserSelf *)), win, SLOT(newSelf(UserSelf *)));
     connect(this, SIGNAL(postMessage(message_s *)), win, SLOT(postMessage(message_s *)));
     connect(this, SIGNAL(userDisconnected(User *)), win, SLOT(userDisconnected(User *)));
     connect(this, SIGNAL(postGameList(Connection *)), win, SLOT(postGameList(Connection *)));
@@ -216,6 +216,7 @@ void Connection::sessionInit()
     char buf[SOCK_BUFSIZE];
     bool isfirst;
     sock = new QTcpSocket;
+    UserSelf *userSelf;
 
     spamCount = 0;
 
@@ -266,9 +267,11 @@ void Connection::sessionInit()
 
         }
         else if(buf[0] == 'A') {
-            user = new User(this, buf);
+            UserSelf *userSelf = new UserSelf(this, buf);
+            user = userSelf;
+
             emit newUser(user);
-            emit newSelf(user);
+            emit newSelf(userSelf);
 
             qDebug() << "hello 1!";
 
@@ -282,10 +285,12 @@ void Connection::sessionInit()
             active = true;
         }
         else {
+            userSelf = new UserSelf(this, username, true, this);
+            user = userSelf;
 
-            user = new User(this, username, true, this);
             emit newUser(user);
-            emit newSelf(user);
+            emit newSelf(userSelf);
+
             qDebug() << "hello 2!";
 
             sock->write(ackX0, sizeof ackX0);
