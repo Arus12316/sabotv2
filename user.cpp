@@ -7,7 +7,7 @@
 User::User(QObject *parent) :
     QObject(parent)
 {
-    this->isSelf = false;
+    this->self = NULL;
     this->selfEntry = NULL;
     color.setRgb(0, 0, 0, 255);
 
@@ -20,14 +20,13 @@ User::User(QObject *parent) :
 
 User::User(Connection *conn, QObject *parent)
 {
-    this->isSelf = false;
+    this->self = NULL;
     this->selfEntry = NULL;
     this->conn = conn;
 }
 
 User::User(const char *buf, QObject *parent)
 {
-    this->isSelf = false;
     this->selfEntry = NULL;
     this->conn = NULL;
     parseData(buf);
@@ -35,7 +34,6 @@ User::User(const char *buf, QObject *parent)
 
 User::User(Connection *conn, const char *buf, QObject *parent)
 {
-    this->isSelf = false;
     this->selfEntry = NULL;
     this->conn = conn;
     parseData(buf);
@@ -43,7 +41,7 @@ User::User(Connection *conn, const char *buf, QObject *parent)
 
 User::User(Connection *conn, const char *name, bool isdummy, QObject *parent)
 {
-    this->isSelf = false;
+    this->self = NULL;
     this->selfEntry = NULL;
 
     id[0] = '1';
@@ -57,11 +55,10 @@ User::User(Connection *conn, const char *name, bool isdummy, QObject *parent)
     color.setRgb(10, 10, 10, 20);
 }
 
-
 void User::parseData(const char *data)
 {
     int i, n;
-    char *ptr, type, col[4];
+    char *ptr, type, col[4], buf[32];
     int r, g, b, rgb;
 
     col[3] = '\0';
@@ -72,8 +69,6 @@ void User::parseData(const char *data)
     id[2] = *data++;
     id[3] = '\0';
 
-    //qDebug() << "id: " << id;
-
     for(ptr = (char *)data; *data == '#'; data++);
 
     n = MAX_UNAME_PASS - (data - ptr);
@@ -82,8 +77,6 @@ void User::parseData(const char *data)
         name[i] = *data++;
     }
     name[i] = '\0';
-
-    //qDebug() << "name: " << name;
 
     col[0] = *data++;
     col[1] = *data++;
@@ -100,72 +93,59 @@ void User::parseData(const char *data)
     col[2] = *data++;
     b = atoi(col);
 
+    if(type == 'A')
+        data += 9;
 
-   // qDebug() << "RGB( "<< r << ", " << g << ", " << b << " )";
-
-
-    for(ptr = field1; *data != ';'; data++)
+    for(ptr = buf; *data != ';'; data++)
         *ptr++ = *data;
     *ptr = '\0';
+    kills = atoi(buf);
 
-    //qDebug() << "field 1: " << field1;
-
-    for(data++, ptr = field2; *data != ';'; data++)
+    for(data++, ptr = buf; *data != ';'; data++)
         *ptr++ = *data;
     *ptr = '\0';
+    deaths = atoi(buf);
 
-    //qDebug() << "field 2: " << field2;
-
-
-    for(data++, ptr = field3; *data != ';'; data++)
+    for(data++, ptr = buf; *data != ';'; data++)
         *ptr++ = *data;
     *ptr = '\0';
+    wins = atoi(buf);
 
-    //qDebug() << "field 3: " << field3;
-
-
-    for(data++, ptr = field4; *data != ';'; data++)
+    for(data++, ptr = buf; *data != ';'; data++)
         *ptr++ = *data;
     *ptr = '\0';
+    losses = atoi(buf);
 
-    //qDebug() << "field 4: " << field4;
-
-
-    for(data++, ptr = field5; *data != ';'; data++)
+    for(data++, ptr = buf; *data != ';'; data++)
         *ptr++ = *data;
     *ptr = '\0';
-
-   // qDebug() << "field 5: " << field5;
-
-
-    for(data++, ptr = field6; *data != ';'; data++)
-        *ptr++ = *data;
-    *ptr = '\0';
-
-   // qDebug() << "field 6: " << field6;
+    roundsStarted = atoi(buf);
 
     if(type == 'A') {
-        for(data++, ptr = field7; *data != ';'; data++)
+        isBallistick = 0;
+        self = new SelfData;
+
+        self->hasLabpass = *++data;
+
+        for(data += 2, ptr = buf; *data != ';'; data++)
             *ptr++ = *data;
         *ptr = '\0';
+        self->daysToExpire = atoi(buf);
 
-       // qDebug() << "field 7: " << field7;
+        self->ticketWaiting = *++data;
 
-        for(data++, ptr = field8; *data != ';'; data++)
+        for(data++, ptr = buf; *data != ';'; data++)
             *ptr++ = *data;
         *ptr = '\0';
-
-       // qDebug() << "field 8: " << field8;
-
-        for(data++, ptr = field9; *data != ';'; data++)
-            *ptr++ = *data;
-        *ptr = '\0';
-
-       // qDebug() << "field 9: " << field9;
+        self->zqkPmT = atoi(buf);
+    }
+    else {
+        isBallistick = *++data;
+        data++;
+        self = NULL;
     }
 
     modLevel = *++data;
-
 
     if(!modLevel) {
         rgb = r << 16 ^ g << 8 ^ b;
@@ -188,6 +168,10 @@ void User::parseData(const char *data)
         b = 255;
 
     color.setRgb(r, g, b, 255);
+}
 
-   // qDebug() << "Mod Level: " << modLevel;
+User::~User()
+{
+    if(self)
+        delete self;
 }

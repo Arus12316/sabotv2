@@ -24,7 +24,6 @@ struct bob {
     b : real
 }
 
-
 class bob : tom {
     
     _() {

@@ -8,6 +8,13 @@
 
 #define MAX_UNAME_PASS 20
 
+struct SelfData {
+    char hasLabpass;
+    int daysToExpire;
+    char ticketWaiting;
+    int zqkPmT;
+};
+
 class User : public QObject
 {
     Q_OBJECT
@@ -16,19 +23,16 @@ public:
     char name[MAX_UNAME_PASS + 1];
     QColor color;
 
-    char field1[32];
-    char field2[32];
-    char field3[32];
-    char field4[32];
-    char field5[32];
-    char field6[32];
-    char field7[32];
-    char field8[32];
-    char field9[32];
-
+    int kills;
+    int deaths;
+    int wins;
+    int losses;
+    int roundsStarted;
+    char isBallistick;
     char modLevel;
+
     Connection *conn;
-    bool isSelf;
+    SelfData *self;
     class QListWidgetItem *listEntry;
     class QListWidgetItem *selfEntry;
 
@@ -39,12 +43,13 @@ public:
 
     explicit User(QObject *parent = 0);
 
+    ~User();
+
 signals:
 
 public slots:
 
 private:
-
     void parseData(const char *data);
 };
 

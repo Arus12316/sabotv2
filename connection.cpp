@@ -267,7 +267,6 @@ void Connection::sessionInit()
         }
         else if(buf[0] == 'A') {
             user = new User(this, buf);
-            user->isSelf = true;
             emit newUser(user);
             emit newSelf(user);
 
@@ -285,7 +284,6 @@ void Connection::sessionInit()
         else {
 
             user = new User(this, username, true, this);
-            user->isSelf = true;
             emit newUser(user);
             emit newSelf(user);
             qDebug() << "hello 2!";
@@ -397,7 +395,6 @@ void Connection::gameEvent()
                         break;
                     case 'U':
                         u = new User(this, bptr);
-                        u->isSelf = false;
                         emit newUser(u);
 
                         //win->db.logUser(u);

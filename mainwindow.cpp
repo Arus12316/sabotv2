@@ -302,7 +302,7 @@ void MainWindow::userDisconnected(User *u)
     qDebug() << endl << u->name << " : " << u->id << " disconnected." << endl;
 
     delete u->listEntry;
-    if(u->isSelf) {
+    if(u->self) {
         delete u->selfEntry;
     }
 
