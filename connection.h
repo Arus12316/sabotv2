@@ -23,6 +23,20 @@ struct message_s {
     char type;
 };
 
+struct cap_s {
+    const int SPAM_THRESHOLD;
+    const int MIN_TIME_MS;
+    time_t t;
+    int count;
+};
+
+typedef enum {
+    FLOOD_NONE = 0,
+    FLOOD_START = 1,
+    FLOOD_STILL = 2,
+    FLOOD_END = 4
+} floodstate_e;
+
 class Connection : public QObject
 {
     Q_OBJECT
@@ -110,6 +124,8 @@ public slots:
 private:
     void openProxyScan();
 
+    floodstate_e checkFlood(cap_s &cap);
+
     quint16 hashUid(const char *uid);
     void insertUser(class User *u);
 
@@ -124,6 +140,10 @@ private:
     QQueue<QString *> resQueue;
     time_t lastTime;
     int spamCount;
+
+    cap_s   pubcap = {20, 1, 0, 0},
+            miscap = {30, 1, 0, 0},
+            pmcap = {20, 1, 0, 0};
 
     char findBuf[21];
 

@@ -43,6 +43,7 @@ public:
     explicit User(QObject *parent = 0);
 
     virtual ~User();
+
 signals:
 
 public slots:

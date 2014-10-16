@@ -319,11 +319,10 @@ void Connection::gameEvent()
     char *bptr, *mptr;
     User *u;
     char id[4];
-    time_t nowTime;
+    char type;
     calcres_s cres;
-    QString *val;
     message_s *msg, *rep;
-    enum {SPAM_THRESHOLD = 30, MIN_TIME_MS = 0, CALC_TIME_MS=1500};
+    enum {CALC_TIME_MS=1500};
 
     sock->setSocketOption(QAbstractSocket::LowDelayOption, 1);
     while(sock->getChar(&c)) {
@@ -430,38 +429,51 @@ void Connection::gameEvent()
                     case 'C':
                         break;
                     case 'M':
-                        nowTime = time(NULL);
-
-                        if(nowTime - lastTime <= MIN_TIME_MS) {
-                            if(spamCount <= SPAM_THRESHOLD)
-                                spamCount++;
-                        }
-                        else {
-                            if(spamCount >= SPAM_THRESHOLD) {
-                                emit postGeneralMain(server, "<<Leaving Flood Mode>>");
-                            }
-                            if(spamCount > SPAM_THRESHOLD - 3)
-                                spamCount = SPAM_THRESHOLD - 3;
-                            else if(spamCount) {
-                                spamCount = 0;
-                            }
-                        }
-                        lastTime = nowTime;
-                        if(spamCount >= SPAM_THRESHOLD) {
-                            if(spamCount == SPAM_THRESHOLD) {
-                                emit postGeneralMain(server, "<<Entered Flood Mode (message spam detected)>>");
-                            }
-                            gameBuf.clear();
-                            return;
-                        }
-
                         id[0] = *++bptr;
                         id[1] = *++bptr;
                         id[2] = *++bptr;
                         id[3] = '\0';
+                        type = *++bptr;
+
+                        if(type == '9') {
+                            switch(checkFlood(pubcap)) {
+                                case FLOOD_START:
+                                     emit postGeneralMain(server, "<<Entered Flood Mode (message spam detected)>>");
+                                case FLOOD_STILL:
+                                    return;
+                                case FLOOD_END:
+                                     emit postGeneralMain(server, "<<Leaving Flood Mode>>");
+                                default:
+                                    break;
+                            }
+                        }
+                        else if(type == 'P') {
+                            switch(checkFlood(pubcap)) {
+                                case FLOOD_START:
+                                     emit postGeneralMain(server, "<<Entered Flood Mode for PM (message spam detected)>>");
+                                case FLOOD_STILL:
+                                    return;
+                                case FLOOD_END:
+                                     emit postGeneralMain(server, "<<Leaving Flood Mode for PM>>");
+                                default:
+                                    break;
+                            }
+                        }
+                        else {
+                            switch(checkFlood(pubcap)) {
+                                case FLOOD_START:
+                                     emit postGeneralMisc(server, "<<Entered Flood Mode MISC (message spam detected)>>");
+                                case FLOOD_STILL:
+                                    return;
+                                case FLOOD_END:
+                                     emit postGeneralMain(server, "<<Leaving Flood Mode MISC>>");
+                                default:
+                                    break;
+                            }
+                        }
 
                         msg = new message_s;
-                        msg->type = *++bptr;
+                        msg->type = type;
                         mptr = msg->body;
                         while(*bptr) {
                             *mptr++ = *++bptr;
@@ -592,6 +604,36 @@ void Connection::sendRes()
         sendPublicMessage(res);
     }
 }
+
+floodstate_e Connection::checkFlood(cap_s &cap)
+{
+    time_t nowTime = time(NULL);
+
+    if(nowTime - cap.t <= cap.MIN_TIME_MS) {
+        if(cap.count <= cap.SPAM_THRESHOLD)
+            cap.count++;
+    }
+    else {
+        if(cap.count >= cap.SPAM_THRESHOLD) {
+            cap.t = nowTime;
+            return FLOOD_END;
+        }
+        if(cap.count > cap.SPAM_THRESHOLD - 3)
+            cap.count = cap.SPAM_THRESHOLD - 3;
+        else if(spamCount) {
+            cap.count = 0;
+        }
+    }
+    cap.t = nowTime;
+    if(cap.count >= cap.SPAM_THRESHOLD) {
+        if(cap.count == cap.SPAM_THRESHOLD) {
+            return FLOOD_START;
+        }
+        return FLOOD_STILL;
+    }
+    return FLOOD_NONE;
+}
+
 
 Connection::~Connection()
 {
