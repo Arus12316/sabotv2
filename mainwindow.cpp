@@ -105,6 +105,11 @@ bool MainWindow::calculatorOn()
     return ui->calculatorOn->isChecked();
 }
 
+bool MainWindow::calculatorPM()
+{
+    return ui->calculatorPM->isChecked();
+}
+
 bool MainWindow::autoReconnectIsChecked()
 {
     return ui->autoReconnect->isChecked();
@@ -113,6 +118,13 @@ bool MainWindow::autoReconnectIsChecked()
 void MainWindow::newTab(const char *server)
 {
 
+}
+
+void MainWindow::qStrCpy(char *dst, QString &src)
+{
+    std::string stdstr = src.toStdString();
+    const char *cstr = stdstr.c_str();
+    strcpy(dst, cstr);
 }
 
 void MainWindow::loginButtonPressed()

@@ -30,6 +30,11 @@ struct cap_s {
     int count;
 };
 
+struct calcrep_s {
+    QString str;
+    class User *user;
+};
+
 typedef enum {
     FLOOD_NONE = 0,
     FLOOD_START = 1,
@@ -137,7 +142,7 @@ private:
     QTimer timer;
     MainWindow *win;
     QString general;
-    QQueue<QString *> resQueue;
+    QQueue<calcrep_s *> resQueue;
     time_t lastTime;
     int spamCount;
 

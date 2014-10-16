@@ -16,6 +16,8 @@
 
 #define ERR(f,...) err(ti, f, __VA_ARGS__)
 
+#define MAXLEXLEN 3
+
 typedef struct tok_s tok_s;
 typedef struct tokiter_s tokiter_s;
 typedef struct opnode_s opnode_s;
@@ -657,12 +659,24 @@ node_s *p_factor(tokiter_s *ti)
                 }
                 NEXTTOK();
                 res = evalfunc(bck, c);
+                if(!res) {
+                    res = node_s_(NTYPE_ID);
+                    res->ident.t = &errtok;
+                    ERR("Too long identifier: %s\n", bck->lex);
+                }
                 p_optfactor(ti, &res);
             }
             else {
                 if(strcmp(bck->lex, "i")) {
-                    res = node_s_(NTYPE_ID);
-                    res->ident.t = bck;
+                    if(strlen(bck->lex) <= 3) {
+                        res = node_s_(NTYPE_ID);
+                        res->ident.t = bck;
+                    }
+                    else {
+                        res = node_s_(NTYPE_ID);
+                        res->ident.t = &errtok;
+                        ERR("Too long identifier: %s\n", bck->lex);
+                    }
                 }
                 else {
                     res = node_s_(NTYPE_NUM);
@@ -926,6 +940,9 @@ inline node_s *evalfunc(tok_s *t, node_s *c)
         p->op.r = c;
         p->op.r->p = p;
         res = p;
+    }
+    else if(strlen(t->lex) > 3) {
+        res = NULL;
     }
     else {
         p = node_s_(NTYPE_OP);

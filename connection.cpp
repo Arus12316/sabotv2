@@ -317,11 +317,11 @@ void Connection::gameEvent()
     char c, t;
     qint64 n;
     char *bptr, *mptr;
-    User *u;
+    User *u, *sender;
     char id[4];
     char type;
     calcres_s cres;
-    message_s *msg, *rep;
+    message_s *msg;
     enum {CALC_TIME_MS=1500};
 
     sock->setSocketOption(QAbstractSocket::LowDelayOption, 1);
@@ -466,7 +466,7 @@ void Connection::gameEvent()
                                 case FLOOD_STILL:
                                     return;
                                 case FLOOD_END:
-                                     emit postGeneralMain(server, "<<Leaving Flood Mode MISC>>");
+                                     emit postGeneralMisc(server, "<<Leaving Flood Mode MISC>>");
                                 default:
                                     break;
                             }
@@ -483,7 +483,8 @@ void Connection::gameEvent()
                             }
                         }
                         *mptr = '\0';
-                        msg->sender = server->lookupUser(id);
+                        sender = server->lookupUser(id);
+                        msg->sender = sender;
                         msg->view = this;
                         cres.status = -1;
                         if(msg->body[0] == ',' && win->calculatorOn()) {
@@ -491,16 +492,16 @@ void Connection::gameEvent()
                         }
                         emit postMessage(msg);
                         if(!cres.status) {
-                            QString *resStr = new QString("");
-                            *resStr += "result: ";
-                            *resStr += cres.val;
-                            resQueue.enqueue(resStr);
+                            calcrep_s *rep = new calcrep_s;
+                            rep->str = "result: ";
+                            rep->str += cres.val;
+                            rep->user = (type == 'P' || win->calculatorPM()) ? sender : NULL;
+                            resQueue.enqueue(rep);
                             if(msg->sender == this->user)
                                 QTimer::singleShot(CALC_TIME_MS, this, SLOT(sendRes()));
                             else
                                 QTimer::singleShot(0, this, SLOT(sendRes()));
                             free(cres.val);
-
                         }
                     }
             }
@@ -600,8 +601,17 @@ void Connection::sendRaw(QString str)
 void Connection::sendRes()
 {
     if(resQueue.size()) {
-        QString *res = resQueue.dequeue();
-        sendPublicMessage(res);
+        calcrep_s *rep = resQueue.dequeue();
+        if(rep->user) {
+            message_s *msg = new message_s;
+            msg->receiver = rep->user;
+            MainWindow::qStrCpy(msg->body, rep->str);
+            sendPrivateMessage(msg);
+        }
+        else {
+            sendPublicMessage(new QString(rep->str));
+        }
+        delete rep;
     }
 }
 

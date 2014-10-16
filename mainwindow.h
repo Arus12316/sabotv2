@@ -53,10 +53,13 @@ public:
     class QLineEdit *getInputRaw();
     class QLineEdit *getPmAutoReply();
     bool calculatorOn();
+    bool calculatorPM();
     bool autoReconnectIsChecked();
     void postMessage();
     int currServerIndex();
     void newTab(class Server *server);
+
+    static void qStrCpy(char *dst, QString &src);
 
 signals:
     void postMiscMessage(class Server *server, QString *msg);
