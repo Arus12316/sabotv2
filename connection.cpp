@@ -218,7 +218,6 @@ void Connection::sessionInit()
     sock = new QTcpSocket;
     UserSelf *userSelf;
 
-    spamCount = 0;
 
     connect(sock, SIGNAL(connected()), this, SLOT(userConnected()));
     connect(sock, SIGNAL(disconnected()), this, SLOT(userDisconnected()));
@@ -277,7 +276,6 @@ void Connection::sessionInit()
 
             sock->write(finishLogin, sizeof finishLogin);
 
-            lastTime = time(NULL);
             connect(sock, SIGNAL(readyRead()), this, SLOT(gameEvent()));
             connect(&timer, SIGNAL(timeout()), this, SLOT(keepAlive()));
             timer.start(SLEEP_TIME);
@@ -301,7 +299,6 @@ void Connection::sessionInit()
             else
                 sock->write(finishLogin, sizeof finishLogin);
 
-            lastTime = time(NULL);
             connect(sock, SIGNAL(readyRead()), this, SLOT(gameEvent()));
             connect(&timer, SIGNAL(timeout()), this, SLOT(keepAlive()));
             timer.start(SLEEP_TIME);
@@ -626,11 +623,12 @@ floodstate_e Connection::checkFlood(cap_s &cap)
     else {
         if(cap.count >= cap.SPAM_THRESHOLD) {
             cap.t = nowTime;
+            cap.count = cap.SPAM_THRESHOLD - 1;
             return FLOOD_END;
         }
         if(cap.count > cap.SPAM_THRESHOLD - 3)
-            cap.count = cap.SPAM_THRESHOLD - 3;
-        else if(spamCount) {
+            cap.count--;
+        else if(cap.count) {
             cap.count = 0;
         }
     }

@@ -79,6 +79,8 @@ private:
         hash_s *next;
     }
     *utable[UID_TABLE_SIZE];
+
+    User *dummy;
 };
 
 #endif // SERVER_H

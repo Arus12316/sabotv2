@@ -45,6 +45,8 @@ Server::Server(int index, QObject *parent) :
     this->index = index;
     this->master = NULL;
 
+    dummy = new User("U15t###########rab~~~8742550000000;0;0;0;30;0;0", this);
+
     for(int i = 0; i < UID_TABLE_SIZE; i++)
         utable[i] = NULL;
 }
@@ -136,7 +138,7 @@ User *Server::lookupUser(const char *key)
         }
         rec = rec->next;
     }
-    qDebug() << "Error: Tried to look up " << key;
-
-    return NULL;
+    qDebug() << "~~~~~~~~~~~~~~~~~Error: Tried to look up " << key;
+    dummy->conn = this->currConn;
+    return dummy;
 }

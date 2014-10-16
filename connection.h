@@ -143,10 +143,8 @@ private:
     MainWindow *win;
     QString general;
     QQueue<calcrep_s *> resQueue;
-    time_t lastTime;
-    int spamCount;
 
-    cap_s   pubcap = {20, 1, 0, 0},
+    cap_s   pubcap = {30, 1, 0, 0},
             miscap = {30, 1, 0, 0},
             pmcap = {20, 1, 0, 0};
 
