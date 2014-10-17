@@ -15,7 +15,7 @@
 #define LOGIN_FLAG "09"
 #define BAN_MSG "091"
 #define PLAYER_FOUND_MSG "Player is located in"
-#define CONN_TIMEOUT 15
+#define CONN_TIMEOUT 18
 #define TIMECHECK_INTERVAL 1000
 
 const quint16 Connection::PORT = 1138;
@@ -445,6 +445,7 @@ void Connection::gameEvent()
                                 case FLOOD_START:
                                      emit postGeneralMain(server, "<<Entered Flood Mode (message spam detected)>>");
                                 case FLOOD_STILL:
+                                    gameBuf.clear();
                                     return;
                                 case FLOOD_END:
                                      emit postGeneralMain(server, "<<Leaving Flood Mode>>");
@@ -457,6 +458,7 @@ void Connection::gameEvent()
                                 case FLOOD_START:
                                      emit postGeneralMain(server, "<<Entered Flood Mode for PM (message spam detected)>>");
                                 case FLOOD_STILL:
+                                    gameBuf.clear();
                                     return;
                                 case FLOOD_END:
                                      emit postGeneralMain(server, "<<Leaving Flood Mode for PM>>");
@@ -469,6 +471,7 @@ void Connection::gameEvent()
                                 case FLOOD_START:
                                      emit postGeneralMisc(server, "<<Entered Flood Mode MISC (message spam detected)>>");
                                 case FLOOD_STILL:
+                                    gameBuf.clear();
                                     return;
                                 case FLOOD_END:
                                      emit postGeneralMisc(server, "<<Leaving Flood Mode MISC>>");
