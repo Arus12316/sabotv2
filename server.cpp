@@ -46,6 +46,12 @@ Server::Server(int index, QObject *parent) :
     this->master = NULL;
 
     dummy = new User("U15t###########rab~~~8742550000000;0;0;0;30;0;0", this);
+    cap = new cap_s;
+
+    cap->count = 0;
+    cap->MIN_TIME_MS = 1;
+    cap->SPAM_THRESHOLD = 30;
+    cap->t = 0;
 
     for(int i = 0; i < UID_TABLE_SIZE; i++)
         utable[i] = NULL;
@@ -141,4 +147,9 @@ User *Server::lookupUser(const char *key)
     qDebug() << "~~~~~~~~~~~~~~~~~Error: Tried to look up " << key;
     dummy->conn = this->currConn;
     return dummy;
+}
+
+Server::~Server()
+{
+    delete cap;
 }

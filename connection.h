@@ -24,8 +24,8 @@ struct message_s {
 };
 
 struct cap_s {
-    const int SPAM_THRESHOLD;
-    const int MIN_TIME_MS;
+    int SPAM_THRESHOLD;
+    int MIN_TIME_MS;
     time_t t;
     int count;
 };
@@ -84,8 +84,6 @@ public:
 
     void findUser(const char *name);
 
-
-
     /*
      * Account Creating methods. Methods with less parameters generate the values randomly. Use
      * only in 1 thread. These are not reentrant.
@@ -94,6 +92,9 @@ public:
     static void createAccount(const char name[], const char pass[], const char email[]);
     static void createAccount(const char name[], const char pass[]);
     static void createAccount(const char pass[]);
+
+    static floodstate_e checkFlood(cap_s &cap);
+
 
 signals:
     void signalConnected();
@@ -125,21 +126,21 @@ public slots:
     void sendPrivateMessage(message_s *msg);
     void sendRaw(QString str);
     void sendRes();
+    void checkConnection();
 
 private:
     void openProxyScan();
 
-    floodstate_e checkFlood(cap_s &cap);
-
     quint16 hashUid(const char *uid);
     void insertUser(class User *u);
 
+    time_t lastRead;
     QTcpSocket *sock;
     char uid[4];
     QThread thread;
     bool active;
     QByteArray gameBuf;
-    QTimer timer;
+    QTimer timer, connTimer;
     MainWindow *win;
     QString general;
     QQueue<calcrep_s *> resQueue;

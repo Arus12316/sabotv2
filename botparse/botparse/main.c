@@ -28,6 +28,7 @@ int main(int argc, const char *argv[])
     errlist_s *err;
     calcres_s res;
     
+    
    /*
     for(i = 0; i < sizeof(calctestcase)/sizeof(*calctestcase); i++) {
         res = eval(calctestcase[i]);

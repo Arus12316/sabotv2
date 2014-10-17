@@ -15,6 +15,8 @@
 #define LOGIN_FLAG "09"
 #define BAN_MSG "091"
 #define PLAYER_FOUND_MSG "Player is located in"
+#define CONN_TIMEOUT 15
+#define TIMECHECK_INTERVAL 1000
 
 const quint16 Connection::PORT = 1138;
 
@@ -54,6 +56,7 @@ const char Connection::charset2[] =
 Connection::Connection(int server, MainWindow *win, QObject *parent) :
     QObject(parent)
 {
+    lastRead = time(NULL);
 
     this->server = Server::servers[server];
     this->win = win;
@@ -278,7 +281,9 @@ void Connection::sessionInit()
 
             connect(sock, SIGNAL(readyRead()), this, SLOT(gameEvent()));
             connect(&timer, SIGNAL(timeout()), this, SLOT(keepAlive()));
+            connect(&connTimer, SIGNAL(timeout()), this, SLOT(checkConnection()));
             timer.start(SLEEP_TIME);
+            connTimer.start(TIMECHECK_INTERVAL);
 
             active = true;
         }
@@ -301,7 +306,9 @@ void Connection::sessionInit()
 
             connect(sock, SIGNAL(readyRead()), this, SLOT(gameEvent()));
             connect(&timer, SIGNAL(timeout()), this, SLOT(keepAlive()));
+            connect(&connTimer, SIGNAL(timeout()), this, SLOT(checkConnection()));
             timer.start(SLEEP_TIME);
+            connTimer.start(TIMECHECK_INTERVAL);
 
             active = true;
         }
@@ -321,6 +328,7 @@ void Connection::gameEvent()
     message_s *msg;
     enum {CALC_TIME_MS=1500};
 
+    lastRead = time(NULL);
     sock->setSocketOption(QAbstractSocket::LowDelayOption, 1);
     while(sock->getChar(&c)) {
         gameBuf += c;
@@ -522,6 +530,7 @@ void Connection::gameEvent()
 
 void Connection::keepAlive()
 {
+
     sock->write(ackX0, sizeof ackX0);
     sock->write(ackX2, sizeof ackX2);
     //sock->is
@@ -609,6 +618,15 @@ void Connection::sendRes()
             sendPublicMessage(new QString(rep->str));
         }
         delete rep;
+    }
+}
+
+void Connection::checkConnection()
+{
+    time_t dt = time(NULL) - lastRead;
+
+    if(dt > CONN_TIMEOUT) {
+        emit sock->disconnected();
     }
 }
 

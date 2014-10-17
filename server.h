@@ -14,6 +14,7 @@ public:
 
     int index;
 
+    struct cap_s *cap;
     class Connection *master;
     class Connection *currConn;
     class QListWidget *userList;
@@ -72,6 +73,8 @@ public slots:
 
 private:
     quint16 hashUid(const char *uid);
+
+    ~Server();
 
     struct hash_s {
         char key[4];

@@ -154,7 +154,7 @@ void MainWindow::loginButtonPressed()
 void MainWindow::newUser(User *u)
 {
     QVariant *data;
-    QString name, *msg;
+    QString name, *msg, *floodMSG;
     QListWidgetItem *item;
 
     time_t t = time(NULL);
@@ -177,13 +177,24 @@ void MainWindow::newUser(User *u)
     ui->userList->addItem(item);
     u->conn->server->insertUser(u);
 
-    msg = new QString('<');
-    *msg += u->name;
-    *msg += ':';
-    *msg += u->id;
-    *msg += "> has entered the lobby.";
-
-    emit postMiscMessage(u->conn->server, msg);
+    switch(Connection::checkFlood(*currServer->cap)) {
+        case FLOOD_END:
+            floodMSG = new QString("<<User c/dc Flood off>>");
+            emit postMiscMessage(u->conn->server, floodMSG);
+        case FLOOD_NONE:
+            msg = new QString('<');
+            *msg += u->name;
+            *msg += ':';
+            *msg += u->id;
+            *msg += "> has entered the lobby.";
+            emit postMiscMessage(u->conn->server, msg);
+            break;
+        case FLOOD_START:
+            floodMSG = new QString("<<User c/dc Flood on>>");
+            emit postMiscMessage(u->conn->server, floodMSG);
+        case FLOOD_STILL:
+            break;
+    }
 
     lock.lock();
     cond.wakeOne();
@@ -309,22 +320,32 @@ int MainWindow::currServerIndex()
 void MainWindow::userDisconnected(User *u)
 {
     Connection *conn = u->conn;
-    QString *msg = new QString("<");
+    QString *msg = new QString("<"), *floodMSG;
 
     qDebug() << endl << u->name << " : " << u->id << " disconnected." << endl;
 
-    *msg += u->name;
-    *msg += ':';
-    *msg += u->id;
-    *msg += "> has left the lobby.";
-
-    emit postMiscMessage(conn->server, msg);
+    switch(Connection::checkFlood(*currServer->cap)) {
+        case FLOOD_END:
+            floodMSG = new QString("<<User c/dc Flood off>>");
+            emit postMiscMessage(u->conn->server, floodMSG);
+        case FLOOD_NONE:
+            *msg += u->name;
+            *msg += ':';
+            *msg += u->id;
+            *msg += "> has left the lobby.";
+            emit postMiscMessage(conn->server, msg);
+            break;
+        case FLOOD_START:
+            floodMSG = new QString("<<User c/dc Flood on>>");
+            emit postMiscMessage(u->conn->server, floodMSG);
+        case FLOOD_STILL:
+            break;
+    }
 
     lock.lock();
     conn->server->deleteUser(u->id);
     cond.wakeOne();
     lock.unlock();
-
 }
 
 void MainWindow::selfUserListItemChanged(QListWidgetItem *curr, QListWidgetItem *prev)
