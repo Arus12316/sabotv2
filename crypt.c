@@ -792,7 +792,6 @@ void aes_block_decrypt(aesblock_s *state, word_u *w)
     InvShiftRows(state);
     InvSubBytes(state);
     AddRoundKey(state, w);
-
 }
 
 inline uint8_t InvSubByte(uint8_t b)

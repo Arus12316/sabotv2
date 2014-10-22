@@ -64,7 +64,7 @@
  <maplist> -> <expression> => <expression> <maplist> | ε
  
  
- <lambda> -> @(<optparamlist>) openbrace <statementlist> closebrace
+ <lambda> -> @(<optparamlist>) -> <type> openbrace <statementlist> closebrace
  
  <sign> -> + | -
  
@@ -94,7 +94,7 @@
  
  <controlsuffix> -> openbrace <statementlist> closebrace | <statement>
  
- <dec> -> <varlet> id <opttype> <assign> | class id <inh> { <declist> } | enum <optid> { <enumlist> } | struct <optid> { <structdeclarator> }
+ <dec> -> <varlet> id <opttype> <assign> | class id <inh> { <declist> } | enum <optid> { <enumlist> } | struct id { <structdeclarator> }
  
  <varlet> -> var | let
  
@@ -262,6 +262,7 @@ typedef struct node_s node_s;
 
 typedef struct rec_s rec_s;
 typedef struct scope_s scope_s;
+typedef struct type_s type_s;
 
 static struct tok_s
 {
@@ -277,6 +278,14 @@ eoftok = {
     "`EOF`"
 };
 
+typedef type_s *ttable[SYM_TABLE_SIZE];
+
+struct type_s
+{
+    char *name;
+    ttable *children;
+};
+
 struct tokchunk_s
 {
     uint8_t size;
@@ -286,7 +295,8 @@ struct tokchunk_s
 
 struct tokiter_s
 {
-    uint8_t i, pass;
+    uint8_t i;
+    bool firstpass;
     tokchunk_s *curr;
     errlist_s *err;
     errlist_s *ecurr;
@@ -339,7 +349,6 @@ struct node_s
     unsigned nchildren;
     node_s **children;
     node_s *parent;
-    
 };
 
 struct rec_s
@@ -351,10 +360,12 @@ struct rec_s
 struct scope_s
 {
     rec_s *table[SYM_TABLE_SIZE];
+    ttable types;
     scope_s *parent;
     unsigned nchildren;
     scope_s **children;
 };
+
 
 static tokiter_s *lex(char *src);
 static tok_s *mtok(tokchunk_s **list, uint16_t line, char *lexeme, size_t len, uint8_t type, uint8_t att);
@@ -399,7 +410,7 @@ static void p_controlsuffix(tokiter_s *ti, node_s *root);
 static node_s *p_dec(tokiter_s *ti);
 static void p_enumlist(tokiter_s *ti, node_s *root);
 static void p_enumlist_(tokiter_s *ti, node_s *root);
-static void p_optid(tokiter_s *ti, node_s *root);
+static char *p_optid(tokiter_s *ti, node_s *root);
 static void p_structdeclarator(tokiter_s *ti, node_s *root);
 static node_s *p_opttype(tokiter_s *ti);
 static node_s *p_type(tokiter_s *ti);
@@ -431,6 +442,8 @@ static node_s *getparentloop(node_s *start);
 static void walk_tree(node_s *root);
 static node_s *typecmp(node_s *t1, node_s *t2);
 
+static void addtype(ttable t, char *name);
+
 static void freetree(node_s *root);
 
 static void emit(tokiter_s *ti, char *code, ...);
@@ -447,7 +460,8 @@ errlist_s *parse(char *src)
     ti = lex(src);
     
     start(ti);
-    ti->pass++;
+    
+    ti->firstpass = false;
     
     printf("code: %s\n", ti->code->buf);
     
@@ -456,11 +470,13 @@ errlist_s *parse(char *src)
 
 tokiter_s *lex(char *src)
 {
+    int i;
     uint16_t line = 1;
     char *bptr, c;
     tok_s *prev = NULL;
     tokchunk_s *head, *curr;
     tokiter_s *ti;
+    type_s **it;
     
     ti = alloc(sizeof *ti);
     curr = head = alloc(sizeof *head);
@@ -471,7 +487,7 @@ tokiter_s *lex(char *src)
     ti->err = NULL;
     ti->ecurr = NULL;
     ti->i = 0;
-    ti->pass = 0;
+    ti->firstpass = true;
     ti->curr = head;
     
     while(*src) {
@@ -1537,7 +1553,7 @@ void p_factor__(tokiter_s *ti, node_s *root)
             op = MAKENODE();
             op->ntype = TYPE_OP;
             op->tok = t;
-            
+
             t = nexttok(ti);
             if(t->type == TOKTYPE_IDENT) {
                 nexttok(ti);
@@ -1617,7 +1633,6 @@ void p_arrayinit(tokiter_s *ti, node_s *root)
                 root->stype = exp->stype;
             }
             else {
-                
             }
             
             addchild(root->ctype, exp);
@@ -1841,6 +1856,12 @@ node_s *p_lambda(tokiter_s *ti)
         param->ntype = TYPE_NODE;
     }
     
+    if(t->type == TOKTYPE_MAP) {
+        nexttok(ti);
+        p_type(ti);
+        t = tok(ti);
+    }
+    
     if(t->type == TOKTYPE_OPENBRACE) {
         nexttok(ti);
         addchild(lambda, param);
@@ -1948,7 +1969,7 @@ node_s *p_control(tokiter_s *ti)
 {
     tok_s *t = tok(ti);
     node_s *control = MAKENODE(), *op = MAKENODE(),
-                    *exp, *arg, *ident, *suffix = MAKENODE();
+                    *exp, *ident, *suffix = MAKENODE();
     
     control->ntype = TYPE_NODE;
     control->stype = TYPE_VOID;
@@ -2254,6 +2275,7 @@ void p_controlsuffix(tokiter_s *ti, node_s *root)
 
 node_s *p_dec(tokiter_s *ti)
 {
+    char *id;
     node_s *ident, *dectype, *dec, *op, *str;
     tok_s *t = tok(ti);
     
@@ -2297,6 +2319,9 @@ node_s *p_dec(tokiter_s *ti)
     else if(t->type == TOKTYPE_CLASS) {
         t = nexttok(ti);
         if(t->type == TOKTYPE_IDENT) {
+            if(ti->firstpass) {
+                addtype(ti->scope->types, t->lex);
+            }
             
             ident = MAKENODE();
             ident->ntype = TYPE_IDENT;
@@ -2345,7 +2370,10 @@ node_s *p_dec(tokiter_s *ti)
         ident->ntype = TYPE_IDENT;
         ident->tok = t;
         
-        p_optid(ti, ident);
+        id = p_optid(ti, ident);
+        if(id && ti->firstpass) {
+            addtype(ti->scope->types, id);
+        }
         t = tok(ti);
         
         if(t->type == TOKTYPE_OPENBRACE) {
@@ -2366,26 +2394,34 @@ node_s *p_dec(tokiter_s *ti)
         }
     }
     else if(t->type == TOKTYPE_STRUCTTYPE) {
-        nexttok(ti);
-        p_optid(ti, dec);
-        t = tok(ti);
-        if(t->type == TOKTYPE_OPENBRACE) {
-            str = MAKENODE();
-            str->ntype = TYPE_NODE;
-            str->tok = t;
-            nexttok(ti);
-            p_structdeclarator(ti, str);
-            t = tok(ti);
-            if(t->type == TOKTYPE_CLOSEBRACE) {
+        t = nexttok(ti);
+        if(t->type == TOKTYPE_IDENT) {
+            if(ti->firstpass) {
+                addtype(ti->scope->types, t->lex);
+            }
+            t = nexttok(ti);
+            if(t->type == TOKTYPE_OPENBRACE) {
+                str = MAKENODE();
+                str->ntype = TYPE_NODE;
+                str->tok = t;
                 nexttok(ti);
+                p_structdeclarator(ti, str);
+                t = tok(ti);
+                if(t->type == TOKTYPE_CLOSEBRACE) {
+                    nexttok(ti);
+                }
+                else {
+                    ERR("Syntax Error: Expected }");
+                    synerr_rec(ti);
+                }
             }
             else {
-                ERR("Syntax Error: Expected }");
+                ERR("Syntax Error: Expected {");
                 synerr_rec(ti);
             }
         }
         else {
-            ERR("Syntax Error: Expected {");
+            ERR("Syntax Error: Expected identifier");
             synerr_rec(ti);
         }
     }
@@ -2426,18 +2462,21 @@ void p_enumlist_(tokiter_s *ti, node_s *root)
     }
 }
 
-void p_optid(tokiter_s *ti, node_s *root)
+char *p_optid(tokiter_s *ti, node_s *root)
 {
-    tok_s *t = tok(ti);
+    tok_s *t = tok(ti), *bck;
     node_s *n;
     
     if(t->type == TOKTYPE_IDENT) {
+        bck = t;
         n = MAKENODE();
         n->ntype = TYPE_IDENT;
         n->tok = t;
         addchild(root, n);
         nexttok(ti);
+        return bck->lex;
     }
+    return NULL;
 }
 
 void p_structdeclarator(tokiter_s *ti, node_s *root)
@@ -3215,6 +3254,30 @@ node_s *typecmp(node_s *t1, node_s *t2)
     return NULL;
 }
 
+void addtype(ttable t, char *name)
+{
+    type_s **prec = &t[pjwhash(name)],
+            *rec = *prec;
+    
+    if(rec) {
+        if(strcmp(rec->name, name)) {
+            if(!rec->children) {
+                rec->children = alloc(sizeof *rec->children);
+            }
+            addtype(*rec->children, name);
+        }
+        else {
+            printf("Redeclaration of %s\n", name);
+        }
+    }
+    else {
+        rec = *prec = alloc(sizeof *rec);
+        rec->name = name;
+        rec->children = NULL;
+        printf("Adding %s\n", name);
+    }
+
+}
 
 void freetree(node_s *root)
 {

@@ -184,7 +184,10 @@ static inline node_s *evalfunc(tok_s *t, node_s *arg);
 static bool treeeq(node_s *r1, node_s *r2);
 static bool isbinop(op_e op);
 
+static node_s **add(node_s *n1, node_s *n2, ttatt_e att);
+
 //static node_s **mult(node_s *n1, node_s *n2, ttatt_e att);
+
 
 static node_s *node_s_(ntype_e type);
 
@@ -1008,6 +1011,12 @@ bool isbinop(op_e op)
             return false;
     }
 }
+
+node_s **add(node_s *n1, node_s *n2, ttatt_e att)
+{
+    return NULL;
+}
+
 /*
 node_s **mult(node_s **acc, node_s *n2, ttatt_e att)
 {

@@ -157,8 +157,6 @@ void MainWindow::newUser(User *u)
     QString name, *msg, *floodMSG;
     QListWidgetItem *item;
 
-    time_t t = time(NULL);
-
     item = new QListWidgetItem;
     u->listEntry = item;
     data = new QVariant(QVariant::fromValue<User *>(u));
@@ -199,8 +197,6 @@ void MainWindow::newUser(User *u)
     lock.lock();
     cond.wakeOne();
     lock.unlock();
-
-    qDebug() << "Diff: " << time(NULL) - t;
 }
 
 void MainWindow::newSelf(UserSelf *u)

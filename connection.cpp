@@ -221,7 +221,6 @@ void Connection::sessionInit()
     sock = new QTcpSocket;
     UserSelf *userSelf;
 
-
     connect(sock, SIGNAL(connected()), this, SLOT(userConnected()));
     connect(sock, SIGNAL(disconnected()), this, SLOT(userDisconnected()));
     connect(sock, SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(errorConnection(QAbstractSocket::SocketError)));
@@ -342,6 +341,7 @@ void Connection::gameEvent()
                     case '0':
                         switch(*++bptr) {
                             case '1':
+                                listLock.lock();
                                 while(*bptr) {
                                     for(mptr = bptr; *bptr != ';'; bptr++);
                                     *(bptr - 1) = '\0';
@@ -349,7 +349,6 @@ void Connection::gameEvent()
                                     bptr++;
                                 }
                                 emit postGameList(this);
-                                listLock.lock();
                                 listCond.wait(&listLock);
                                 listLock.unlock();
                                 break;
@@ -403,31 +402,28 @@ void Connection::gameEvent()
                         }
                         break;
                     case 'U':
+                        win->lock.lock();
                         u = new User(this, bptr);
                         emit newUser(u);
 
                         //win->db.logUser(u);
 
                         //force synchronization
-                        win->lock.lock();
                         win->cond.wait(&win->lock);
                         win->lock.unlock();
                         break;
                     case 'D':
+                        win->lock.lock();
+
                         id[0] = *++bptr;
                         id[1] = *++bptr;
                         id[2] = *++bptr;
                         id[3] = '\0';
                         u = server->lookupUser(id);
-
                         strcpy(findBuf, u->name);
-
                         emit userDisconnected(u);
 
-                        //findUser(findBuf);
-
                         //force synchronization
-                        win->lock.lock();
                         win->cond.wait(&win->lock);
                         win->lock.unlock();
                         break;
@@ -533,7 +529,6 @@ void Connection::gameEvent()
 
 void Connection::keepAlive()
 {
-
     sock->write(ackX0, sizeof ackX0);
     sock->write(ackX2, sizeof ackX2);
     //sock->is
@@ -628,6 +623,8 @@ void Connection::checkConnection()
 {
     time_t dt = time(NULL) - lastRead;
 
+    qDebug() << "Checking connection: " << dt;
+
     if(dt > CONN_TIMEOUT) {
         emit sock->disconnected();
     }
@@ -663,9 +660,9 @@ floodstate_e Connection::checkFlood(cap_s &cap)
     return FLOOD_NONE;
 }
 
-
 Connection::~Connection()
 {
+    qDebug() << "Connection Destructor Called";
     active = false;
     if(sock->isOpen())
         sock->close();

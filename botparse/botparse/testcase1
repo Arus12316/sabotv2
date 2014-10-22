@@ -6,10 +6,9 @@ let omg : (() -> real) -> real := @(a){
     a()
 }
 
-g := @(a, b) {
+g := @(a, b) -> Int {
     return @() {
         return @() {
-
         }
     }
 }
@@ -22,6 +21,11 @@ var bob : (a : int[]) -> real[] := @(){
 struct bob {
     a : int, 
     b : real
+}
+
+struct bob {
+    omg: Int,
+    zomg: Real
 }
 
 class bob : tom {

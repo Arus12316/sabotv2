@@ -50,7 +50,7 @@ public:
     QMutex listLock;
     QWaitCondition listCond;
     QStringList gameList;
-
+    QThread thread;
     char *username;
     char *password;
     class User *user;
@@ -137,7 +137,6 @@ private:
     time_t lastRead;
     QTcpSocket *sock;
     char uid[4];
-    QThread thread;
     bool active;
     QByteArray gameBuf;
     QTimer timer, connTimer;
