@@ -316,7 +316,6 @@ void Connection::sessionInit()
 
 void Connection::gameEvent()
 {
-    int i;
     char c, t;
     qint64 n;
     char *bptr, *mptr;
@@ -621,9 +620,7 @@ void Connection::sendRes()
 
 void Connection::checkConnection()
 {
-    time_t dt = time(NULL) - lastRead;
-
-    qDebug() << "Checking connection: " << dt;
+    int dt = difftime(time(NULL), lastRead);
 
     if(dt > CONN_TIMEOUT) {
         emit sock->disconnected();

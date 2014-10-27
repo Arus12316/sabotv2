@@ -13,14 +13,16 @@ g := @(a, b) -> Int {
     }
 }
 
+
 var c := [1, 2, 3, 4, [3], [3]]
 
-var bob : (a : int[]) -> real[] := @(){
+var bob : (a : int[], ..., a : Int, ..., b : Int) -> real[] := @(){
 }
 
 struct bob {
     a : int, 
-    b : real
+    b : real,
+    a : bob
 }
 
 struct bob {
@@ -28,9 +30,12 @@ struct bob {
     zomg: Real
 }
 
+bob() := 32
+
 class bob : tom {
     
     _() {
+
     }
 
     ~_() {
@@ -52,8 +57,6 @@ let bob := @(x, y){x + y}
 let b := @(x : real , y : real) {
     x + y
 }
-
-
 
 
 
