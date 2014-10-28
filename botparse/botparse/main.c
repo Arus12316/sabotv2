@@ -16,7 +16,7 @@ char *calctestcase[] = {
     "!!!,,,,..230987409237480",
     "..././/..//***",
     "(1 + 1)^(1+1)*(33^33^3^44^(1^4 plus 5^3^2^(8+1)))*32*(1-cos(cos(cos(tanh(32*e*pi))*pi)pi))e",
-    "cos(pi)e*cos(pi)"
+    "cos(pi)e*cos(pi)*cos(23*32|3"
 };
 
 char *readsrc(char *file);
@@ -29,13 +29,13 @@ int main(int argc, const char *argv[])
     calcres_s res;
     
     
-   /*
+   
     for(i = 0; i < sizeof(calctestcase)/sizeof(*calctestcase); i++) {
         res = eval(calctestcase[i]);
         printf("result: %s\n\n", res.val);
     }
     
-    return 0;*/
+    return 0;
     src = readsrc(testcase1f);
     
     err = parse(src);

@@ -13,7 +13,6 @@ g := @(a, b) -> Int {
     }
 }
 
-
 var c := [1, 2, 3, 4, [3], [3]]
 
 var bob : (a : int[], ..., a : Int, ..., b : Int) -> real[] := @(){
@@ -31,6 +30,20 @@ struct bob {
 }
 
 bob() := 32
+
+if x = 32 {
+    println("hey")
+}
+else if (x = 32) {
+    println("derp")
+}
+else if(ahaha) {
+    if(32)
+        2
+}
+else {
+    println(bah)
+}
 
 class bob : tom {
     

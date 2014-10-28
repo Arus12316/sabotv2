@@ -136,6 +136,7 @@
  */
 
 #include "parse.h"
+#include "tree.h"
 #include "general.h"
 #include <stdio.h>
 #include <stdint.h>
@@ -307,14 +308,13 @@ static node_s *right(node_s *node);
 static node_s *left(node_s *node);
 
 static unsigned pjwhash(char *key);
-static bool addident(scope_s *root, node_s *ident);
+static bool addident(scope_s *root, char *key, node_s *type);
 static scope_s *idtinit(scope_s *parent);
 static void pushscope(tokiter_s *ti);
 static inline void popscope(tokiter_s *ti);
 static bool checkflow(node_s *root);
 static node_s *getparentfunc(node_s *start);
 static node_s *getparentloop(node_s *start);
-static void walk_tree(node_s *root);
 static node_s *typecmp(node_s *t1, node_s *t2);
 
 static void addtype(ttable t, char *name);
@@ -330,13 +330,14 @@ static void print_node(node_s *node);
 
 errlist_s *parse(char *src)
 {
+    node_s *tree;
     tokiter_s *ti;
     
     ti = lex(src);
     
-    start(ti);
+    tree = start(ti);
     
-    ti->firstpass = false;
+    walk_tree(tree);
     
     printf("code: %s\n", ti->code->buf);
     
@@ -1179,11 +1180,9 @@ node_s *p_factor_(tokiter_s *ti)
             break;
         case TOKTYPE_NOT:
             nexttok(ti);
-            
             op = MAKENODE();
             op->type = TOKTYPE_NOT;
             op->tok = t;
-            
             f = p_factor(ti);
             addchild(op, f);
             n = op;
@@ -1982,7 +1981,7 @@ void p_controlsuffix(tokiter_s *ti, node_s *root)
 node_s *p_dec(tokiter_s *ti)
 {
     char *id;
-    node_s *ident, *dectype, *dec, *op;
+    node_s *ident, *dectype, *dec;
     tok_s *t = tok(ti);
     
     dec = MAKENODE();
@@ -2005,8 +2004,8 @@ node_s *p_dec(tokiter_s *ti)
             addchild(dec, dectype);
             p_assign(ti, &dec);
             
-            if(addident(ti->scope, ident)) {
-               // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
+            if(addident(ti->scope, t->lex, dectype)) {
+                // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
             }
         }
         else {
@@ -2030,7 +2029,8 @@ node_s *p_dec(tokiter_s *ti)
             
             addchild(dec, ident);
 
-            if(addident(ti->scope, ident)) {
+            addtype(ti->scope->types, t->lex);
+            if(addident(ti->scope, t->lex, dec)) {
                // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
             }
             t = nexttok(ti);
@@ -2072,8 +2072,11 @@ node_s *p_dec(tokiter_s *ti)
         ident->tok = t;
         
         id = p_optid(ti);
-        if(id && ti->firstpass) {
+        if(id) {
             addtype(ti->scope->types, id);
+            if(addident(ti->scope, t->lex, dec)) {
+                // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
+            }
         }
         t = tok(ti);
         
@@ -2103,6 +2106,12 @@ node_s *p_dec(tokiter_s *ti)
             ident->type = TOKTYPE_IDENT;
             ident->att = TOKATT_DEFAULT;
             ident->tok = t;
+            
+            addtype(ti->scope->types, t->lex);
+            if(addident(ti->scope, t->lex, dec)) {
+                // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
+            }
+            
             t = nexttok(ti);
             if(t->type == TOKTYPE_OPENBRACE) {
 
@@ -2534,7 +2543,6 @@ void p_mapdec(tokiter_s *ti, node_s **dec)
     }
 }
 
-
 node_s *p_typelist(tokiter_s *ti)
 {
     node_s *type;
@@ -2636,13 +2644,14 @@ node_s *p_param(tokiter_s *ti)
         ident->tok = t;
         
         nexttok(ti);
-        
-        if(addident(ti->scope, ident)) {
-           // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
-        }
-        
+                
         opt = p_opttype(ti);
         addchild(ident, opt);
+        
+        if(addident(ti->scope, t->lex, opt)) {
+            // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
+        }
+        
         p_assign(ti, &ident);
         return ident;
     }
@@ -2809,9 +2818,8 @@ unsigned pjwhash(char *key)
     return h % SYM_TABLE_SIZE;
 }
 
-bool addident(scope_s *root, node_s *ident)
+bool addident(scope_s *root, char *key, node_s *type)
 {
-    char *key = ident->tok->lex;
     unsigned index = pjwhash(key);
     rec_s **ptr = &root->table[index], *i = *ptr, *n;
     
@@ -2827,6 +2835,7 @@ bool addident(scope_s *root, node_s *ident)
     }
     n = alloc(sizeof *n);
     n->key = key;
+    n->type = type;
     n->next = NULL;
     *ptr = n;
     return false;
@@ -2899,16 +2908,6 @@ node_s *getparentloop(node_s *start)
         start = start->parent;
     }
     return NULL;
-}
-
-void walk_tree(node_s *root)
-{
-    unsigned i;
-    
-    //printf("%u\n", root->nchildren);
-    for(i = 0; i < root->nchildren; i++)
-        walk_tree(root->children[i]);
-    
 }
 
 node_s *typecmp(node_s *t1, node_s *t2)
@@ -3034,4 +3033,3 @@ void print_node(node_s *node)
         printf(" %s ", node->tok->lex);
     }
 }
-

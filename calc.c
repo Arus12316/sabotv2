@@ -9,7 +9,7 @@
 #include <stdarg.h>
 
 #define TOK() (ti->curr)
-#define NEXTTOK() (ti->curr = ti->curr->next)
+#define NEXTTOK() (ti->curr->next ? ti->curr = ti->curr->next : ti->curr)
 
 #define TC(C) TCC(C)
 #define TCC(C) #C

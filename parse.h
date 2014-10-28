@@ -132,6 +132,7 @@ struct node_s
 struct rec_s
 {
     char *key;
+    node_s *type;
     rec_s *next;
 };
 
