@@ -296,8 +296,6 @@ static void addtype(ttable t, char *name);
 
 static void freetree(node_s *root);
 
-static void emit(tokiter_s *ti, char *code, ...);
-static void makelabel(tokiter_s *ti, char *buf);
 
 static void adderr(tokiter_s *ti, char *str, int lineno);
 
@@ -312,7 +310,7 @@ errlist_s *parse(char *src)
     
     tree = start(ti);
     
-    walk_tree(tree);
+    walk_tree(ti->scope, tree);
     
     printf("code: %s\n", ti->code->buf);
     
@@ -977,15 +975,14 @@ node_s *p_optexpression(tokiter_s *ti)
 
 node_s *p_expression(tokiter_s *ti)
 {
-    node_s *node, *exp, *p;
+    node_s *node, *exp;
     
     exp = MAKENODE();
     exp->type = TOKTYPE_EXPRESSION;
     
     node = p_shiftexpr(ti);
-    p = exp;
-    p_expression_(ti, &p);
-    addchild(exp, p);
+    p_expression_(ti, &node);
+    addchild(exp, node);
     return exp;
 }
 
@@ -1827,8 +1824,6 @@ node_s *p_if(tokiter_s *ti)
     node_s  *op = MAKENODE(),
             *exp, *suffix = MAKENODE();
     
-    makelabel(ti, label1);
-    makelabel(ti, label2);
     
     op->type = TOKTYPE_IF;
     op->att = TOKATT_DEFAULT;
@@ -1838,11 +1833,6 @@ node_s *p_if(tokiter_s *ti)
     
     nexttok(ti);
     exp = p_expression(ti);
-    emit(ti, "\ttest: exp\n", NULL);
-    emit(ti, "\tbne ", label1, NULL);
-    emit(ti, "\t...\n", NULL);
-    emit(ti, "\tjmp ", label2, NULL);
-    emit(ti, label1, "\n\t...\n", label2, NULL);
     
     addchild(op, exp);
     addchild(op, suffix);
@@ -2918,6 +2908,7 @@ void pushscope(tokiter_s *ti)
     ti->scope = n;
 }
 
+
 inline void popscope(tokiter_s *ti)
 {
     ti->scope = ti->scope->parent;
@@ -3004,29 +2995,6 @@ void freetree(node_s *root)
         freetree(root->children[i]);
     free(root);
 }
-
-void emit(tokiter_s *ti, char *str, ...)
-{
-    char *s;
-    buf_s *b = ti->code;
-    va_list argp;
-    
-    va_start(argp, str);
-    
-    bufaddstr(b, str, strlen(str));
-
-    while((s = va_arg(argp, char *))) {
-        bufaddstr(b, s, strlen(s));
-    }
-    va_end(argp);
-}
-
-void makelabel(tokiter_s *ti, char *buf)
-{
-    sprintf(buf, "_l%u:\n", ti->labelcount);
-    ti->labelcount++;
-}
-
 
 void printerrs(errlist_s *err)
 {
