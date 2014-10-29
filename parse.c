@@ -121,7 +121,8 @@
  <mapdec> -> => <type>
  
  <inh> -> : id | ε
- <declist> ->  <optsign> <dec> <optsemicolon> <declist> | <destructannotation> _(<paramlist>) {<statementlist>} <declist> | { <op> } { <statementlist> } |ε
+ <declist> ->  <optsign> <dec> <optsemicolon> <declist> | <destructannotation> _(<paramlist>) {<statementlist>} <declist> 
+                | { <op> } (<optparamlist>) { <statementlist> } <declist> |ε
  
  <destructannotation> -> ~ | ε
  
@@ -160,29 +161,6 @@
 #define MAKENODE() node_s_(ti->scope)
 #define ERR(str) adderr(ti,str,-1)
 
-typedef enum {
-    TYPE_VOID,
-    TYPE_NUM,
-    TYPE_INTEGER,
-    TYPE_REAL,
-    TYPE_STRING,
-    TYPE_REGEX,
-    TYPE_STRUCTLITERAL,
-    TYPE_LIST,
-    TYPE_ARRAY,
-    TYPE_CLOSURE,
-    TYPE_TYPEEXP,
-    TYPE_EPSILON,
-    TYPE_OP,
-    TYPE_PARAMLIST,
-    TYPE_DEC,
-    TYPE_IDENT,
-    TYPE_NODE,
-    TYPE_INCOMPLETE,
-    TYPE_ERROR
-}
-type_e;
-
 typedef struct tokchunk_s tokchunk_s;
 typedef struct tokiter_s tokiter_s;
 
@@ -217,7 +195,6 @@ static struct keyw_s {
     uint8_t type;
 }
 keywords[] = {
-    {"not", TOKTYPE_NOT},
     {"if", TOKTYPE_IF},
     {"else", TOKTYPE_ELSE},
     {"while", TOKTYPE_WHILE},
@@ -227,12 +204,6 @@ keywords[] = {
     {"default", TOKTYPE_DEFAULT},
     {"var", TOKTYPE_VAR},
     {"let", TOKTYPE_LET},
-    {"void", TOKTYPE_VOID},
-    {"int", TOKTYPE_INTEGER},
-    {"char", TOKTYPE_CHARTYPE},
-    {"real", TOKTYPE_REAL},
-    {"string", TOKTYPE_STRINGTYPE},
-    {"regex", TOKTYPE_REGEXTYPE},
     {"return", TOKTYPE_RETURN},
     {"class", TOKTYPE_CLASS},
     {"do", TOKTYPE_DO},
@@ -447,7 +418,7 @@ tokiter_s *lex(char *src)
                 src++;
                 break;
             case '~':
-                prev = mtok(&curr, line, "~", 1, TOKTYPE_DESTRUCTOR, TOKATT_DEFAULT);
+                prev = mtok(&curr, line, "~", 1, TOKTYPE_COMPLEMENT, TOKATT_DEFAULT);
                 src++;
                 break;
             case '$':
@@ -876,6 +847,7 @@ void p_statementlist(tokiter_s *ti, node_s *root, node_s *last)
         case TOKTYPE_CHAR:
         case TOKTYPE_STRING:
         case TOKTYPE_NOT:
+        case TOKTYPE_COMPLEMENT:
         case TOKTYPE_OPENPAREN:
         case TOKTYPE_NUM:
         case TOKTYPE_STRUCTLITERAL:
@@ -914,6 +886,7 @@ node_s *p_statement(tokiter_s *ti)
         case TOKTYPE_DOT:
         case TOKTYPE_OPENPAREN:
         case TOKTYPE_NOT:
+        case TOKTYPE_COMPLEMENT:
         case TOKTYPE_IF:
         case TOKTYPE_SWITCH:
         case TOKTYPE_CHAR:
@@ -984,6 +957,7 @@ node_s *p_optexpression(tokiter_s *ti)
         case TOKTYPE_DOT:
         case TOKTYPE_OPENPAREN:
         case TOKTYPE_NOT:
+        case TOKTYPE_COMPLEMENT:
         case TOKTYPE_IF:
         case TOKTYPE_SWITCH:
         case TOKTYPE_CHAR:
@@ -1238,6 +1212,15 @@ node_s *p_factor_(tokiter_s *ti)
             nexttok(ti);
             op = MAKENODE();
             op->type = TOKTYPE_NOT;
+            op->tok = t;
+            f = p_factor(ti);
+            addchild(op, f);
+            n = op;
+            break;
+        case TOKTYPE_COMPLEMENT:
+            nexttok(ti);
+            op = MAKENODE();
+            op->type = TOKTYPE_COMPLEMENT;
             op->tok = t;
             f = p_factor(ti);
             addchild(op, f);
@@ -2315,63 +2298,6 @@ node_s *p_type(tokiter_s *ti)
     tok_s *t = tok(ti);
     
     switch(t->type) {
-        case TOKTYPE_VOID:
-            nexttok(ti);
-            type = MAKENODE();
-            type->type = TOKTYPE_VOID;
-            type->att = TOKATT_DEFAULT;
-            type->tok= t;
-            break;
-        case TOKTYPE_INTEGER:
-            nexttok(ti);
-            type = MAKENODE();
-            type->type = TOKTYPE_INTEGER;
-            type->att = TOKATT_DEFAULT;
-            type->tok = t;
-            array = p_array(ti, NULL);
-            addchild(type, array);
-            p_mapdec(ti, &type);
-            break;
-        case TOKTYPE_CHARTYPE:
-            nexttok(ti);
-            type = MAKENODE();
-            type->type = TOKTYPE_CHARTYPE;
-            type->att = TOKATT_DEFAULT;
-            type->tok = t;
-            array = p_array(ti, NULL);
-            addchild(type, array);
-            p_mapdec(ti, &type);
-            break;
-        case TOKTYPE_REAL:
-            nexttok(ti);
-            type = MAKENODE();
-            type->type = TOKTYPE_REAL;
-            type->att = TOKATT_DEFAULT;
-            type->tok = t;
-            array = p_array(ti, NULL);
-            addchild(type, array);
-            p_mapdec(ti, &type);
-            break;
-        case TOKTYPE_STRINGTYPE:
-            nexttok(ti);
-            type = MAKENODE();
-            type->type = TOKTYPE_STRINGTYPE;
-            type->att = TOKATT_DEFAULT;
-            type->tok = t;
-            array = p_array(ti, NULL);
-            addchild(type, array);
-            p_mapdec(ti, &type);
-            break;
-        case TOKTYPE_REGEXTYPE:
-            nexttok(ti);
-            type = MAKENODE();
-            type->type = TOKTYPE_REGEXTYPE;
-            type->att = TOKATT_DEFAULT;
-            type->tok = t;
-            array = p_array(ti, NULL);
-            addchild(type, array);
-            p_mapdec(ti, &type);
-            break;
         case TOKTYPE_IDENT:
             nexttok(ti);
             type = MAKENODE();
@@ -2458,7 +2384,7 @@ void p_declist(tokiter_s *ti, node_s *root)
 {
     int sign;
     tok_s *t = tok(ti);
-    node_s *dec, *st, *dc = NULL, *opt, *stmt;
+    node_s *dec, *st, *dc = NULL, *opt, *stmt, *op;
     
     switch(t->type) {
         case TOKTYPE_LET:
@@ -2471,6 +2397,85 @@ void p_declist(tokiter_s *ti, node_s *root)
             t = tok(ti);
             if(t->type == TOKTYPE_SEMICOLON)
                 t = nexttok(ti);
+            p_declist(ti, root);
+            break;
+        case TOKTYPE_OPENBRACE:
+            t = nexttok(ti);
+            dec = MAKENODE();
+            dec->type = TOKTYPE_OVERLOADOP;
+            dec->att = TOKATT_DEFAULT;
+            switch(t->type) {
+                case TOKTYPE_ADDOP:
+                case TOKTYPE_MULOP:
+                case TOKTYPE_SHIFT:
+                case TOKTYPE_EXPOP:
+                case TOKTYPE_NOT:
+                case TOKTYPE_COMPLEMENT:
+                    op = MAKENODE();
+                    op->type = t->type;
+                    op->att = t->att;
+                    addchild(dec, op);
+                    break;
+                case TOKTYPE_OPENBRACKET:
+                    t = nexttok(ti);
+                    if(t->type != TOKTYPE_CLOSEBRACKET) {
+                        ERR("Syntax Error: Expected ']");
+                    }
+                    op = MAKENODE();
+                    op->type = TOKTYPE_OPENBRACKET;
+                    op->att = TOKATT_DEFAULT;
+                    addchild(op, dec);
+                    break;
+                default:
+                    ERR("Operator Cannot Be Overloaded");
+                    break;
+            }
+            t = nexttok(ti);
+            if(t->type == TOKTYPE_CLOSEBRACE) {
+                t = nexttok(ti);
+                if(t->type == TOKTYPE_OPENPAREN) {
+                    nexttok(ti);
+                    opt = p_optparamlist(ti);
+                    addchild(dec, opt);
+                    t = tok(ti);
+                    if(t->type == TOKTYPE_CLOSEPAREN) {
+                        t = nexttok(ti);
+                        if(t->type == TOKTYPE_OPENBRACE) {
+                            nexttok(ti);
+                            stmt = MAKENODE();
+                            stmt->type = TOKTYPE_STMTLIST;
+                            stmt->att = TOKATT_DEFAULT;
+                            addchild(dec, stmt);
+                            p_statementlist(ti, stmt, NULL);
+                            t = tok(ti);
+                            if(t->type == TOKTYPE_CLOSEBRACE) {
+                                nexttok(ti);
+                            }
+                            else {
+                                ERR("Syntax Error: Expected '}'");
+                                synerr_rec(ti);
+                            }
+                        }
+                        else {
+                            ERR("Syntax Error: Expected '{");
+                            synerr_rec(ti);
+                        }
+                    }
+                    else {
+                        ERR("Syntax Error: Expected ')");
+                        synerr_rec(ti);
+                    }
+                }
+                else {
+                    ERR("Syntax Error: Expected '(");
+                    synerr_rec(ti);
+                }
+            }
+            else {
+                ERR("Syntax Error: Expected '}");
+                synerr_rec(ti);
+            }
+            addchild(root, dec);
             p_declist(ti, root);
             break;
         case TOKTYPE_ADDOP:
@@ -2488,7 +2493,7 @@ void p_declist(tokiter_s *ti, node_s *root)
                 t = nexttok(ti);
             p_declist(ti, root);
             break;
-        case TOKTYPE_DESTRUCTOR:
+        case TOKTYPE_COMPLEMENT:
             dc = MAKENODE();
             dc->type = TOKTYPE_DESTRUCTOR;
             dc->att = TOKATT_DEFAULT;
@@ -2614,11 +2619,6 @@ node_s *p_typelist(tokiter_s *ti)
     root->att = TOKATT_DEFAULT;
     
     switch(t->type) {
-        case TOKTYPE_VOID:
-        case TOKTYPE_INTEGER:
-        case TOKTYPE_REAL:
-        case TOKTYPE_STRINGTYPE:
-        case TOKTYPE_REGEXTYPE:
         case TOKTYPE_OPENPAREN:
             type = p_type(ti);
             addchild(root, type);
@@ -2658,11 +2658,6 @@ void p_typelist_(tokiter_s *ti, node_s *root)
     if(t->type == TOKTYPE_COMMA) {
         t = nexttok(ti);
         switch(t->type) {
-            case TOKTYPE_VOID:
-            case TOKTYPE_INTEGER:
-            case TOKTYPE_REAL:
-            case TOKTYPE_STRINGTYPE:
-            case TOKTYPE_REGEXTYPE:
             case TOKTYPE_OPENPAREN:
                 type = p_type(ti);
                 addchild(root, type);

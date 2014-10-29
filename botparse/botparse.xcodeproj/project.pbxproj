@@ -46,9 +46,9 @@
 		2F84DE801994741100527AFF /* general.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = general.c; path = ../../general.c; sourceTree = "<group>"; };
 		2F84DE811994741100527AFF /* regex.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = regex.h; path = ../../regex.h; sourceTree = "<group>"; };
 		2F84DE851994743900527AFF /* general.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = general.h; path = ../../general.h; sourceTree = "<group>"; };
-		2F84DE8819955CC500527AFF /* testcase1 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = testcase1; sourceTree = "<group>"; };
-		2FCF2C6319B10E1800D53AE2 /* testcase2 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = testcase2; sourceTree = "<group>"; };
-		2FCF2C6419B246BC00D53AE2 /* testcase3 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = testcase3; sourceTree = "<group>"; };
+		2F84DE8819955CC500527AFF /* testcase1.bot */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = testcase1.bot; sourceTree = "<group>"; };
+		2FCF2C6319B10E1800D53AE2 /* testcase2.bot */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = testcase2.bot; sourceTree = "<group>"; };
+		2FCF2C6419B246BC00D53AE2 /* testcase3.bot */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = testcase3.bot; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -83,9 +83,9 @@
 			children = (
 				2F6A4F1619D5D7FF0098FC73 /* calc.h */,
 				2F6A4F1519D5D7FF0098FC73 /* calc.c */,
-				2F84DE8819955CC500527AFF /* testcase1 */,
-				2FCF2C6319B10E1800D53AE2 /* testcase2 */,
-				2FCF2C6419B246BC00D53AE2 /* testcase3 */,
+				2F84DE8819955CC500527AFF /* testcase1.bot */,
+				2FCF2C6319B10E1800D53AE2 /* testcase2.bot */,
+				2FCF2C6419B246BC00D53AE2 /* testcase3.bot */,
 				2F84DE74199473E100527AFF /* main.c */,
 				2F84DE7E1994741100527AFF /* parse.h */,
 				2F84DE7D1994741100527AFF /* parse.c */,

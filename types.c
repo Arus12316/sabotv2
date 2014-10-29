@@ -2,6 +2,13 @@
 #include "parse.h"
 #include <stdlib.h>
 
+type_s void_type = {
+    .npairs = 0,
+    .width = 0,
+    .str = "Void",
+    .pairs = NULL
+};
+
 type_s char_type = {
     .npairs = 4,
     .width = 4,
@@ -97,31 +104,27 @@ pair_s char_pairs[] = {
     {
         .optype = TOKTYPE_ADDOP,
         .opatt = TOKATT_ADD,
-        .t1 = &char_type,
-        .t2 = &char_type
+        .t = &char_type,
     },
     {
         .optype = TOKTYPE_ADDOP,
         .opatt = TOKATT_SUB,
-        .t1 = &char_type,
-        .t2 = &char_type
+        .t = &char_type,
     },
     {
         .optype = TOKTYPE_ADDOP,
         .opatt = TOKATT_ADD,
-        .t1 = &char_type,
-        .t2 = &int_type
+        .t = &int_type
     },
     {
         .optype = TOKTYPE_ADDOP,
         .opatt = TOKATT_SUB,
-        .t1 = &char_type,
-        .t2 = &int_type
+        .t = &int_type
     }
 };
 
 pair_s int8_pairs[] = {
-    
+
 };
 
 pair_s uint8_pairs[] = {
@@ -166,6 +169,23 @@ pair_s float_pairs[] = {
 
 pair_s double_pairs[] = {
     
+};
+
+type_s *typelist[] = {
+    &void_type,
+    &char_type,
+    &int8_type,
+    &uint8_type,
+    &int16_type,
+    &uint16_type,
+    &int32_type,
+    &uint32_type,
+    &int64_type,
+    &uint64_type,
+    &int_type,
+    &uint_type,
+    &float_type,
+    &double_type,
 };
 
 

@@ -18,6 +18,7 @@ var c := [1, 2, 3, 4, [3], [3]]
 var bob : (a : int[], ..., a : Int, ..., b : Int) -> real[] := @(){
 }
 
+
 struct bob {
     a : int, 
     b : real,
@@ -60,13 +61,14 @@ class bob : tom {
     ~_() {
     }
 
+    {[]}(a: Double) {
+
+    }
 
     var a : int
 
     - var a : int
     + var b : int
-
-
 }
 
 let bob := @(x, y){x + y}
