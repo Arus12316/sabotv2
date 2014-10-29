@@ -3,12 +3,13 @@
 
 #define SYM_TABLE_SIZE 19
 
+#include "types.h"
+
 typedef struct errlist_s errlist_s;
 typedef struct tok_s tok_s;
 typedef struct node_s node_s;
 typedef struct rec_s rec_s;
 typedef struct scope_s scope_s;
-typedef struct type_s type_s;
 
 typedef type_s *ttable[SYM_TABLE_SIZE];
 
@@ -38,6 +39,7 @@ typedef enum {
     TOKTYPE_EXPOP,
     TOKTYPE_MULOP,
     TOKTYPE_ADDOP,
+    TOKTYPE_SHIFT,
     TOKTYPE_RELOP,
     TOKTYPE_REGEX,
     TOKTYPE_ASSIGN,
@@ -106,6 +108,10 @@ typedef enum {
     TOKATT_ADD,
     TOKATT_SUB,
     TOKATT_EXP,
+    TOKATT_LSHIFT,
+    TOKATT_RSHIFT,
+    TOKATT_LCSHIFT,
+    TOKATT_RCSHIFT,
 } toktatt_e ;
 
 struct tok_s

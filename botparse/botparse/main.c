@@ -30,12 +30,12 @@ int main(int argc, const char *argv[])
     
     
    
-    for(i = 0; i < sizeof(calctestcase)/sizeof(*calctestcase); i++) {
+   /* for(i = 0; i < sizeof(calctestcase)/sizeof(*calctestcase); i++) {
         res = eval(calctestcase[i]);
         printf("result: %s\n\n", res.val);
     }
     
-    return 0;
+    return 0;*/
     src = readsrc(testcase1f);
     
     err = parse(src);

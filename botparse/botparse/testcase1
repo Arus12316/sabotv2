@@ -39,11 +39,13 @@ else if (x = 32) {
 }
 else if(ahaha) {
     if(32)
-        2
+        2 
 }
 else {
     println(bah)
 }
+
+var a := 32
 
 class bob : tom {
     
@@ -58,10 +60,13 @@ class bob : tom {
     ~_() {
     }
 
+
     var a : int
 
     - var a : int
     + var b : int
+
+
 }
 
 let bob := @(x, y){x + y}

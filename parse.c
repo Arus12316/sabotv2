@@ -5,9 +5,16 @@
 
  <optexpression> -> <expression> | ε
  
- <expression> -> <simple_expression> <expression'>
  
- <expression'> -> relop <simple_expression> | ε
+ <expression> -> <shiftexpr> <expression'>
+ 
+ <expression'> -> relop <shiftexpr> | ε
+
+ 
+ <shiftexpr> -> <simple_expression> <shiftexpr'>
+ 
+ <shiftexpr'> -> shiftop <simple_expression> | ε
+ 
  
  <simple_expression> -> <sign> <term> <simple_expression'>
                         |
@@ -114,7 +121,7 @@
  <mapdec> -> => <type>
  
  <inh> -> : id | ε
- <declist> ->  <optsign> <dec> <optsemicolon> <declist> | <destructannotation> _(<paramlist>) {<statementlist>} <declist> | ε
+ <declist> ->  <optsign> <dec> <optsemicolon> <declist> | <destructannotation> _(<paramlist>) {<statementlist>} <declist> | { <op> } { <statementlist> } |ε
  
  <destructannotation> -> ~ | ε
  
@@ -186,12 +193,6 @@ static tok_s eoftok = {
     "`EOF`"
 };
 
-struct type_s
-{
-    char *name;
-    ttable *children;
-};
-
 struct tokchunk_s
 {
     uint8_t size;
@@ -257,6 +258,9 @@ static node_s *p_statement(tokiter_s *ti);
 static node_s *p_optexpression(tokiter_s *ti);
 static node_s *p_expression(tokiter_s *ti);
 static void p_expression_(tokiter_s *ti, node_s **p);
+static node_s *p_shiftexpr(tokiter_s *ti);
+static void p_shiftexpr_(tokiter_s *ti, node_s **p);
+
 static node_s *p_simple_expression(tokiter_s *ti);
 static void p_simple_expression_(tokiter_s *ti, node_s **p);
 static node_s *p_term(tokiter_s *ti);
@@ -425,8 +429,14 @@ tokiter_s *lex(char *src)
                 src++;
                 break;
             case '!':
-                prev = mtok(&curr, line, "!", 1, TOKTYPE_NOT, TOKATT_DEFAULT);
-                src++;
+                if(*(src + 1) == '=') {
+                    prev = mtok(&curr, line, "!=", 2, TOKTYPE_RELOP, TOKATT_NEQ);
+                    src += 2;
+                }
+                else {
+                    prev = mtok(&curr, line, "!", 1, TOKTYPE_NOT, TOKATT_DEFAULT);
+                    src++;
+                }
                 break;
             case '&':
                 prev = mtok(&curr, line, "&", 1, TOKTYPE_MULOP, TOKATT_AND);
@@ -465,13 +475,19 @@ tokiter_s *lex(char *src)
                     prev = mtok(&curr, line, "<-", 2, TOKTYPE_FORVAR, TOKATT_DEFAULT);
                     src += 2;
                 }
-                else if(*(src + 1) == '>') {
-                    prev = mtok(&curr, line, "<>", 2, TOKTYPE_RELOP, TOKATT_NEQ);
-                    src += 2;
-                }
                 else if(*(src + 1) == '=') {
                     prev = mtok(&curr, line, "<=", 2, TOKTYPE_RELOP, TOKATT_LEQ);
                     src += 2;
+                }
+                else if(*(src + 1) == '<') {
+                    if(*(src + 2) == '*') {
+                        prev = mtok(&curr, line, "<<*", 3, TOKTYPE_SHIFT, TOKATT_LCSHIFT);
+                        src += 3;
+                    }
+                    else {
+                        prev = mtok(&curr, line, "<<", 2, TOKTYPE_SHIFT, TOKATT_LSHIFT);
+                        src += 2;
+                    }
                 }
                 else {
                     prev = mtok(&curr, line, "<", 1, TOKTYPE_RELOP, TOKATT_L);
@@ -482,6 +498,16 @@ tokiter_s *lex(char *src)
                 if(*(src + 1) == '=') {
                     prev = mtok(&curr, line, ">=", 2, TOKTYPE_RELOP, TOKATT_GEQ);
                     src += 2;
+                }
+                else if(*(src + 1) == '>') {
+                    if(*(src + 2) == '*') {
+                        prev = mtok(&curr, line, ">>*", 3, TOKTYPE_SHIFT, TOKATT_RCSHIFT);
+                        src += 3;
+                    }
+                    else {
+                        prev = mtok(&curr, line, ">>", 2, TOKTYPE_SHIFT, TOKATT_RSHIFT);
+                        src += 2;
+                    }
                 }
                 else {
                     prev = mtok(&curr, line, ">", 1, TOKTYPE_RELOP, TOKATT_G);
@@ -982,7 +1008,7 @@ node_s *p_expression(tokiter_s *ti)
     exp = MAKENODE();
     exp->type = TOKTYPE_EXPRESSION;
     
-    node = p_simple_expression(ti);
+    node = p_shiftexpr(ti);
     p = exp;
     p_expression_(ti, &p);
     addchild(exp, p);
@@ -996,7 +1022,7 @@ void p_expression_(tokiter_s *ti, node_s **p)
     
     if(t->type == TOKTYPE_RELOP) {
         nexttok(ti);
-        s = p_simple_expression(ti);
+        s = p_shiftexpr(ti);
         
         op = MAKENODE();
         op->type = TOKTYPE_RELOP;
@@ -1004,6 +1030,36 @@ void p_expression_(tokiter_s *ti, node_s **p)
         
         addchild(op, *p);
         addchild(op, s);
+        *p = op;
+    }
+}
+
+node_s *p_shiftexpr(tokiter_s *ti)
+{
+    node_s *sexp;
+    
+    sexp = p_simple_expression(ti);
+    
+    p_shiftexpr_(ti, &sexp);
+    
+    return sexp;
+}
+
+void p_shiftexpr_(tokiter_s *ti, node_s **p)
+{
+    node_s *op, *sexp;
+    tok_s *t = tok(ti);
+    
+    if(t->type == TOKTYPE_SHIFT) {
+        nexttok(ti);
+        sexp = p_simple_expression(ti);
+        
+        op = MAKENODE();
+        op->type = TOKTYPE_SHIFT;
+        op->att = t->att;
+        
+        addchild(op, *p);
+        addchild(op, sexp);
         *p = op;
     }
 }
@@ -1073,7 +1129,7 @@ void p_term_(tokiter_s *ti, node_s **p)
     if(t->type == TOKTYPE_MULOP) {
         nexttok(ti);
         f = p_factor(ti);
-        
+
         op = MAKENODE();
         op->type = TOKTYPE_ADDOP;
         op->att = t->att;
@@ -1704,7 +1760,6 @@ node_s *p_control(tokiter_s *ti)
     node_s  *op = MAKENODE(),
             *exp, *ident, *suffix = MAKENODE();
     
-    
     switch(t->type) {
         case TOKTYPE_WHILE:
             nexttok(ti);
@@ -2003,6 +2058,12 @@ node_s *p_dec(tokiter_s *ti)
             dectype = p_opttype(ti);
             addchild(dec, dectype);
             p_assign(ti, &dec);
+            
+            if(!dectype) {
+                if(dec->type != TOKTYPE_ASSIGN) {
+                    ERR("Error: Declaration must either have a type annotation or an assignment");
+                }
+            }
             
             if(addident(ti->scope, t->lex, dectype)) {
                 // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
@@ -2917,7 +2978,7 @@ node_s *typecmp(node_s *t1, node_s *t2)
 
 void addtype(ttable t, char *name)
 {
-    type_s **prec = &t[pjwhash(name)],
+  /*  type_s **prec = &t[pjwhash(name)],
             *rec = *prec;
     
     if(rec) {
@@ -2936,7 +2997,7 @@ void addtype(ttable t, char *name)
         rec->name = name;
         rec->children = NULL;
         printf("Adding %s\n", name);
-    }
+    }*/
 
 }
 
