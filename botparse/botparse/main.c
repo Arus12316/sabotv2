@@ -27,8 +27,6 @@ int main(int argc, const char *argv[])
     char *src;
     errlist_s *err;
     calcres_s res;
-    
-    
    
    /* for(i = 0; i < sizeof(calctestcase)/sizeof(*calctestcase); i++) {
         res = eval(calctestcase[i]);
@@ -46,7 +44,6 @@ int main(int argc, const char *argv[])
     
     return 0;
 }
-
 
 char *readsrc(char *file) 
 {

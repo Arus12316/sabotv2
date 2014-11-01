@@ -4,14 +4,13 @@
 #define SYM_TABLE_SIZE 19
 
 #include "types.h"
+#include <stdbool.h>
 
 typedef struct errlist_s errlist_s;
 typedef struct tok_s tok_s;
 typedef struct node_s node_s;
 typedef struct rec_s rec_s;
 typedef struct scope_s scope_s;
-
-typedef type_s *ttable[SYM_TABLE_SIZE];
 
 struct errlist_s
 {
@@ -134,14 +133,17 @@ struct node_s
 struct rec_s
 {
     char *key;
-    node_s *type;
+    bool isconst;
+    type_s *type;
+    node_s *val;
     rec_s *next;
 };
 
 struct scope_s
 {
+    int i;
     rec_s *table[SYM_TABLE_SIZE];
-    ttable types;
+    rec_s *types[SYM_TABLE_SIZE];
     scope_s *parent;
     unsigned nchildren;
     scope_s **children;
@@ -149,6 +151,12 @@ struct scope_s
 
 
 extern errlist_s *parse(char *src);
+
+extern bool addident(rec_s *table[], char *key, bool isconst);
+extern void bindtype(scope_s *child, char *key, type_s *type);
+extern bool bindexpr(scope_s *child, char *key, node_s *val);
+extern node_s *identlookup(scope_s *child, char *key);
+extern node_s *typelookup(scope_s *child, char *key);
 
 extern void printerrs(errlist_s *err);
 

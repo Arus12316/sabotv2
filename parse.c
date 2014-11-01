@@ -146,9 +146,9 @@
 #include "parse.h"
 #include "tree.h"
 #include "general.h"
+#include "types.h"
 #include <stdio.h>
 #include <stdint.h>
-#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdarg.h>
@@ -283,7 +283,8 @@ static node_s *right(node_s *node);
 static node_s *left(node_s *node);
 
 static unsigned pjwhash(char *key);
-static bool addident(scope_s *root, char *key, node_s *type);
+static bool addtype(scope_s *child, char *key, node_s *type);
+static node_s *tablelookup(rec_s *table[], char *key);
 static scope_s *idtinit(scope_s *parent);
 static void pushscope(tokiter_s *ti);
 static inline void popscope(tokiter_s *ti);
@@ -291,8 +292,6 @@ static bool checkflow(node_s *root);
 static node_s *getparentfunc(node_s *start);
 static node_s *getparentloop(node_s *start);
 static node_s *typecmp(node_s *t1, node_s *t2);
-
-static void addtype(ttable t, char *name);
 
 static void freetree(node_s *root);
 
@@ -803,6 +802,8 @@ tok_s *peeknexttok(tokiter_s *ti)
 
 node_s *start(tokiter_s *ti)
 {
+    int i;
+    primtype_s *type;
     tok_s *t;
     node_s *root = MAKENODE();
     
@@ -811,6 +812,10 @@ node_s *start(tokiter_s *ti)
     ti->scope = idtinit(NULL);
     ti->code = bufinit();
     ti->labelcount = 0;
+    
+    for(i = 0; (type = nextype(i)); i++) {
+        addident(ti->scope->types, type->str, NULL);
+    }
 
     p_statementlist(ti, root, NULL);
     t = tok(ti);
@@ -1820,10 +1825,8 @@ node_s *p_control(tokiter_s *ti)
 
 node_s *p_if(tokiter_s *ti)
 {
-    char label1[16], label2[16];
     node_s  *op = MAKENODE(),
             *exp, *suffix = MAKENODE();
-    
     
     op->type = TOKTYPE_IF;
     op->att = TOKATT_DEFAULT;
@@ -2037,10 +2040,6 @@ node_s *p_dec(tokiter_s *ti)
                     ERR("Error: Declaration must either have a type annotation or an assignment");
                 }
             }
-            
-            if(addident(ti->scope, t->lex, dectype)) {
-                // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
-            }
         }
         else {
             dec = NULL;
@@ -2052,10 +2051,6 @@ node_s *p_dec(tokiter_s *ti)
     else if(t->type == TOKTYPE_CLASS) {
         t = nexttok(ti);
         if(t->type == TOKTYPE_IDENT) {
-            if(ti->firstpass) {
-                addtype(ti->scope->types, t->lex);
-            }
-
             ident = MAKENODE();
             ident->type = TOKTYPE_IDENT;
             ident->att = TOKATT_DEFAULT;
@@ -2063,8 +2058,7 @@ node_s *p_dec(tokiter_s *ti)
             
             addchild(dec, ident);
 
-            addtype(ti->scope->types, t->lex);
-            if(addident(ti->scope, t->lex, dec)) {
+            if(addtype(ti->scope, t->lex, dec)) {
                // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
             }
             t = nexttok(ti);
@@ -2107,8 +2101,7 @@ node_s *p_dec(tokiter_s *ti)
         
         id = p_optid(ti);
         if(id) {
-            addtype(ti->scope->types, id);
-            if(addident(ti->scope, t->lex, dec)) {
+            if(addtype(ti->scope, t->lex, dec)) {
                 // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
             }
         }
@@ -2135,14 +2128,12 @@ node_s *p_dec(tokiter_s *ti)
     else if(t->type == TOKTYPE_STRUCTTYPE) {
         t = nexttok(ti);
         if(t->type == TOKTYPE_IDENT) {
-            addtype(ti->scope->types, t->lex);
             ident = MAKENODE();
             ident->type = TOKTYPE_IDENT;
             ident->att = TOKATT_DEFAULT;
             ident->tok = t;
             
-            addtype(ti->scope->types, t->lex);
-            if(addident(ti->scope, t->lex, dec)) {
+            if(addtype(ti->scope, t->lex, dec)) {
                 // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
             }
             
@@ -2401,6 +2392,7 @@ void p_declist(tokiter_s *ti, node_s *root)
                 case TOKTYPE_EXPOP:
                 case TOKTYPE_NOT:
                 case TOKTYPE_COMPLEMENT:
+                case TOKTYPE_ASSIGN:
                     op = MAKENODE();
                     op->type = t->type;
                     op->att = t->att;
@@ -2694,7 +2686,7 @@ node_s *p_param(tokiter_s *ti)
         opt = p_opttype(ti);
         addchild(ident, opt);
         
-        if(addident(ti->scope, t->lex, opt)) {
+        if(addident(ti->scope->table, t->lex, opt)) {
             // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
         }
         
@@ -2864,10 +2856,10 @@ unsigned pjwhash(char *key)
     return h % SYM_TABLE_SIZE;
 }
 
-bool addident(scope_s *root, char *key, node_s *type)
+bool addident(rec_s *table[], char *key, bool isconst)
 {
     unsigned index = pjwhash(key);
-    rec_s **ptr = &root->table[index], *i = *ptr, *n;
+    rec_s **ptr = &table[index], *i = *ptr, *n;
     
     if(i) {
         while(i->next) {
@@ -2881,10 +2873,100 @@ bool addident(scope_s *root, char *key, node_s *type)
     }
     n = alloc(sizeof *n);
     n->key = key;
-    n->type = type;
     n->next = NULL;
+    n->val = NULL;
+    n->isconst = isconst;
     *ptr = n;
     return false;
+}
+
+void bindtype(scope_s *child, char *key, type_s *type)
+{
+    rec_s *i;
+    unsigned index = pjwhash(key);
+
+    while(child) {
+        for(i = child->types[index]; i; i = i->next) {
+            if(!strcmp(i->key, key)) {
+                i->type = type;
+                return;
+            }
+        }
+        child = child->parent;
+    }
+}
+
+bool bindexpr(scope_s *child, char *key, node_s *val)
+{
+    rec_s *i;
+    unsigned index = pjwhash(key);
+    
+    while(child) {
+        for(i = child->types[index]; i; i = i->next) {
+            if(!strcmp(i->key, key)) {
+                i->val= val;
+                return true;
+            }
+        }
+        child = child->parent;
+    }
+    return false;
+}
+
+bool addtype(scope_s *child, char *key, node_s *type)
+{
+    rec_s **table = child->types, *i;
+    unsigned index = pjwhash(key);
+    
+    while(child) {
+        for(i = child->types[index]; i; i = i->next) {
+            if(!strcmp(i->key, key))
+                return false;
+        }
+        child = child->parent;
+    }
+    addident(table, key, false);
+    return true;
+}
+
+node_s *tablelookup(rec_s *table[], char *key)
+{
+    rec_s *i;
+    unsigned index = pjwhash(key);
+    
+    for(i = table[index]; i; i = i->next) {
+        if(!strcmp(i->key, key)) {
+            return i->type;
+        }
+    }
+    return NULL;
+}
+
+node_s *identlookup(scope_s *child, char *key)
+{
+    node_s *n;
+    
+    while(child) {
+        if((n = tablelookup(child->table, key))) {
+            return n;
+        }
+        child = child->parent;
+    }
+    return NULL;
+}
+
+
+node_s *typelookup(scope_s *child, char *key)
+{
+    node_s *n;
+    
+    while(child) {
+        if((n = tablelookup(child->types, key))) {
+            return n;
+        }
+        child = child->parent;
+    }
+    return NULL;
 }
 
 scope_s *idtinit(scope_s *parent)
@@ -2960,31 +3042,6 @@ node_s *getparentloop(node_s *start)
 node_s *typecmp(node_s *t1, node_s *t2)
 {
     return NULL;
-}
-
-void addtype(ttable t, char *name)
-{
-  /*  type_s **prec = &t[pjwhash(name)],
-            *rec = *prec;
-    
-    if(rec) {
-        if(strcmp(rec->name, name)) {
-            if(!rec->children) {
-                rec->children = alloc(sizeof *rec->children);
-            }
-            addtype(*rec->children, name);
-        }
-        else {
-            printf("Redeclaration of %s\n", name);
-        }
-    }
-    else {
-        rec = *prec = alloc(sizeof *rec);
-        rec->name = name;
-        rec->children = NULL;
-        printf("Adding %s\n", name);
-    }*/
-
 }
 
 void freetree(node_s *root)

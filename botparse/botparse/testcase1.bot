@@ -1,6 +1,6 @@
+
 let f : (a : int, b : int) -> int
 let g : (a : real, b : real) -> () -> () -> real[]
-
 
 let omg : (() -> real) -> real := @(a){
     a()
@@ -49,20 +49,55 @@ else {
 
 var a := 32
 
+let f := @(a: Int8) -> Int {
+    if(a = 32) {
+        a := 33
+    }
+    a
+}
+
+let f := @(a: Int8) -> Double {
+}
+
 class bob : tom {
-    
+    let a: Int
+    let b: Int
+    let c: String
+
+    let c: String[]
+
     _() {
+        _.a := 32
+        _.b := 33
+        _.c := "hello world"
+        if _.a = 23 {
+            _.a := 33
+            _.b := _.a * 32 * 32
+        }
+        __()
+    }
+
+    ~_(a: Int, b: Int) {
 
     }
 
     ~_() {
+    }
+
+    {*=}(a: Double) {
+        _.a ^ a
+        _.a XOR 32
+    }
+
+    {^}(a: Double) {
+        _.a *= a
+    }
+
+    {>>}(a: Double) {
 
     }
 
-    ~_() {
-    }
-
-    {[]}(a: Double) {
+    { >>* }() {
 
     }
 
@@ -73,7 +108,6 @@ class bob : tom {
 }
 
 let bob := @(x, y){x + y}
-
 
 let b := @(x : real , y : real) {
     x + y
