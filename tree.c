@@ -51,6 +51,7 @@ static void walk_break(state_s *state, node_s *b);
 static void walk_continue(state_s *state, node_s *c);
 
 static type_s resolve_ident(state_s *state, node_s *ident);
+static type_s *totype(node_s *texp);
 
 static void emit(buf_s *b, char *code, ...);
 static void makelabel(unsigned *labelcount, char *buf);
@@ -306,6 +307,24 @@ type_s resolve_ident(state_s *state, node_s *ident)
     n = identlookup(state->scope, identval);
     if(!n) {
         printf("Use of undeclared identifier: %s\n", identval);
+    }
+    return t;
+}
+
+type_s *totype(node_s *texp)
+{
+    type_s *t = alloc(sizeof *t);
+    
+
+    switch(texp->type) {
+        case TOKTYPE_IDENT:
+            if(texp->nchildren) {
+                t->cat = CLASS_ARRAY;
+                t->array.indeces = texp->children[0];
+                
+            }
+            break;
+        
     }
     return t;
 }

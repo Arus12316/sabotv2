@@ -2955,6 +2955,10 @@ node_s *identlookup(scope_s *child, char *key)
     return NULL;
 }
 
+bool addtype(scope_s *child, char *key, primtype_s *t)
+{
+    
+}
 
 node_s *typelookup(scope_s *child, char *key)
 {

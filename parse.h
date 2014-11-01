@@ -133,9 +133,17 @@ struct node_s
 struct rec_s
 {
     char *key;
-    bool isconst;
-    type_s *type;
-    node_s *val;
+    union {
+        struct {
+            bool isconst;
+            type_s *type;
+            node_s *val;
+        } ident;
+        struct {
+            primtype_s *type;
+            
+        }type;
+    };
     rec_s *next;
 };
 
@@ -155,6 +163,7 @@ extern errlist_s *parse(char *src);
 extern bool addident(rec_s *table[], char *key, bool isconst);
 extern void bindtype(scope_s *child, char *key, type_s *type);
 extern bool bindexpr(scope_s *child, char *key, node_s *val);
+extern bool addtype(scope_s *child, char *key, primtype_s *t);
 extern node_s *identlookup(scope_s *child, char *key);
 extern node_s *typelookup(scope_s *child, char *key);
 
