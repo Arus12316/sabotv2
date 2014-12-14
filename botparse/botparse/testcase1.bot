@@ -13,6 +13,13 @@ g := @(a, b) -> Int {
     }
 }
 
+g := @(a, b) -> Int {
+
+}
+
+
+
+
 var c := [1, 2, 3, 4, [3], [3]]
 
 var bob : (a : int[], ..., a : Int, ..., b : Int) -> real[] := @(){
@@ -50,14 +57,21 @@ else {
 var a := 32
 
 let f := @(a: Int8) -> Int {
-    if(a = 32) {
+    if(a = 32)
         a := 33
     }
     a
 }
 
-let f := @(a: Int8) -> Double {
+let f := @(a: Int8) -> Int<Int> {
+    if a > 3 f(a - 2) 4
 }
+
+let f := @(a: Int8) -> Double {
+    
+}
+
+let f : Bob<Tom<Int<Derp<Int>>>>
 
 class bob : tom {
     let a: Int
@@ -69,6 +83,7 @@ class bob : tom {
     _() {
         _.a := 32
         _.b := 33
+        _.hi := 333
         _.c := "hello world"
         if _.a = 23 {
             _.a := 33
@@ -106,6 +121,7 @@ class bob : tom {
     - var a : int
     + var b : int
 }
+
 
 let bob := @(x, y){x + y}
 

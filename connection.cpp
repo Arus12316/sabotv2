@@ -15,7 +15,7 @@
 #define LOGIN_FLAG "09"
 #define BAN_MSG "091"
 #define PLAYER_FOUND_MSG "Player is located in"
-#define CONN_TIMEOUT 18
+#define CONN_TIMEOUT 25
 #define TIMECHECK_INTERVAL 1000
 
 const quint16 Connection::PORT = 1138;
@@ -491,6 +491,7 @@ void Connection::gameEvent()
                         msg->view = this;
                         cres.status = -1;
                         if(msg->body[0] == ',' && win->calculatorOn()) {
+                            qDebug() << "Attempting to parse: " << &msg->body[1];
                             cres = eval(&msg->body[1]);
                         }
                         emit postMessage(msg);

@@ -10,41 +10,41 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = sabotv2
 TEMPLATE = app
 
-SOURCES += main.cpp\
-mainwindow.cpp \
-connection.cpp \
-user.cpp \
-server.cpp \
-loginmultiusers.cpp \
-regex.c \
-createaccount.cpp \
-crypt.c \
-general.c \
-raid.cpp \
-    proxyscan.cpp \
-    database.cpp \
-    calc.c
+SOURCES += $$PWD/main.cpp\
+$$PWD/mainwindow.cpp \
+$$PWD/connection.cpp \
+$$PWD/user.cpp \
+$$PWD/server.cpp \
+$$PWD/loginmultiusers.cpp \
+$$PWD/regex.c \
+$$PWD/createaccount.cpp \
+$$PWD/crypt.c \
+$$PWD/general.c \
+$$PWD/raid.cpp \
+    $$PWD/proxyscan.cpp \
+    $$PWD/database.cpp \
+    $$PWD/calc.c
 
-HEADERS += mainwindow.h \
-connection.h \
-user.h \
-server.h \
-loginmultiusers.h \
-regex.h \
-createaccount.h \
-crypt.h \
-general.h \
-raid.h \
-    proxyscan.h \
-    database.h \
-    schema.h \
-    calc.h
+HEADERS += $$PWD/mainwindow.h \
+$$PWD/connection.h \
+$$PWD/user.h \
+$$PWD/server.h \
+$$PWD/loginmultiusers.h \
+$$PWD/regex.h \
+$$PWD/createaccount.h \
+$$PWD/crypt.h \
+$$PWD/general.h \
+$$PWD/raid.h \
+    $$PWD/proxyscan.h \
+    $$PWD/database.h \
+    $$PWD/schema.h \
+    $$PWD/calc.h
 
-FORMS += mainwindow.ui \
-loginmultiusers.ui \
-createaccount.ui \
-raid.ui \
-proxyscan.ui
+FORMS += $$PWD/mainwindow.ui \
+$$PWD/loginmultiusers.ui \
+$$PWD/createaccount.ui \
+$$PWD/raid.ui \
+$$PWD/proxyscan.ui
 
 CONFIG += c++11
 

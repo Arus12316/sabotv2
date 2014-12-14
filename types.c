@@ -4,7 +4,7 @@
 #include <string.h>
 
 primtype_s void_type = {
-
+    .isresolved = true,
     .npairs = 0,
     .width = 0,
     .str = "Void",
@@ -12,12 +12,15 @@ primtype_s void_type = {
 };
 
 primtype_s char_type = {
-    .npairs = 4,    .width = 4,
+    .isresolved = true,
+    .npairs = 4,
+    .width = 4,
     .str = "UInt",
     .pairs = char_pairs
 };
 
 primtype_s int8_type = {
+    .isresolved = true,
     .npairs = 0,
     .width = 1,
     .str = "Int8",
@@ -25,6 +28,7 @@ primtype_s int8_type = {
 };
 
 primtype_s uint8_type = {
+    .isresolved = true,
     .npairs = 0,
     .width = 1,
     .str = "UInt8",
@@ -32,6 +36,7 @@ primtype_s uint8_type = {
 };
 
 primtype_s int16_type = {
+    .isresolved = true,
     .npairs = 0,
     .width = 2,
     .str = "Int16",
@@ -39,6 +44,7 @@ primtype_s int16_type = {
 };
 
 primtype_s uint16_type = {
+    .isresolved = true,
     .npairs = 0,
     .width = 2,
     .str = "UInt16",
@@ -46,6 +52,7 @@ primtype_s uint16_type = {
 };
 
 primtype_s int32_type = {
+    .isresolved = true,
     .npairs = 0,
     .width = 4,
     .str = "UInt64",
@@ -53,6 +60,7 @@ primtype_s int32_type = {
 };
 
 primtype_s uint32_type = {
+    .isresolved = true,
     .npairs = 0,
     .width = 4,
     .str = "UInt64",
@@ -60,6 +68,7 @@ primtype_s uint32_type = {
 };
 
 primtype_s int64_type = {
+    .isresolved = true,
     .npairs = 0,
     .width = 8,
     .str = "Int64",
@@ -67,6 +76,7 @@ primtype_s int64_type = {
 };
 
 primtype_s uint64_type = {
+    .isresolved = true,
     .npairs = 0,
     .width = 8,
     .str = "UInt64",
@@ -74,6 +84,7 @@ primtype_s uint64_type = {
 };
 
 primtype_s int_type = {
+    .isresolved = true,
     .npairs = 0,
     .width = 4,
     .str = "Int",
@@ -81,6 +92,7 @@ primtype_s int_type = {
 };
 
 primtype_s uint_type = {
+    .isresolved = true,
     .npairs = 0,
     .width = 4,
     .str = "UInt",
@@ -88,6 +100,7 @@ primtype_s uint_type = {
 };
 
 primtype_s float_type = {
+    .isresolved = true,
     .npairs = 0,
     .width = 4,
     .str = "Float",
@@ -95,6 +108,7 @@ primtype_s float_type = {
 };
 
 primtype_s double_type = {
+    .isresolved = true,
     .npairs = 0,
     .width = 8,
     .str = "Double",
@@ -102,6 +116,7 @@ primtype_s double_type = {
 };
 
 primtype_s string_type = {
+    .isresolved = true,
     .npairs = 0,
     .width = -1,
     .str = "String",
@@ -109,6 +124,7 @@ primtype_s string_type = {
 };
 
 primtype_s regex_type = {
+    .isresolved = true,
     .npairs = 0,
     .width = -1,
     .str = "Regex",

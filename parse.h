@@ -137,11 +137,10 @@ struct rec_s
         struct {
             bool isconst;
             type_s *type;
-            node_s *val;
+            node_s *expr;
         } ident;
         struct {
             primtype_s *type;
-            
         }type;
     };
     rec_s *next;

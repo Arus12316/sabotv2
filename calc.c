@@ -7,6 +7,7 @@
 #include <math.h>
 #include <complex.h>
 #include <stdarg.h>
+#include <assert.h>
 
 #define TOK() (ti->curr)
 #define NEXTTOK() (ti->curr->next ? ti->curr = ti->curr->next : ti->curr)
@@ -474,6 +475,7 @@ node_s *p_term(tokiter_s *ti)
     node_s *acc;
     
     acc = p_subterm(ti);
+    assert(acc);
     p_term_(ti, &acc);
     return acc;
 }

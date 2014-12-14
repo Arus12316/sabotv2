@@ -176,7 +176,6 @@ void walk_factor(state_s *state, node_s *factor)
     }
 }
 
-
 val_s walk_factor_(state_s *state, node_s *fact_)
 {
     val_s val, v1, v2;

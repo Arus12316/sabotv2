@@ -508,7 +508,7 @@
        <rect>
         <x>0</x>
         <y>360</y>
-        <width>170</width>
+        <width>169</width>
         <height>26</height>
        </rect>
       </property>
@@ -1246,6 +1246,9 @@
         <pointsize>10</pointsize>
        </font>
       </property>
+      <property name="placeholderText">
+       <string/>
+      </property>
      </widget>
      <widget class="QLabel" name="label_2">
       <property name="geometry">
@@ -1276,7 +1279,7 @@
        <string>Calculator On</string>
       </property>
       <property name="checked">
-       <bool>false</bool>
+       <bool>true</bool>
       </property>
      </widget>
      <widget class="QCheckBox" name="calculatorPM">
@@ -1290,6 +1293,9 @@
       </property>
       <property name="text">
        <string>Calculator PM Only</string>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
       </property>
      </widget>
     </widget>

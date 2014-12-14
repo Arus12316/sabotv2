@@ -1,6 +1,8 @@
 #ifndef NATIVETYPES_H_
 #define NATIVETYPES_H_
 
+#include <stdbool.h>
+
 typedef enum {
     CLASS_SCALAR,
     CLASS_ARRAY,
@@ -21,17 +23,24 @@ struct pair_s {
 struct prop_s
 {
     char *name;
+    unsigned lineno;
     primtype_s *result;
     primtype_s **params;
 };
 
 struct primtype_s {
+    bool isresolved;
+    union {
+        char *pstr;
+        primtype_s *p;
+    };
     short npairs;
     short width;
     char *str;
     pair_s *pairs;
     prop_s *static_props;
     prop_s *instance_props;
+    unsigned short lineno;
 };
 
 struct type_s {

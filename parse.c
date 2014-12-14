@@ -56,7 +56,7 @@
                 |
                 <switch>
 
- <factor''> -> [ <expression> ] <factor''> | . id <factor''> | ( <optarglist> ) <factor''> | ε
+ <factor''> -> [ <expression> ] <factor''> | . id <factor''> | ( <optarglist> ) <factor''> | < <identtype> > ( <optarglist> ) <factor''> | ε
  
  <assign> -> assignop <expression> | ε
  
@@ -91,9 +91,9 @@
  
  <switch> -> switch(<expression>) openbrace <caselist> closebrace
  
- <caselist> ->  case <arglist> map <expression> <caselist>
+ <caselist> ->  case <arglist> map <statementlist> <caselist>
                 |
-                default map <expression> <caselist>
+                default map <statementlist> <caselist>
                 |
                 ε
  
@@ -114,9 +114,13 @@
  
  <opttype> -> : <type> | ε
  
- <type> -> void | int <array> <mapdec> | char <array> <mapdec> | real <array> <mapdec> | string <array> <mapdec> |
-            regex <array> <mapdec> |
-            id <array> <mapdec> | ( <typelist> ) <array> <mapdec> map <type>
+ <type> -> id <optgeneric> <array> <mapdec> | ( <typelist> ) <array> <mapdec> map <type> | <generic>
+ 
+ <identtype> -> id <optgeneric> <identtypelist>
+ 
+ <identtypelist> -> , id <optgeneric> <identtypelist>
+ 
+ <optgeneric> -> < <identtype> > | ε
  
  <mapdec> -> => <type>
  
@@ -181,6 +185,7 @@ struct tokchunk_s
 struct tokiter_s
 {
     uint8_t i;
+    bool lookahead;
     bool firstpass;
     tokchunk_s *curr;
     errlist_s *err;
@@ -240,6 +245,7 @@ static node_s *p_factor(tokiter_s *ti);
 static void p_optexp(tokiter_s *ti, node_s **p);
 static node_s *p_factor_(tokiter_s *ti);
 static void p_factor__(tokiter_s *ti, node_s **p);
+static void p_genericcall(tokiter_s *ti);
 static void p_assign(tokiter_s *ti, node_s **p);
 static void p_arrayinit(tokiter_s *ti, node_s *root);
 static node_s *p_structliteral(tokiter_s *ti);
@@ -264,8 +270,13 @@ static char *p_optid(tokiter_s *ti);
 static void p_structdeclarator(tokiter_s *ti, node_s *root);
 static node_s *p_opttype(tokiter_s *ti);
 static node_s *p_type(tokiter_s *ti);
+
+static void p_identtype(tokiter_s *ti);
+static void p_identtypelist(tokiter_s *ti);
+static void p_optgeneric(tokiter_s *ti);
+
 static void p_inh(tokiter_s *ti, node_s *root);
-static void p_declist(tokiter_s *ti, node_s *root);
+static void p_declist(tokiter_s *ti, node_s *root, primtype_s *ptype);
 static node_s *p_array(tokiter_s *ti, node_s *root);
 static void p_mapdec(tokiter_s *ti, node_s **dec);
 
@@ -283,7 +294,6 @@ static node_s *right(node_s *node);
 static node_s *left(node_s *node);
 
 static unsigned pjwhash(char *key);
-static bool addtype(scope_s *child, char *key, node_s *type);
 static node_s *tablelookup(rec_s *table[], char *key);
 static scope_s *idtinit(scope_s *parent);
 static void pushscope(tokiter_s *ti);
@@ -292,9 +302,10 @@ static bool checkflow(node_s *root);
 static node_s *getparentfunc(node_s *start);
 static node_s *getparentloop(node_s *start);
 static node_s *typecmp(node_s *t1, node_s *t2);
+static primtype_s *priminit(tok_s *tok);
+static prop_s *propinit(tok_s *tok);
 
 static void freetree(node_s *root);
-
 
 static void adderr(tokiter_s *ti, char *str, int lineno);
 
@@ -309,7 +320,7 @@ errlist_s *parse(char *src)
     
     tree = start(ti);
     
-    walk_tree(ti->scope, tree);
+   // walk_tree(ti->scope, tree);
     
     printf("code: %s\n", ti->code->buf);
     
@@ -327,6 +338,7 @@ tokiter_s *lex(char *src)
     type_s **it;
     
     ti = alloc(sizeof *ti);
+    ti->lookahead = false;
     curr = head = alloc(sizeof *head);
     
     head->size = 0;
@@ -814,7 +826,7 @@ node_s *start(tokiter_s *ti)
     ti->labelcount = 0;
     
     for(i = 0; (type = nextype(i)); i++) {
-        addident(ti->scope->types, type->str, NULL);
+        addtype(ti->scope, type->str, type);
     }
 
     p_statementlist(ti, root, NULL);
@@ -1366,11 +1378,41 @@ void p_factor__(tokiter_s *ti, node_s **p)
                 synerr_rec(ti);
             }
             break;
+       // case TOKTYPE_RELOP:
+         //   p_genericcall(ti);
+           // break;
         default:
             //epsilon production
             break;
     }
 }
+
+void p_genericcall(tokiter_s *ti)
+{
+    node_s *opt;
+    tok_s *t = tok(ti);
+    tokiter_s la;
+    
+    if(t->att == TOKATT_L) {
+        la = *ti;
+        la.lookahead = true;
+        nexttok(&la);
+        p_identtype(&la);
+        t = tok(&la);
+        if(t->type == TOKTYPE_RELOP && t->att == TOKATT_G) {
+            t = nexttok(&la);
+            if(t->type == TOKTYPE_OPENPAREN) {
+                la.lookahead = false;
+                *ti = la;
+                opt = p_optarglist(ti);
+              //  bob<Int>(a)
+            }
+        }
+        
+    }
+    
+}
+
 
 void p_assign(tokiter_s *ti, node_s **p)
 {
@@ -1859,7 +1901,6 @@ void p_else(tokiter_s *ti, node_s *root)
 {
     tok_s *t = tok(ti);
     node_s *op;
-    
     if(t->type == TOKTYPE_ELSE) {
         nexttok(ti);
         op = MAKENODE();
@@ -1922,7 +1963,6 @@ node_s *p_switch(tokiter_s *ti)
     }
     return op;
 }
-
 
 void p_caselist(tokiter_s *ti, node_s *root)
 {
@@ -2012,7 +2052,8 @@ void p_controlsuffix(tokiter_s *ti, node_s *root)
 node_s *p_dec(tokiter_s *ti)
 {
     char *id;
-    node_s *ident, *dectype, *dec;
+    primtype_s *prim;
+    node_s *ident, *dectype, *dec, *inh;
     tok_s *t = tok(ti);
     
     dec = MAKENODE();
@@ -2057,17 +2098,27 @@ node_s *p_dec(tokiter_s *ti)
             ident->tok = t;
             
             addchild(dec, ident);
-
-            if(addtype(ti->scope, t->lex, dec)) {
+            
+            prim = priminit(t);
+            
+            if(addtype(ti->scope, t->lex, prim)) {
                // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
             }
             t = nexttok(ti);
             p_inh(ti, dec);
+            if(dec->nchildren > 1) {
+                inh = dec->children[1];
+                if(inh->children) {
+                    inh = inh->children[0];
+                    prim->pstr = inh->tok->lex;
+                }
+            }
+            
             t = tok(ti);
             if(t->type == TOKTYPE_OPENBRACE) {
                 nexttok(ti);
                 PUSHSCOPE();
-                p_declist(ti, dec);
+                p_declist(ti, dec, prim);
                 POPSCOPE();
                 t = tok(ti);
                 if(t->type == TOKTYPE_CLOSEBRACE) {
@@ -2101,6 +2152,7 @@ node_s *p_dec(tokiter_s *ti)
         
         id = p_optid(ti);
         if(id) {
+        
             if(addtype(ti->scope, t->lex, dec)) {
                 // adderr(ti, "Redeclaration", t->lex, t->line, "unique name", NULL);
             }
@@ -2280,11 +2332,12 @@ node_s *p_type(tokiter_s *ti)
     
     switch(t->type) {
         case TOKTYPE_IDENT:
-            nexttok(ti);
             type = MAKENODE();
             type->type = TOKTYPE_IDENT;
             type->att = TOKATT_DEFAULT;
             type->tok = t;
+            nexttok(ti);
+            p_optgeneric(ti);
             array = p_array(ti, NULL);
             addchild(type, array);
             p_mapdec(ti, &type);
@@ -2333,6 +2386,67 @@ node_s *p_type(tokiter_s *ti)
     return type;
 }
 
+void p_identtype(tokiter_s *ti)
+{
+    tok_s *t = tok(ti);
+    
+    if(t->type == TOKTYPE_IDENT) {
+        t = nexttok(ti);
+        p_optgeneric(ti);
+        p_identtypelist(ti);
+    }
+    else {
+        if(!ti->lookahead) {
+            ERR("Syntax Error: Expected identifier");
+            synerr_rec(ti);
+        }
+    }
+}
+
+void p_identtypelist(tokiter_s *ti)
+{
+    tok_s *t = tok(ti);
+    
+    if(t->type == TOKTYPE_COMMA) {
+        t = nexttok(ti);
+        if(t->type == TOKTYPE_IDENT) {
+            nexttok(ti);
+            p_optgeneric(ti);
+            p_identtypelist(ti);
+        }
+        else {
+            if(!ti->lookahead) {
+                ERR("Syntax Error: Expected identifier");
+                synerr_rec(ti);
+            }
+        }
+    }
+}
+
+void p_optgeneric(tokiter_s *ti)
+{
+    tok_s *t = tok(ti);
+    
+    if(t->type == TOKTYPE_RELOP && t->att == TOKATT_L) {
+        nexttok(ti);
+        p_identtype(ti);
+        t = tok(ti);
+        if(t->type == TOKTYPE_RELOP && t->att == TOKATT_G) {
+            nexttok(ti);
+        }
+        else if(t->type == TOKTYPE_SHIFT && t->att == TOKATT_RSHIFT) {
+            t->type = TOKTYPE_RELOP;
+            t->att = TOKATT_G;
+        }
+        else {
+            if(!ti->lookahead) {
+                ERR("Syntax Error: Expected >");
+                synerr_rec(ti);
+            }
+        }
+    }
+}
+
 void p_inh(tokiter_s *ti, node_s *root)
 {
     node_s *op, *ident;
@@ -2352,7 +2466,7 @@ void p_inh(tokiter_s *ti, node_s *root)
             ident->att = TOKATT_DEFAULT;
             ident->tok = t;
             addchild(root, op);
-            addchild(root, ident);
+            addchild(op, ident);
         }
         else {
             ERR("Syntax Error: Expected identifier");
@@ -2361,10 +2475,11 @@ void p_inh(tokiter_s *ti, node_s *root)
     }
 }
 
-void p_declist(tokiter_s *ti, node_s *root)
+void p_declist(tokiter_s *ti, node_s *root, primtype_s *ptype)
 {
     int sign;
-    tok_s *t = tok(ti);
+    prop_s *prop;
+    tok_s *t = tok(ti), *idtok;
     node_s *dec, *st, *dc = NULL, *opt, *stmt, *op;
     
     switch(t->type) {
@@ -2373,12 +2488,19 @@ void p_declist(tokiter_s *ti, node_s *root)
         case TOKTYPE_CLASS:
         case TOKTYPE_ENUM:
         case TOKTYPE_STRUCTTYPE:
+            idtok = peeknexttok(ti);
             dec = p_dec(ti);
             addchild(root, dec);
             t = tok(ti);
             if(t->type == TOKTYPE_SEMICOLON)
-                t = nexttok(ti);
-            p_declist(ti, root);
+                nexttok(ti);
+            
+            if(dec->type == TOKTYPE_LET || dec->type == TOKTYPE_VAR) {
+                prop = propinit(idtok);
+                
+            }
+            
+            p_declist(ti, root, ptype);
             break;
         case TOKTYPE_OPENBRACE:
             t = nexttok(ti);
@@ -2458,7 +2580,7 @@ void p_declist(tokiter_s *ti, node_s *root)
                 synerr_rec(ti);
             }
             addchild(root, dec);
-            p_declist(ti, root);
+            p_declist(ti, root, ptype);
             break;
         case TOKTYPE_ADDOP:
             sign = p_sign(ti);
@@ -2473,7 +2595,7 @@ void p_declist(tokiter_s *ti, node_s *root)
             t = tok(ti);
             if(t->type == TOKTYPE_SEMICOLON)
                 t = nexttok(ti);
-            p_declist(ti, root);
+            p_declist(ti, root, ptype);
             break;
         case TOKTYPE_COMPLEMENT:
             dc = MAKENODE();
@@ -2533,7 +2655,7 @@ void p_declist(tokiter_s *ti, node_s *root)
                 ERR("Error: Identifier must be a constructor or destructor: _ or ~_");
                 synerr_rec(ti);
             }
-            p_declist(ti, root);
+            p_declist(ti, root, ptype);
             break;
         default:
             //epsilon production
@@ -2874,8 +2996,9 @@ bool addident(rec_s *table[], char *key, bool isconst)
     n = alloc(sizeof *n);
     n->key = key;
     n->next = NULL;
-    n->val = NULL;
-    n->isconst = isconst;
+    n->ident.isconst = isconst;
+    n->ident.expr = NULL;
+    n->ident.type = NULL;
     *ptr = n;
     return false;
 }
@@ -2888,7 +3011,7 @@ void bindtype(scope_s *child, char *key, type_s *type)
     while(child) {
         for(i = child->types[index]; i; i = i->next) {
             if(!strcmp(i->key, key)) {
-                i->type = type;
+                i->ident.type = type;
                 return;
             }
         }
@@ -2904,7 +3027,7 @@ bool bindexpr(scope_s *child, char *key, node_s *val)
     while(child) {
         for(i = child->types[index]; i; i = i->next) {
             if(!strcmp(i->key, key)) {
-                i->val= val;
+                i->ident.expr= val;
                 return true;
             }
         }
@@ -2913,7 +3036,7 @@ bool bindexpr(scope_s *child, char *key, node_s *val)
     return false;
 }
 
-bool addtype(scope_s *child, char *key, node_s *type)
+bool addtype(scope_s *child, char *key, primtype_s *ptype)
 {
     rec_s **table = child->types, *i;
     unsigned index = pjwhash(key);
@@ -2936,7 +3059,7 @@ node_s *tablelookup(rec_s *table[], char *key)
     
     for(i = table[index]; i; i = i->next) {
         if(!strcmp(i->key, key)) {
-            return i->type;
+            return i->ident.expr;
         }
     }
     return NULL;
@@ -2953,11 +3076,6 @@ node_s *identlookup(scope_s *child, char *key)
         child = child->parent;
     }
     return NULL;
-}
-
-bool addtype(scope_s *child, char *key, primtype_s *t)
-{
-    
 }
 
 node_s *typelookup(scope_s *child, char *key)
@@ -3047,6 +3165,28 @@ node_s *typecmp(node_s *t1, node_s *t2)
 {
     return NULL;
 }
+
+primtype_s *priminit(tok_s *t)
+{
+    primtype_s *prim;
+    
+    prim = allocz(sizeof *prim);
+    prim->str = t->lex;
+    prim->lineno = t->line;
+    return prim;
+}
+
+prop_s *propinit(tok_s *tok)
+{
+
+    prop_s *prop;
+    
+    prop = allocz(sizeof *prop);
+    prop->name = tok->lex;
+    prop->lineno = tok->line;
+    return prop;
+}
+
 
 void freetree(node_s *root)
 {
